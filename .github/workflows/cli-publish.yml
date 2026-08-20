@@ -77,7 +77,7 @@ jobs:
             node packages/cli/scripts/prepare-npm-oidc-publish.mjs
           fi
           node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('$PKG/package.json')); p.version='$VERSION'; fs.writeFileSync('$PKG/package.json', JSON.stringify(p,null,2)+'\n');"
-          cd "$PKG" && npm publish --provenance --access restricted
+          cd "$PKG" && npm publish --provenance --access public
 
   publish-main:
     needs: publish-platform
