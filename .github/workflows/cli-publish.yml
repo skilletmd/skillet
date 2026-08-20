@@ -98,6 +98,9 @@ jobs:
       - name: Bundle CLI for npm fallback
         run: pnpm --filter skilletmd bundle
 
+      - name: Verify publish artifacts
+        run: node packages/cli/scripts/verify-publish-artifacts.mjs
+
       - name: Prepare publish manifest
         run: node packages/cli/scripts/publish-prep.mjs
 
@@ -115,7 +118,13 @@ jobs:
             node packages/cli/scripts/prepare-npm-oidc-publish.mjs
           fi
           node -e "const fs=require('fs'); const p='packages/cli/package.json'; const j=JSON.parse(fs.readFileSync(p)); j.version='$VERSION'; fs.writeFileSync(p, JSON.stringify(j,null,2)+'\n');"
-          cd packages/cli && npm publish --provenance --access public
+          # --ignore-scripts: this job already ran build-cli-deps, bundle, verify
+          # and publish-prep as explicit steps above. prepublishOnly would run
+          # them a second time, and by then publish-prep has emptied
+          # `dependencies` — so pnpm sees packages/cli/package.json disagreeing
+          # with pnpm-lock.yaml and dies on ERR_PNPM_OUTDATED_LOCKFILE. The
+          # lifecycle hook stays in package.json to protect a manual publish.
+          cd packages/cli && npm publish --provenance --access public --ignore-scripts
 
       - name: Restore package.json
         if: always()
