@@ -67,6 +67,12 @@ jobs:
 
   release:
     needs: guard-version
+    # Gated on the `release` environment, which requires a human approval before
+    # the job starts. This job holds every signing secret — Apple, Azure, and the
+    # updater key that signs an update every installed Skillet will execute — so
+    # a stolen token or a pushed tag alone must not be enough to produce a signed
+    # release. Approve it in the run's UI.
+    environment: release
     permissions:
       contents: write # create the GitHub Release + upload assets
     strategy:
