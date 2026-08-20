@@ -155,7 +155,7 @@ describe('publish-step scan findings panel', () => {
   })
 
   it('a secret on a KEY=value line offers a one-click placeholder fix', async () => {
-    const md = VALID_MD + '\nAWS_ACCESS_KEY_ID=AKIA2RZ7K4Q3PN5T6XW9\n' // secret on line 10
+    const md = VALID_MD + '\nAWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n' // secret on line 10
     mockScanDraft.mockResolvedValue({
       status: 'quarantined',
       reason: 'secret',
@@ -179,7 +179,7 @@ describe('publish-step scan findings panel', () => {
 
     const ta = screen.getByLabelText('skill markdown') as HTMLTextAreaElement
     expect(ta.value).toContain('AWS_ACCESS_KEY_ID=YOUR_AWS_ACCESS_KEY_ID')
-    expect(ta.value).not.toContain('AKIA2RZ7K4Q3PN5T6XW9')
+    expect(ta.value).not.toContain('AKIAIOSFODNN7EXAMPLE')
   })
 
   it('a private flagged publish shows no note inputs (notes are public-only)', async () => {

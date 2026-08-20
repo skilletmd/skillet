@@ -118,7 +118,7 @@ export const MALICIOUS_CORPUS_CORE: MaliciousCorpusEntry[] = [
     expectCategories: ['secret'],
     expectStatus: 'quarantined',
     bundle: new Map([
-      ['scripts/setup.sh', b('AWS_ACCESS_KEY_ID=AKIA2RZ7K4Q3PN5T6XW9\n')],
+      ['scripts/setup.sh', b('AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n')],
     ]),
   },
   {
