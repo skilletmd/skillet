@@ -55,7 +55,7 @@ jobs:
       # including the unrelated mcp build — is not needed to build this app.)
       - run: pnpm install --frozen-lockfile
 
-      - uses: oven-sh/setup-bun@735343e4c3bd1c3800b96cfe6df97445ddb5406 # v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
       # tauri build bundles a standalone skillet sidecar (see prepare-skillet-sidecar.mjs)
       # then produces the platform installer.

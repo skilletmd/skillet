@@ -18,6 +18,7 @@
     "check:registry": "node scripts/check-registry-health.mjs",
     "check:web-csp": "node scripts/check-web-csp.mjs",
     "check:tracker-ids": "node scripts/check-no-tracker-ids.mjs",
+    "check:action-pins": "node scripts/check-action-pins.mjs",
     "check:line-endings": "node scripts/check-line-endings.mjs",
     "check:registry-api": "node scripts/gen-registry-api.mjs --check",
     "gen:registry-api": "node scripts/gen-registry-api.mjs",
