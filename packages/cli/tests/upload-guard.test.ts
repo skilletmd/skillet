@@ -12,7 +12,7 @@ const CLI = join(__dirname, "..", "dist", "cli.cjs");
 // Paired machine so the upload guards are reachable past the pairing gate. A
 // stored device token marks a linked machine; the registry is a refused port so
 // no publish/telemetry ever leaves the box.
-function pairedEnv(): { env: NodeJS.ProcessEnv; skilletDir: string } {
+function pairedEnv(): { env: NodeJS.ProcessEnv; skilletDir: string; home: string } {
   const skilletDir = mkdtempSync(join(tmpdir(), "skillet-upload-guard-"));
   const home = mkdtempSync(join(tmpdir(), "skillet-upload-guard-home-"));
   mkdirSync(skilletDir, { recursive: true });
@@ -30,17 +30,22 @@ function pairedEnv(): { env: NodeJS.ProcessEnv; skilletDir: string } {
       SKILLET_REGISTRY_URL: "http://127.0.0.1:1",
     },
     skilletDir,
+    home,
   };
 }
 
 /** Import a real local skill so the kit has one capturable (local, un-owned) entry. */
-function importLocalSkill(env: NodeJS.ProcessEnv): void {
+// cwd matters: `import` materializes through the project-scoped adapter, which
+// walks up for a .git/.agents marker. Run it outside a sandbox and the skill
+// lands in the REPO's .agents/skills — ambient state that later makes other
+// tests pass locally and fail on a clean CI checkout.
+function importLocalSkill(env: NodeJS.ProcessEnv, cwd: string): void {
   const skillDir = mkdtempSync(join(tmpdir(), "skillet-upload-guard-skill-"));
   writeFileSync(
     join(skillDir, "SKILL.md"),
     "---\nname: guard-demo\ndescription: test skill\n---\n\nBody.\n",
   );
-  const res = spawnSync(process.execPath, [CLI, "import", skillDir], { encoding: "utf8", env });
+  const res = spawnSync(process.execPath, [CLI, "import", skillDir], { encoding: "utf8", env, cwd });
   if (process.platform !== "win32") assert.equal(res.status, 0, res.stderr);
 }
 
@@ -74,8 +79,8 @@ test("upload with a positional name emits a structured error (--json)", () => {
 // The second defense: a no-`--skill` batch is a bulk action. Non-interactively
 // (no TTY) without `--all` it must refuse rather than silently publish all.
 test("bare upload without --skill/--all refuses in non-TTY mode (--json)", () => {
-  const { env } = pairedEnv();
-  importLocalSkill(env);
+  const { env, home } = pairedEnv();
+  importLocalSkill(env, home);
   const res = spawnSync(process.execPath, [CLI, "upload", "--json"], { encoding: "utf8", env });
   if (process.platform !== "win32") assert.notEqual(res.status, 0);
   const body = JSON.parse(res.stdout.trim()) as { ok: boolean; code?: string };

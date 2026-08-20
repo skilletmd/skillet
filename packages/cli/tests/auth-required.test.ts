@@ -102,7 +102,13 @@ test("unpaired import of a real local skill exits 3 with the shared message, kit
     join(skillDir, "SKILL.md"),
     "---\nname: demo-skill\ndescription: test skill\n---\n\nBody.\n",
   );
-  const res = spawnSync(process.execPath, [CLI, "import", skillDir], { encoding: "utf8", env });
+  // cwd inside the sandbox: `import` materializes through the project-scoped
+  // adapter, which would otherwise write into the repo's own .agents/skills.
+  const res = spawnSync(process.execPath, [CLI, "import", skillDir], {
+    encoding: "utf8",
+    env,
+    cwd: home,
+  });
   if (process.platform !== "win32") assert.equal(res.status, AUTH_REQUIRED_EXIT);
   assert.match(res.stderr, /Sign in and get a pair code at https:\/\/skillet\.md\/settings/);
   assert.match(res.stderr, /skillet connect <code>/);
@@ -218,7 +224,7 @@ test("import, add, and upload gate through the shared module before any work", (
 test("paired import of a local skill still works (regression)", () => {
   // Refused-connection registry so the fail-silent telemetry flush never
   // reaches the real registry with the fake device token.
-  const { env, skilletDir } = isolatedEnv({ SKILLET_REGISTRY_URL: "http://127.0.0.1:1" });
+  const { env, skilletDir, home } = isolatedEnv({ SKILLET_REGISTRY_URL: "http://127.0.0.1:1" });
   // Any stored device token marks a linked machine (post-U1 invariant).
   mkdirSync(skilletDir, { recursive: true });
   writeFileSync(
@@ -230,7 +236,15 @@ test("paired import of a local skill still works (regression)", () => {
     join(skillDir, "SKILL.md"),
     "---\nname: paired-demo\ndescription: test skill\n---\n\nBody.\n",
   );
-  const res = spawnSync(process.execPath, [CLI, "import", skillDir], { encoding: "utf8", env });
+  // This import SUCCEEDS, so it materializes — and the project-scoped adapter
+  // walks up for a .git/.agents marker. Without a sandbox cwd the skill lands
+  // in the repo's own .agents/skills, which is how the checkout accumulates the
+  // ambient state other tests then quietly depend on.
+  const res = spawnSync(process.execPath, [CLI, "import", skillDir], {
+    encoding: "utf8",
+    env,
+    cwd: home,
+  });
   if (process.platform !== "win32") assert.equal(res.status, 0);
   assert.match(res.stdout, /Imported "paired-demo"/);
   // The kit actually received the skill — the gate blocks only unpaired runs.
@@ -249,17 +263,30 @@ test("wizard with no credentials never calls /signup and exits cleanly with conn
   const port = (server.address() as AddressInfo).port;
 
   try {
-    const { env } = isolatedEnv({ SKILLET_REGISTRY_URL: `http://127.0.0.1:${port}` });
+    const { env, home } = isolatedEnv({ SKILLET_REGISTRY_URL: `http://127.0.0.1:${port}` });
+    // Give the sandbox a runtime of its own to detect. Without this the test
+    // asserts on ambient machine state: Cursor and Windsurf detect through
+    // absolute paths (/Applications/Cursor.app) that HOME isolation cannot
+    // reach, so this passed on any Mac with those editors installed and found
+    // nothing on a clean Linux runner. Codex detects HOME-relative, which the
+    // sandbox owns outright.
+    mkdirSync(join(home, ".codex"), { recursive: true });
     const result = await new Promise<{ status: number | null; stdout: string }>((resolve) => {
-      const child = spawn(process.execPath, [CLI], { env, stdio: ["ignore", "pipe", "pipe"] });
+      // Run in the sandbox too, so a project-scoped adapter cannot write into
+      // the checkout. A repo-root .agents/ left by an earlier run is the other
+      // half of the ambient state this test used to depend on.
+      const child = spawn(process.execPath, [CLI], {
+        env,
+        cwd: home,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
       let stdout = "";
       child.stdout.on("data", (d: Buffer) => (stdout += d.toString()));
       child.on("close", (status) => resolve({ status, stdout }));
     });
 
-    // Deliberate exit, not an error: cold start installs the router skill for
-    // the detected agents (this repo checkout is itself a detected runtime) and
-    // points at `skillet connect` for opt-in pairing.
+    // Deliberate exit, not an error: cold start installs the router skill into
+    // every detected agent and points at `skillet connect` for opt-in pairing.
     if (process.platform !== "win32") assert.equal(result.status, 0);
     assert.match(result.stdout, /Installed \/skillet/);
     assert.match(result.stdout, /skillet connect/);
