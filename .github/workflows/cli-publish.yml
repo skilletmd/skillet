@@ -59,9 +59,6 @@ jobs:
           export CLI_PUBLISH_VERSION="${CLI_PUBLISH_VERSION#cli-v}"
           node packages/cli/scripts/stage-platform-binaries.mjs --only ${{ matrix.target }}
 
-      - name: Prepare npm OIDC publish
-        run: node packages/cli/scripts/prepare-npm-oidc-publish.mjs
-
       - name: Publish platform package with provenance
         shell: bash
         env:
@@ -103,9 +100,6 @@ jobs:
 
       - name: Prepare publish manifest
         run: node packages/cli/scripts/publish-prep.mjs
-
-      - name: Prepare npm OIDC publish
-        run: node packages/cli/scripts/prepare-npm-oidc-publish.mjs
 
       - name: Publish skilletmd with provenance
         shell: bash
