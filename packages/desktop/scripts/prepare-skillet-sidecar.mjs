@@ -31,8 +31,14 @@ if (!spec) {
 
 console.log(`Building skillet sidecar for ${key} (${spec.triple})…`);
 
+// Defer to the CLI's own dependency list rather than restating it. This used to
+// build protocol and core only, and the bundle also needs mcp and every
+// adapters-* dist — esbuild fails with "Could not resolve
+// @skillet/adapters-claude-code" on a clean checkout, and never on a dev machine
+// where those dists are already warm. build-cli-deps.mjs is what `skilletmd
+// test` and build-native.mjs both use, so the sidecar cannot drift from it again.
 execSync(
-  'pnpm --filter @skillet/protocol build && pnpm --filter @skillet/core build && pnpm --filter skilletmd bundle',
+  `node "${join(repoRoot, 'packages', 'cli', 'scripts', 'build-cli-deps.mjs')}" && pnpm --filter skilletmd bundle`,
   { cwd: repoRoot, stdio: 'inherit' },
 );
 
