@@ -1,38 +1,45 @@
 #!/usr/bin/env node
 /**
- * Notarize + staple the signed macOS artifacts produced by `tauri build`.
+ * Notarize + staple the .dmg, and verify the whole macOS release is Gatekeeper-clean.
  *
- * `tauri build` already code-signs the .app, the sidecar, and the .dmg with the
- * Developer ID identity in APPLE_SIGNING_IDENTITY. Notarization is the separate
- * Apple-side step: submit the artifact, wait for the ticket, staple it so the
- * app launches without a network round-trip, then confirm Gatekeeper accepts it.
+ * Division of labour — `tauri build` does MORE than it looks like:
  *
- * Credentials — either a stored notarytool keychain profile (preferred; nothing
- * lands in a file or in shell history):
+ *   1. signs the .app + the sidecar (APPLE_SIGNING_IDENTITY)
+ *   2. notarizes and staples the .app          <- only if the APPLE_API_* vars are set
+ *   3. builds the styled .dmg around it        <- background image, icon positions
+ *   4. signs the .dmg, writes the updater .tar.gz + .sig
+ *
+ * Step 2 is silently skipped when the credentials are absent — the build prints
+ * "skipping app notarization" as a Warn and still exits 0, so an unnotarized
+ * release looks like a successful one. Set these before `tauri build`:
+ *
+ *   APPLE_SIGNING_IDENTITY   "Developer ID Application: … (TEAMID)"
+ *   APPLE_API_KEY            the 10-char App Store Connect Key ID
+ *   APPLE_API_ISSUER         the issuer UUID
+ *   APPLE_API_KEY_PATH       path to AuthKey_XXXXXXXXXX.p8
+ *
+ * What is left for this script is the .dmg: Tauri signs it but does not notarize
+ * it, and an un-notarized dmg trips Gatekeeper on download even though the app
+ * inside is clean.
+ *
+ * Do NOT rebuild the dmg here. An earlier version of this script staged the app
+ * and ran bare `hdiutil create`, which produced a working but unstyled dmg — the
+ * configured background and icon layout were silently dropped. Tauri's dmg is
+ * already built around the stapled app; it only needs the Apple round-trip.
+ *
+ * Credentials for this script: a stored notarytool keychain profile (preferred),
  *
  *   xcrun notarytool store-credentials skillet-notary \
  *     --key ~/private_keys/AuthKey_XXXXXXXXXX.p8 \
  *     --key-id XXXXXXXXXX --issuer <issuer-uuid>
- *
  *   node scripts/notarize-macos.mjs --profile skillet-notary
  *
- * ...or App Store Connect API key values straight from the environment, which is
- * what CI uses:
- *
- *   APPLE_API_KEY_PATH  path to AuthKey_XXXXXXXXXX.p8
- *   APPLE_API_KEY       the 10-char Key ID
- *   APPLE_API_ISSUER    the issuer UUID
- *
- * Staple the .app BEFORE the .dmg: stapling the app mutates its bundle, and a
- * dmg built around an unstapled app ships an unstapled app inside it. Tauri has
- * already built the dmg by the time this runs, so the dmg is re-created from the
- * stapled app rather than stapled in place.
+ * or the same APPLE_API_* vars the build uses, so CI can export one set.
  */
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tmpdir } from 'node:os';
 
 const desktopRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const bundleDir = join(desktopRoot, 'src-tauri', 'target', 'release', 'bundle');
@@ -42,11 +49,23 @@ const flag = (name) => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 ? args[i + 1] : undefined;
 };
-
 const profile = flag('profile');
-const identity = process.env['APPLE_SIGNING_IDENTITY'];
 
-/** notarytool auth flags, from a keychain profile or raw ASC key env vars. */
+function run(cmd, cmdArgs) {
+  return execFileSync(cmd, cmdArgs, { stdio: 'inherit' });
+}
+
+/**
+ * Combined stdout+stderr. `codesign --display` and `spctl --assess` write their
+ * whole report to STDERR, so capturing stdout alone returns an empty string and
+ * any check against it "fails" on a perfectly good bundle.
+ */
+function capture(cmd, cmdArgs) {
+  const r = spawnSync(cmd, cmdArgs, { encoding: 'utf8' });
+  return `${r.stdout ?? ''}${r.stderr ?? ''}`.trim();
+}
+
+/** notarytool auth flags, from a keychain profile or the ASC key env vars. */
 function notaryAuth() {
   if (profile) return ['--keychain-profile', profile];
   const keyPath = process.env['APPLE_API_KEY_PATH'];
@@ -61,87 +80,64 @@ function notaryAuth() {
   process.exit(1);
 }
 
-function run(cmd, cmdArgs, opts = {}) {
-  return execFileSync(cmd, cmdArgs, { stdio: 'inherit', ...opts });
-}
-function capture(cmd, cmdArgs) {
-  return execFileSync(cmd, cmdArgs, { encoding: 'utf8' }).trim();
-}
-
-/** The single .app under bundle/macos — bail loudly on zero or many. */
-function findApp() {
-  const dir = join(bundleDir, 'macos');
+/** The single artifact with `ext` under bundle/<sub> — bail loudly on zero or many. */
+function findOne(sub, ext) {
+  const dir = join(bundleDir, sub);
   if (!existsSync(dir)) {
-    console.error(`No macOS bundle at ${dir}. Run \`pnpm exec tauri build\` first.`);
+    console.error(`No ${dir}. Run \`pnpm exec tauri build\` first.`);
     process.exit(1);
   }
-  const apps = readdirSync(dir).filter((f) => f.endsWith('.app'));
-  if (apps.length !== 1) {
-    console.error(`Expected exactly one .app in ${dir}, found ${apps.length}: ${apps.join(', ')}`);
+  const hits = readdirSync(dir).filter((f) => f.endsWith(ext));
+  if (hits.length !== 1) {
+    console.error(`Expected exactly one ${ext} in ${dir}, found ${hits.length}: ${hits.join(', ')}`);
     process.exit(1);
   }
-  return join(dir, apps[0]);
+  return join(dir, hits[0]);
 }
 
 const auth = notaryAuth();
-const appPath = findApp();
-const appName = appPath.split('/').pop();
+const appPath = findOne('macos', '.app');
+const dmgPath = findOne('dmg', '.dmg');
 
-// --- 0. The app must already be Developer ID signed with a hardened runtime.
-// Notarization rejects an ad-hoc or unsigned bundle, and the rejection log is
-// far less legible than this check.
-console.log(`Verifying signature on ${appName}…`);
+// --- 1. The app must already be signed, hardened, AND stapled by the build.
+// If the build ran without APPLE_API_*, it is signed but not notarized, and
+// notarizing the dmg around it would ship a half-clean release.
+console.log(`Checking ${appPath.split('/').pop()}…`);
 run('codesign', ['--verify', '--strict', '--verbose=2', appPath]);
-const flags = capture('codesign', ['--display', '--verbose=2', appPath]);
-if (!/flags=.*runtime/.test(flags)) {
+
+const sig = capture('codesign', ['--display', '--verbose=2', appPath]);
+if (!/flags=.*runtime/.test(sig)) {
   console.error('App is not signed with the hardened runtime; notarization will be rejected.');
-  console.error(flags);
+  console.error(sig);
   process.exit(1);
 }
 
-// --- 1. Notarize the .app. Submitted as a zip because notarytool takes
-// zip/dmg/pkg only, never a bare bundle directory.
-const staging = mkdtempSync(join(tmpdir(), 'skillet-notarize-'));
-const zipPath = join(staging, 'app.zip');
-console.log('Zipping app for submission…');
-run('ditto', ['-c', '-k', '--keepParent', appPath, zipPath]);
+const stapled = spawnSync('xcrun', ['stapler', 'validate', appPath], { encoding: 'utf8' });
+if (stapled.status !== 0) {
+  console.error(
+    'App has no notarization ticket stapled.\n' +
+      'The build skipped notarization — re-run `tauri build` with APPLE_API_KEY, ' +
+      'APPLE_API_ISSUER, and APPLE_API_KEY_PATH set, then run this again.',
+  );
+  process.exit(1);
+}
+console.log('App is signed, hardened, and stapled ✓');
 
-console.log('Submitting to Apple (this usually takes a few minutes)…');
-run('xcrun', ['notarytool', 'submit', zipPath, ...auth, '--wait', '--timeout', '30m']);
-
-// --- 2. Staple the app, so first launch works offline.
-console.log('Stapling ticket to the app…');
-run('xcrun', ['stapler', 'staple', appPath]);
-run('xcrun', ['stapler', 'validate', appPath]);
-
-// --- 3. Rebuild the dmg around the now-stapled app. Tauri's dmg was assembled
-// before the ticket existed, so shipping it would hand users an unstapled app.
-const dmgDir = join(bundleDir, 'dmg');
-const dmgs = existsSync(dmgDir) ? readdirSync(dmgDir).filter((f) => f.endsWith('.dmg')) : [];
-if (dmgs.length === 1) {
-  const dmgPath = join(dmgDir, dmgs[0]);
-  console.log(`Rebuilding ${dmgs[0]} around the stapled app…`);
-  const stage = join(staging, 'dmg-stage');
-  run('mkdir', ['-p', stage]);
-  run('cp', ['-R', appPath, stage]);
-  run('ln', ['-s', '/Applications', join(stage, 'Applications')]);
-  rmSync(dmgPath, { force: true });
-  run('hdiutil', ['create', '-volname', 'Skillet', '-srcfolder', stage, '-ov', '-format', 'UDZO', dmgPath]);
-  if (identity) {
-    run('codesign', ['--force', '--timestamp', '--sign', identity, dmgPath]);
-  }
-  console.log('Notarizing the dmg…');
+// --- 2. Notarize the dmg itself. Tauri signs it but never submits it.
+if (spawnSync('xcrun', ['stapler', 'validate', dmgPath]).status === 0) {
+  console.log('DMG already stapled, skipping submission.');
+} else {
+  console.log('Submitting the dmg to Apple (this usually takes a few minutes)…');
   run('xcrun', ['notarytool', 'submit', dmgPath, ...auth, '--wait', '--timeout', '30m']);
   run('xcrun', ['stapler', 'staple', dmgPath]);
   run('xcrun', ['stapler', 'validate', dmgPath]);
-} else if (dmgs.length > 1) {
-  console.warn(`Skipping dmg step: expected one .dmg, found ${dmgs.length}.`);
 }
 
-// --- 4. The real bar: a freshly downloaded copy must assess as accepted, or
-// first launch shows the "cannot be opened" warning.
-console.log('Gatekeeper assessment…');
+// --- 3. The real bar: both artifacts must assess as accepted, or first launch
+// shows the "cannot be opened" warning. spctl exits non-zero on rejection, so
+// these two calls are the assertion.
+console.log('\nGatekeeper assessment…');
 run('spctl', ['--assess', '--type', 'execute', '--verbose=4', appPath]);
+run('spctl', ['--assess', '--type', 'open', '--context', 'context:primary-signature', '--verbose=4', dmgPath]);
 
-rmSync(staging, { recursive: true, force: true });
-console.log(`\nNotarized and stapled: ${appPath}`);
+console.log(`\nNotarized and stapled:\n  ${appPath}\n  ${dmgPath}`);
