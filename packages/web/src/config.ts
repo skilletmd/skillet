@@ -13,13 +13,17 @@ export const SKILLET_DMG_URL = 'https://skillet.md/download/mac'
 // Download target for "↓ Download Skillet for Windows" (302 → latest NSIS .exe / MSI).
 export const SKILLET_WINDOWS_INSTALLER_URL = 'https://skillet.md/download/windows'
 
-// Fine-print labels under the Mac CTA.
-export const SKILLET_MIN_OS_LABEL = 'macOS 13 Ventura or later'
-export const SKILLET_APP_SIZE_LABEL = '~12 MB · Free'
+// Fine-print labels under the Mac CTA. Sizes are the real installer sizes on
+// the current release — re-measure them when the bundle changes rather than
+// estimating. The app carries a Bun-compiled sidecar, which is most of the
+// weight. Apple Silicon is stated because the build is aarch64-only: an Intel
+// Mac on Ventura satisfies the OS floor and still cannot run it.
+export const SKILLET_MIN_OS_LABEL = 'Apple Silicon · macOS 13 Ventura or later'
+export const SKILLET_APP_SIZE_LABEL = '~28 MB · Free'
 
-// Fine-print labels under the Windows CTA.
-export const SKILLET_WINDOWS_MIN_OS_LABEL = 'Windows 10 or later'
-export const SKILLET_WINDOWS_APP_SIZE_LABEL = '~15 MB · Free'
+// Fine-print labels under the Windows CTA. x64 only; there is no ARM64 build.
+export const SKILLET_WINDOWS_MIN_OS_LABEL = '64-bit Windows 10 or later'
+export const SKILLET_WINDOWS_APP_SIZE_LABEL = '~33 MB · Free'
 
 // Sparkle auto-update feed. Shares the skillet.md/install origin so download and
 // update resolve on one domain. Empty = hide the "It updates itself." line and
