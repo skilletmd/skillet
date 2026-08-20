@@ -55,6 +55,7 @@ jobs:
       # that never existed, so npm skipped all five silently (optional deps are
       # non-fatal) and no user ever got a native binary.
       - name: Stamp version from the tag
+        shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#cli-v}"
           echo "Publishing version $VERSION"
@@ -85,6 +86,15 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#cli-v}"
           PKG="packages/cli-${{ matrix.target }}"
+          NAME=$(node -p "require('./$PKG/package.json').name")
+          # Idempotent: one platform failing used to strand the other four at a
+          # version that can never be completed, because npm refuses to
+          # republish. Skipping what is already there makes a re-run finish the
+          # job instead of forcing a version bump.
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "$NAME@$VERSION already published — skipping"
+            exit 0
+          fi
           if [ -n "${NPM_TOKEN:-}" ]; then
             echo "Publishing with NPM_TOKEN"
             export NODE_AUTH_TOKEN="$NPM_TOKEN"
@@ -117,6 +127,7 @@ jobs:
       # that never existed, so npm skipped all five silently (optional deps are
       # non-fatal) and no user ever got a native binary.
       - name: Stamp version from the tag
+        shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#cli-v}"
           echo "Publishing version $VERSION"
