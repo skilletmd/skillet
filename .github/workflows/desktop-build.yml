@@ -65,9 +65,12 @@ jobs:
       # material is optional and a fork with no secrets still builds. These are
       # test artifacts, not a release: no one auto-updates from them, so turn
       # updater artifacts off here. release.yml keeps them and supplies the key.
+      # Passed as a FILE, not inline JSON: single quotes do not quote on Windows,
+      # so an inline --config '{"bundle":...}' reaches tauri with its double
+      # quotes stripped and fails to parse. A path is shell-agnostic.
       - run: >-
           pnpm --filter @skillet/desktop exec tauri build
-          --config '{"bundle":{"createUpdaterArtifacts":false}}'
+          --config src-tauri/tauri.ci-unsigned.conf.json
 
       - name: Upload unsigned macOS app (notarize input)
         if: matrix.name == 'macos'
