@@ -71,10 +71,9 @@ jobs:
       # then produces the platform installer.
       # createUpdaterArtifacts is on in tauri.conf.json and a pubkey is set, so
       # `tauri build` demands TAURI_SIGNING_PRIVATE_KEY to sign the update
-      # payload — which contradicts this workflow's whole premise that signing
-      # material is optional and a fork with no secrets still builds. These are
-      # test artifacts, not a release: no one auto-updates from them, so turn
-      # updater artifacts off here. release.yml keeps them and supplies the key.
+      # payload. This workflow produces test artifacts, not a release, and no one
+      # auto-updates from them — so updater artifacts are off here and the key
+      # never has to reach CI. release.yml is the signed release path.
       # Passed as a FILE, not inline JSON: single quotes do not quote on Windows,
       # so an inline --config '{"bundle":...}' reaches tauri with its double
       # quotes stripped and fails to parse. A path is shell-agnostic.
@@ -91,15 +90,6 @@ jobs:
           --config src-tauri/tauri.ci-unsigned.conf.json
           ${{ matrix.name == 'windows' && '--config src-tauri/tauri.windows-signing.conf.json' || '' }}
 
-      - name: Upload unsigned macOS app (notarize input)
-        if: matrix.name == 'macos'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: skillet-desktop-macos-unsigned
-          path: packages/desktop/src-tauri/target/release/bundle/macos/*.app
-          if-no-files-found: error
-          retention-days: 5
-
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: skillet-desktop-${{ matrix.name }}
@@ -108,41 +98,3 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  # Signing material is optional. Forks never receive secrets, a fresh clone has
-  # none configured, and no contributor should need an Apple Developer ID for CI
-  # to pass — so presence is probed here and the notarize job skips when it is
-  # absent. It has to be a job output because `secrets` is not available in a
-  # job-level `if`.
-  signing-available:
-    name: Check signing secrets
-    runs-on: ubuntu-latest
-    outputs:
-      ready: ${{ steps.probe.outputs.ready }}
-    steps:
-      - id: probe
-        env:
-          CERT: ${{ secrets.DEVELOPER_ID_CERT_P12_BASE64 }}
-          NOTARY_KEY: ${{ secrets.NOTARY_API_KEY_P8_BASE64 }}
-        run: |
-          if [ -n "$CERT" ] && [ -n "$NOTARY_KEY" ]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "No macOS signing secrets configured - skipping notarization." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-  notarize-macos:
-    name: macOS sign + notarize
-    needs: [build, signing-available]
-    if: github.ref == 'refs/heads/main' && needs.signing-available.outputs.ready == 'true'
-    uses: ./.github/workflows/macos-notarize.yml
-    with:
-      app-artifact: skillet-desktop-macos-unsigned
-      bundle-id: sh.skillet.desktop
-      dmg-name: Skillet.dmg
-    secrets:
-      DEVELOPER_ID_CERT_P12_BASE64: ${{ secrets.DEVELOPER_ID_CERT_P12_BASE64 }}
-      DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
-      NOTARY_API_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
-      NOTARY_API_ISSUER_ID: ${{ secrets.NOTARY_API_ISSUER_ID }}
-      NOTARY_API_KEY_P8_BASE64: ${{ secrets.NOTARY_API_KEY_P8_BASE64 }}
