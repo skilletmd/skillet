@@ -116,7 +116,6 @@ fn bundled_skillet() -> Option<PathBuf> {
     None
 }
 
-#[cfg(debug_assertions)]
 /// Directories to search for a helper binary: a few fixed POSIX install
 /// locations first, then everything on PATH.
 ///
@@ -159,6 +158,10 @@ fn find_in_dirs(dirs: &[PathBuf], names: &[String]) -> Option<PathBuf> {
     None
 }
 
+/// Dev-only: run the workspace `cli.cjs` through node instead of the packaged
+/// sidecar. Resolved against CARGO_MANIFEST_DIR, which does not exist in a
+/// shipped bundle, so this is compiled out of release builds entirely.
+#[cfg(debug_assertions)]
 fn dev_skillet_node_cli() -> Option<(String, Vec<String>)> {
     let cli_js = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../cli/dist/cli.cjs");
     if !cli_js.is_file() {

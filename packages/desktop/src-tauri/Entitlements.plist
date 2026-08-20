@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Hardened-runtime entitlements for the Developer ID build.
+
+	  The `skillet` sidecar is a Bun-compiled standalone binary, so it carries a
+	  JavaScriptCore JIT. Without allow-jit + allow-unsigned-executable-memory the
+	  hardened runtime kills it on first script compile and the tray goes silently
+	  empty (stdout is closed before commander ever writes) — the same failure mode
+	  as an unknown CLI command.
+
+	  disable-library-validation lets the app's own process load the Tauri
+	  webview's nested code paths signed under a different team when Apple ships a
+	  system WebKit update mid-cycle.
+
+	  Not sandboxed: Skillet writes agent skill folders all over $HOME by design,
+	  which App Sandbox cannot express. Developer ID distribution does not require it.
+	-->
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Skillet desktop (Tauri) \u2014 cross-platform menubar syncer",
+  "description": "Skillet desktop (Tauri) — cross-platform menubar syncer",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -11,7 +11,8 @@
     "test": "pnpm --filter \"@skillet/desktop^...\" build && vitest run",
     "tauri": "tauri",
     "build:local": "pnpm prepare-sidecar && tauri build --config src-tauri/tauri.local.conf.json",
-    "prepare-sidecar": "node scripts/prepare-skillet-sidecar.mjs"
+    "prepare-sidecar": "node scripts/prepare-skillet-sidecar.mjs",
+    "notarize:macos": "node scripts/notarize-macos.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
