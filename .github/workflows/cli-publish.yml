@@ -48,6 +48,25 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Stamp the version FIRST. Everything downstream reads it: the bundle
+      # bakes CLI_VERSION from here, and publish-prep pins the platform
+      # optionalDependencies to it. Stamping at publish time instead shipped
+      # skilletmd@0.1.36 with optionalDependencies pinned to 0.1.34 — a version
+      # that never existed, so npm skipped all five silently (optional deps are
+      # non-fatal) and no user ever got a native binary.
+      - name: Stamp version from the tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#cli-v}"
+          echo "Publishing version $VERSION"
+          node -e "
+            const fs = require('fs');
+            for (const p of ['packages/cli/package.json', ...fs.readdirSync('packages').filter(d => d.startsWith('cli-')).map(d => 'packages/' + d + '/package.json')]) {
+              const j = JSON.parse(fs.readFileSync(p));
+              j.version = '$VERSION';
+              fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n');
+            }
+          "
+
       - name: Build native binary
         run: pnpm --filter skilletmd run build-native -- --target ${{ matrix.target }}
 
@@ -73,7 +92,6 @@ jobs:
             unset NODE_AUTH_TOKEN
             node packages/cli/scripts/prepare-npm-oidc-publish.mjs
           fi
-          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('$PKG/package.json')); p.version='$VERSION'; fs.writeFileSync('$PKG/package.json', JSON.stringify(p,null,2)+'\n');"
           cd "$PKG" && npm publish --provenance --access public
 
   publish-main:
@@ -91,6 +109,25 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Stamp the version FIRST. Everything downstream reads it: the bundle
+      # bakes CLI_VERSION from here, and publish-prep pins the platform
+      # optionalDependencies to it. Stamping at publish time instead shipped
+      # skilletmd@0.1.36 with optionalDependencies pinned to 0.1.34 — a version
+      # that never existed, so npm skipped all five silently (optional deps are
+      # non-fatal) and no user ever got a native binary.
+      - name: Stamp version from the tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#cli-v}"
+          echo "Publishing version $VERSION"
+          node -e "
+            const fs = require('fs');
+            for (const p of ['packages/cli/package.json', ...fs.readdirSync('packages').filter(d => d.startsWith('cli-')).map(d => 'packages/' + d + '/package.json')]) {
+              const j = JSON.parse(fs.readFileSync(p));
+              j.version = '$VERSION';
+              fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n');
+            }
+          "
 
       - name: Build workspace dependencies
         run: node packages/cli/scripts/build-cli-deps.mjs
@@ -117,7 +154,6 @@ jobs:
             unset NODE_AUTH_TOKEN
             node packages/cli/scripts/prepare-npm-oidc-publish.mjs
           fi
-          node -e "const fs=require('fs'); const p='packages/cli/package.json'; const j=JSON.parse(fs.readFileSync(p)); j.version='$VERSION'; fs.writeFileSync(p, JSON.stringify(j,null,2)+'\n');"
           # --ignore-scripts: this job already ran build-cli-deps, bundle, verify
           # and publish-prep as explicit steps above. prepublishOnly would run
           # them a second time, and by then publish-prep has emptied
