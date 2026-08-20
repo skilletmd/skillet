@@ -57,6 +57,16 @@ jobs:
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
+      # Windows OS code-signing happens INSIDE tauri build, via the signCommand
+      # in tauri.windows-signing.conf.json, so the signer has to be on PATH
+      # first. Azure Trusted Signing needs no cert file: trusted-signing-cli
+      # reads the AZURE_* credentials from the environment.
+      - name: Install Azure signer
+        if: matrix.name == 'windows' && env.AZURE_TENANT_ID != ''
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        run: cargo install trusted-signing-cli --version 0.11.0 --locked
+
       # tauri build bundles a standalone skillet sidecar (see prepare-skillet-sidecar.mjs)
       # then produces the platform installer.
       # createUpdaterArtifacts is on in tauri.conf.json and a pubkey is set, so
@@ -68,9 +78,18 @@ jobs:
       # Passed as a FILE, not inline JSON: single quotes do not quote on Windows,
       # so an inline --config '{"bundle":...}' reaches tauri with its double
       # quotes stripped and fails to parse. A path is shell-agnostic.
-      - run: >-
+      #
+      # Windows additionally merges the Azure signing overlay, which signs the
+      # installer as it is bundled. Config files merge in order, so the unsigned
+      # updater setting stays and the signCommand is layered on top.
+      - env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        run: >-
           pnpm --filter @skillet/desktop exec tauri build
           --config src-tauri/tauri.ci-unsigned.conf.json
+          ${{ matrix.name == 'windows' && '--config src-tauri/tauri.windows-signing.conf.json' || '' }}
 
       - name: Upload unsigned macOS app (notarize input)
         if: matrix.name == 'macos'
