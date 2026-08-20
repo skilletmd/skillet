@@ -4,7 +4,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const dist = join(here, "..", "dist");
+// Optional dist override (argv[2]). The CLI's test files run in parallel and
+// several of them spawn dist/cli.cjs, so the tests that assert this script
+// FAILS on a damaged artifact verify a private copy instead of corrupting the
+// shared bundle out from under their siblings. No argument = the real dist,
+// which is what prepublishOnly uses.
+const dist = process.argv[2] ?? join(here, "..", "dist");
 const bundledSkill = join(dist, "bundled-skills", "skillet-route", "SKILL.md");
 const cliCjs = join(dist, "cli.cjs");
 

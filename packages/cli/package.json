@@ -39,7 +39,7 @@
     "bundle": "node scripts/bundle-cli.mjs",
     "build-native": "node scripts/build-native.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node scripts/build-cli-deps.mjs && node --import ./tests/scrub-env.mjs --import tsx/esm --test tests/*.test.ts",
+    "test": "node scripts/build-cli-deps.mjs && pnpm bundle && node --import ./tests/scrub-env.mjs --import tsx/esm --test tests/*.test.ts",
     "clean": "rm -rf dist",
     "prepublishOnly": "node scripts/build-cli-deps.mjs && pnpm bundle && node scripts/verify-publish-artifacts.mjs && node scripts/publish-prep.mjs",
     "postpublish": "node scripts/publish-restore.mjs"
