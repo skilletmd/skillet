@@ -1,0 +1,13 @@
+packages:
+  - "packages/*"
+  - "packages/adapters/*"
+allowBuilds:
+  "@prisma/client": true
+  "@prisma/engines": true
+  esbuild: true
+  prisma: true
+  sharp: true
+# Force patched floors for memo Criticals (pnpm 11: overrides live here, not package.json).
+overrides:
+  vitest: ">=3.2.6"
+  happy-dom: ">=20.8.9"

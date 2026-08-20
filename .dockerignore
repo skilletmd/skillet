@@ -1,0 +1,16 @@
+# Keep secrets out of the Docker build context.
+# The registry image builds from the repo root, so any committed-or-local
+# .env in the tree (e.g. packages/registry/.env) would otherwise be copied
+# into the build context via `COPY packages/registry/ ...`.
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+
+# Not needed in the build context (deps are installed in-image; history is irrelevant).
+.git
+**/node_modules
+
+# Local tooling / scratch that should never ship in an image.
+.claude

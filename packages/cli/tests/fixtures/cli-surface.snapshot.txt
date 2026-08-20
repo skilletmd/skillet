@@ -1,0 +1,785 @@
+Skillet test   Your skills, everywhere.
+
+Usage
+  skillet             first run: connect, then sync
+  skillet <command>   run any command below
+
+Getting started
+  init                  Install the /skillet router skill into your agents. No account needed
+  connect <code>        Link this machine with a pair code from skillet.md Settings
+  web [path]            Open skillet.md in your browser (e.g. /settings)
+
+Skills into your kit
+  add [source]          Add a skill or kit from the library, GitHub, or a path
+  search <keyword...>   Search the public skill library
+  list                  List skills grouped by kit
+
+Sync & share
+  sync                  Put your kit into every agent on this machine
+  mcp                   Serve your kit to MCP agents (Claude Desktop, Cursor, Claude Code)
+  upload                Upload local skills, private, to your account
+  export <ref>          Export a skill or kit as a .zip for anywhere Skillet cannot sync
+
+This machine
+  whoami                Who this machine is signed in as
+  logout                Sign out of this machine
+  usage                 Skill stats on this machine (local only)
+  activity              What Skillet records: view, export, delete, or change it
+  device                Your machines: which one this is, plus how to rename it
+  doctor                Auth, sync state, pending updates, and paths
+
+More commands   import · scan · pending · edits · trust · pin
+Details         skillet <command> --help
+
+# sync
+skillet sync   Put your kit into every agent on this machine
+
+Usage
+  skillet sync [options]
+
+Options
+  --cwd <dir>           Working directory for skillet.lock
+  --json                Emit a machine-readable result report
+  --dry-run             Preview sync targets and detected agents without writing anything
+  --allow-quarantined   Pre-approve quarantined versions in runs without a terminal
+  --check               Detect registry changes without writing to agents
+  --background          Mark this run as an automatic background sync. Agent folders that still need macOS folder access stay parked
+  --user-initiated      Mark this run as user-initiated. Skillet may read agent folders that require a macOS folder-access prompt, and remembers the grant
+  --token <token>       Bearer token (session, device, or env override)
+  -h, --help            display help for command
+
+
+# agents
+skillet agents   List the agents on this machine and where their skills live
+
+Usage
+  skillet agents [options]
+
+Options
+  --json                Emit a machine-readable list of detected agents
+  -h, --help            display help for command
+
+
+# usage
+skillet usage   Skill stats on this machine (local only)
+
+Usage
+  skillet usage [options]
+
+Options
+  --json                Emit a machine-readable usage list
+  -h, --help            display help for command
+
+
+# activity
+activity   What Skillet records: view, export, delete, or change it
+
+Usage
+  skillet activity <command> [options]
+
+Commands
+  status [options]          Show whether activity is recorded and what decides it
+  on                        Turn activity recording on
+  off                       Turn activity recording off (opt out)
+  choose [options] <where>  Answer the skill-stats question: `sync` stats to your account, or keep them `local`
+  clear                     Delete your recorded activity: local history and server events
+  export                    Export everything recorded about you (local route history + server activity)
+
+Options
+  -h, --help
+    display help for command
+
+Run `skillet activity <command> --help` for command-specific options.
+
+# activity status
+skillet activity status   Show whether activity is recorded and what decides it
+
+Usage
+  skillet activity status [options]
+
+Options
+  --json                Emit machine-readable state
+  -h, --help            display help for command
+
+
+# activity on
+skillet activity on   Turn activity recording on
+
+Usage
+  skillet activity on [options]
+
+Options
+  -h, --help            display help for command
+
+
+# activity off
+skillet activity off   Turn activity recording off (opt out)
+
+Usage
+  skillet activity off [options]
+
+Options
+  -h, --help            display help for command
+
+
+# activity choose
+skillet activity choose   Answer the skill-stats question: `sync` stats to your account, or keep them `local`
+
+Usage
+  skillet activity choose [options] <where>
+
+Options
+  --json                Emit machine-readable result
+  -h, --help            display help for command
+
+Arguments
+  where  
+
+
+# activity clear
+skillet activity clear   Delete your recorded activity: local history and server events
+
+Usage
+  skillet activity clear [options]
+
+Options
+  -h, --help            display help for command
+
+
+# activity export
+skillet activity export   Export everything recorded about you (local route history + server activity)
+
+Usage
+  skillet activity export [options]
+
+Options
+  -h, --help            display help for command
+
+
+# restore
+skillet restore   Restore skills a sync prune moved to trash. No args lists runs; pass a run id or `latest`.
+
+Usage
+  skillet restore [options] [run]
+
+Options
+  --json                Emit machine-readable output
+  -h, --help            display help for command
+
+Arguments
+  run  
+
+
+# edits
+edits   Skills you customized: your live edits, with author updates held
+
+Usage
+  skillet edits <command> [options]
+
+Commands
+  list [options]             List your customized skills and which have a held update
+  check [options]            Detect unreconciled local edits (read-only; for the desktop tray)
+  diff [options] <skill>     Show your version against the author's current one
+  take <skill>               Replace your edit with the author's version (backs yours up first)
+  restore <skill>            Replace your edit with the author's original (backs yours up first)
+  keep <skill>               Acknowledge a held update so it stops nudging until the next one
+  propose [options] <skill>  Propose your edit upstream to the skill's author
+
+Options
+  -h, --help
+    display help for command
+
+Run `skillet edits <command> --help` for command-specific options.
+
+# edits list
+skillet edits list   List your customized skills and which have a held update
+
+Usage
+  skillet edits list [options]
+
+Options
+  --json                Emit machine-readable output
+  -h, --help            display help for command
+
+
+# edits check
+skillet edits check   Detect unreconciled local edits (read-only; for the desktop tray)
+
+Usage
+  skillet edits check [options]
+
+Options
+  --json                Emit machine-readable output
+  --background          Mark this run as an automatic background check. Agent folders that still need macOS folder access stay parked
+  -h, --help            display help for command
+
+
+# edits diff
+skillet edits diff   Show your version against the author's current one
+
+Usage
+  skillet edits diff [options] <skill>
+
+Options
+  --json                Emit machine-readable output
+  -h, --help            display help for command
+
+Arguments
+  skill  
+
+
+# edits take
+skillet edits take   Replace your edit with the author's version (backs yours up first)
+
+Usage
+  skillet edits take [options] <skill>
+
+Options
+  -h, --help            display help for command
+
+Arguments
+  skill  
+
+
+# edits restore
+skillet edits restore   Replace your edit with the author's original (backs yours up first)
+
+Usage
+  skillet edits restore [options] <skill>
+
+Options
+  -h, --help            display help for command
+
+Arguments
+  skill  
+
+
+# edits keep
+skillet edits keep   Acknowledge a held update so it stops nudging until the next one
+
+Usage
+  skillet edits keep [options] <skill>
+
+Options
+  -h, --help            display help for command
+
+Arguments
+  skill  
+
+
+# edits propose
+skillet edits propose   Propose your edit upstream to the skill's author
+
+Usage
+  skillet edits propose [options] <skill>
+
+Options
+  --registry <url>      Registry base URL (overrides identity default)
+  --token <token>       Bearer token (overrides SKILLET_TOKEN env var)
+  --json                Emit machine-readable output (proposed/not_authorized/base_stale exit 0)
+  -h, --help            display help for command
+
+Arguments
+  skill  
+
+
+# sweep
+skillet sweep   Move a removed agent's skill folders to the trash (restorable)
+
+Usage
+  skillet sweep [options] <path>
+
+Options
+  --json                Emit machine-readable output
+  -h, --help            display help for command
+
+Arguments
+  path  
+
+
+# list
+skillet list   List skills grouped by kit
+
+Usage
+  skillet list [options]
+
+Options
+  --json                Emit the kit as JSON, including each skill's SKILL.md body (the desktop app's read contract)
+  -h, --help            display help for command
+
+
+# search
+skillet search   Search the public skill library
+
+Usage
+  skillet search [options] <keyword...>
+
+Options
+  --json                Emit machine-readable results
+  --source <slug>       Fixed source marker for router-driven calls
+  --limit <n>           Results per query (registry-clamped 1..25)
+  -h, --help            display help for command
+
+Arguments
+  keyword  One or more capability keywords (each is one library search)
+
+
+# init
+skillet init   Install the /skillet router skill into your agents. No account needed
+
+Usage
+  skillet init [options]
+
+Options
+  --print               Print the router skill instead of installing it (copy-paste fallback)
+  -h, --help            display help for command
+
+
+# scan
+skillet scan   Check your kit for unsafe skills
+
+Usage
+  skillet scan [options]
+
+Options
+  --json                Emit a machine-readable scan report
+  -h, --help            display help for command
+
+
+# doctor
+skillet doctor   Auth, sync state, pending updates, and paths
+
+Usage
+  skillet doctor [options]
+
+Options
+  --json                Emit machine-readable doctor report
+  -h, --help            display help for command
+
+
+# auth
+auth   Sign in and manage registry session
+
+Usage
+  skillet auth <command> [options]
+
+Commands
+  logout [options]  Sign out of this machine
+  help [command]    display help for command
+
+Options
+  -h, --help
+    display help for command
+
+Run `skillet auth <command> --help` for command-specific options.
+
+# auth logout
+skillet auth logout   Sign out of this machine
+
+Usage
+  skillet auth logout [options]
+
+Options
+  --registry <url>      Registry base URL
+  -h, --help            display help for command
+
+
+# whoami
+skillet whoami   Who this machine is signed in as
+
+Usage
+  skillet whoami [options]
+
+Options
+  --json                Emit machine-readable identity JSON
+  -h, --help            display help for command
+
+
+# device
+device   Your machines: which one this is, plus how to rename it
+
+Usage
+  skillet device <command> [options]
+
+Commands
+  list [options]            List the machines on your account
+  rename [options] <label>  Rename this machine
+
+Options
+  -h, --help
+    display help for command
+
+Run `skillet device <command> --help` for command-specific options.
+
+# device list
+skillet device list   List the machines on your account
+
+Usage
+  skillet device list [options]
+
+Options
+  --registry <url>      Registry base URL
+  --token <token>       Session token (defaults to $SKILLET_TOKEN)
+  --json                Emit machine-readable JSON
+  -h, --help            display help for command
+
+
+# device rename
+skillet device rename   Rename this machine
+
+Usage
+  skillet device rename [options] <label>
+
+Options
+  --registry <url>      Registry base URL
+  --token <token>       Registry token (defaults to this machine's credentials)
+  --json                Emit machine-readable JSON
+  -h, --help            display help for command
+
+Arguments
+  label  
+
+
+# logout
+skillet logout   Sign out of this machine
+
+Usage
+  skillet logout [options]
+
+Options
+  --registry <url>      Registry base URL
+  --forget              Also erase this machine's local credentials
+  -h, --help            display help for command
+
+
+# connect
+skillet connect   Link this machine with a pair code from skillet.md Settings
+
+Usage
+  skillet connect [options] [code]
+
+Options
+  --registry <url>      Registry base URL
+  --label <label>       Label for this machine in settings
+  --client <kind>       Client surface: cli or desktop
+  --json                Emit machine-readable result
+  -h, --help            display help for command
+
+Arguments
+  code  
+
+
+# web
+skillet web   Open skillet.md in your browser (e.g. /settings)
+
+Usage
+  skillet web [options] [path]
+
+Options
+  -h, --help            display help for command
+
+Arguments
+  path  
+
+
+# add
+add   Add a skill or kit from the library, GitHub, or a path
+
+Usage
+  skillet add <command> [options]
+
+Commands
+  kit [options] <ref>  Subscribe to a kit and sync its skills
+
+Options
+  --registry <url>
+    Registry base URL
+  --ref <ref>
+    GitHub branch, tag, or commit
+  --skill <name>
+    Install only the named skill(s) from a repo; repeatable
+  --list
+    List discoverable skills without installing
+  -y, --yes
+    Skip prompts; use defaults
+  -g, --global
+    Install only to Universal ~/.agents/skills (skip other agents)
+  -a, --adapter <name>
+    Target agent(s) by name; repeatable
+  --json
+    Machine-readable output
+  --token <token>
+    Bearer token override
+  --pin
+    Pin registry skill to current version
+  --cwd <dir>
+    Working directory for skillet.lock
+  -h, --help
+    display help for command
+
+Run `skillet add <command> --help` for command-specific options.
+
+# add kit
+skillet add kit   Subscribe to a kit and sync its skills
+
+Usage
+  skillet add kit [options] <ref>
+
+Options
+  --registry <url>      Registry base URL
+  --ref <ref>           GitHub branch, tag, or commit
+  --skill <name>        Install only the named skill(s) from a repo; repeatable
+  --list                List discoverable skills without installing
+  -y, --yes             Skip prompts; use defaults
+  -g, --global          Install only to Universal ~/.agents/skills (skip other agents)
+  -a, --adapter <name>  Target agent(s) by name; repeatable
+  --json                Machine-readable output
+  --token <token>       Bearer token override
+  --pin                 Pin registry skill to current version
+  --cwd <dir>           Working directory for skillet.lock
+  -h, --help            display help for command
+
+Arguments
+  ref  
+
+
+# import
+skillet import   Bring skills you already have (in your agents or a folder) into your kit
+
+Usage
+  skillet import [options] [source]
+
+Options
+  -y, --yes             Import every discovered skill without prompting
+  --ref <ref>           GitHub branch, tag, or commit to import from
+  --skill <name>        Import only the named skill(s) from a repo; repeatable. Skips the picker.
+  --all                 Import every skill found in the repo; skips the picker
+  --force               Overwrite an existing kit skill when the slug collides
+  --local               Import into your kit only; don't back up to your account
+  -h, --help            display help for command
+
+Arguments
+  source  
+
+
+# export
+skillet export   Export a skill or kit as a .zip for anywhere Skillet cannot sync
+
+Usage
+  skillet export [options] [ref]
+
+Options
+  --kit <name>          Export every skill in a kit as one archive
+  --stdout              Write the zip to stdout instead of a file
+  -h, --help            display help for command
+
+Arguments
+  ref  
+
+
+# upload
+skillet upload   Upload local skills, private, to your account
+
+Usage
+  skillet upload [options] [name]
+
+Options
+  --skill <slug>        Upload only the named skill(s); repeatable
+  --all                 Upload every un-published local skill (required for a no --skill batch)
+  --public              Publish publicly (requires confirmation; default is private)
+  --yes                 Skip the public-upload confirmation (required for --public without a terminal)
+  --json                Emit a machine-readable report (for the desktop app)
+  --registry <url>      Registry base URL
+  --token <token>       Session token (defaults to $SKILLET_TOKEN)
+  -h, --help            display help for command
+
+Arguments
+  name  
+
+
+# mcp
+skillet mcp   Serve your kit to MCP agents (Claude Desktop, Cursor, Claude Code)
+
+Usage
+  skillet mcp [options]
+
+Options
+  --port <number>       Start HTTP transport on this port instead of stdio
+  --token <token>       Bearer token for stdio mode (defaults to this machine's paired device token)
+  -h, --help            display help for command
+
+
+
+Overview
+  Expose your local Skillet kit to MCP clients that run on this machine:
+  Claude Desktop, Cursor, Claude Code, or any client that can spawn a local
+  MCP server. The server is a read-only view over ~/.skillet/skills/, skills
+  you already synced and approved.
+
+Before you start
+  Run skillet sync (or sync from the desktop app) so ~/.skillet/skills/ has
+  content.
+
+Transports
+  stdio (default): local subprocess clients spawn skillet mcp and talk over
+    stdin/stdout. Use for Claude Desktop, Cursor, and Claude Code.
+  HTTP (--port <n>): loopback Streamable HTTP on 127.0.0.1 for local HTTP
+    clients. On start, a loopback bearer is saved to
+    ~/.skillet/mcp-loopback-token (mode 0600).
+
+Auth
+  stdio: uses this machine's paired device token automatically (device.json,
+    falling back to your session). Pass --token to override with a skillet_s_
+    (session), skillet_d_ (device), or skillet_k_ (kit key) bearer. An
+    unpaired machine with no token serves an empty skill list (fail-closed).
+  HTTP: every request must present the loopback bearer from
+    ~/.skillet/mcp-loopback-token or a registry-validated skillet bearer as
+    Authorization: Bearer …. Prefix-only tokens are rejected.
+
+Tools
+  list_skills()     Kit manifest (slug, name, description, version, author)
+  get_skill(slug)   SKILL.md body plus supporting-file resource URIs
+  search_skills(q)  Keyword search over name and description
+
+Resources
+  skillet://{owner}/{slug}/{path}   one resource per file in each skill bundle
+  (e.g. skillet://you/my-skill/SKILL.md). Owner _local for unowned imports.
+
+Examples
+
+  Claude Desktop / Cursor (claude_desktop_config.json or ~/.cursor/mcp.json):
+
+    {
+      "mcpServers": {
+        "skillet": {
+          "command": "skillet",
+          "args": ["mcp"]
+        }
+      }
+    }
+
+  HTTP loopback (local HTTP clients on this machine):
+
+    skillet mcp --port 8765
+    # Point the client at http://127.0.0.1:8765 with:
+    # Authorization: Bearer $(cat ~/.skillet/mcp-loopback-token)
+
+Web agents (ChatGPT, Claude.ai)
+  These run in the cloud and cannot reach a server on your machine. Connect
+  them with your hosted MCP link instead: on https://skillet.md, open Settings → Account,
+  turn on MCP, and paste the link into the client. (skillet export + bundle
+  upload still works as a static snapshot alternative.)
+
+More
+  https://skillet.md/docs/mcp
+  https://skillet.md/docs/runtimes/claude-ai
+  https://skillet.md/docs/runtimes/chatgpt
+  Run skillet export for a static .zip when a client cannot use MCP.
+
+# route
+route   The /skillet router: picks the right skill for a task
+
+Usage
+  skillet route <command> [options]
+
+Commands
+  manifest [options]            List kit skills for agent routing (metadata only, no SKILL.md bodies)
+  begin [options]               Record a /skillet invocation (metadata only)
+  hook [options]                Agent hook entrypoint for /skillet
+  record [options] <skill-ref>  Record a routed skill pick
+  help [command]                display help for command
+
+Options
+  -h, --help
+    display help for command
+
+Run `skillet route <command> --help` for command-specific options.
+
+# route manifest
+skillet route manifest   List kit skills for agent routing (metadata only, no SKILL.md bodies)
+
+Usage
+  skillet route manifest [options]
+
+Options
+  --json                Emit machine-readable manifest
+  -h, --help            display help for command
+
+
+# route begin
+skillet route begin   Record a /skillet invocation (metadata only)
+
+Usage
+  skillet route begin [options]
+
+Options
+  --runtime <runtime>   Agent name, e.g. cursor
+  --source <source>     Recorder source, e.g. cursor-hook
+  --surface <surface>   Invocation surface, e.g. user-prompt-submit
+  --json                Emit machine-readable result
+  -h, --help            display help for command
+
+
+# route hook
+skillet route hook   Agent hook entrypoint for /skillet
+
+Usage
+  skillet route hook [options]
+
+Options
+  --runtime <runtime>   Agent name, e.g. cursor, claude-code, codex
+  -h, --help            display help for command
+
+
+# route record
+skillet route record   Record a routed skill pick
+
+Usage
+  skillet route record [options] <skill-ref>
+
+Options
+  --runtime <runtime>   Agent name, e.g. cursor, claude-code, codex
+  --json                Emit machine-readable result
+  -h, --help            display help for command
+
+Arguments
+  skill-ref  
+
+
+# pending
+skillet pending   Skills waiting for your review, with their diffs
+
+Usage
+  skillet pending [options]
+
+Options
+  --json                Emit a machine-readable pending list
+  --background          Mark this run as an automatic background check. Agent folders that still need macOS folder access stay parked
+  -h, --help            display help for command
+
+
+# approve
+skillet approve   Approve a skill's waiting update and apply it
+
+Usage
+  skillet approve [options] <slug>
+
+Options
+  --version <number>    Exact version to approve (defaults to the current waiting version)
+  -h, --help            display help for command
+
+Arguments
+  slug  
+
+
+# reject
+skillet reject   Reject a skill's waiting update; a newer version asks again
+
+Usage
+  skillet reject [options] <slug>
+
+Options
+  -h, --help            display help for command
+
+Arguments
+  slug  

@@ -1,0 +1,336 @@
+{
+  "threatCategories": {
+    "destructive": {
+      "detectors": [
+        "chmod-recursive-world",
+        "dd-of-device",
+        "drop-table",
+        "find-delete-root",
+        "fork-bomb",
+        "mkfs",
+        "rebind-host",
+        "rm-rf-root",
+        "shred-device",
+        "sudo-rm",
+        "truncate-table"
+      ],
+      "whyTags": [
+        "destructive:chmod-recursive-world",
+        "destructive:dd-of-device",
+        "destructive:drop-table",
+        "destructive:find-delete-root",
+        "destructive:fork-bomb",
+        "destructive:mkfs",
+        "destructive:rebind-host",
+        "destructive:rm-rf-root",
+        "destructive:shred-device",
+        "destructive:sudo-rm",
+        "destructive:truncate-table"
+      ]
+    },
+    "excessive-agency": {
+      "detectors": [
+        "act-without-approval",
+        "auto-approve",
+        "execute-arbitrary-code",
+        "skip-confirmation",
+        "unbounded-loop",
+        "unrestricted-tool-use",
+        "wildcard-tool-grant"
+      ],
+      "whyTags": [
+        "excessive-agency:act-without-approval",
+        "excessive-agency:auto-approve",
+        "excessive-agency:execute-arbitrary-code",
+        "excessive-agency:skip-confirmation",
+        "excessive-agency:unbounded-loop",
+        "excessive-agency:unrestricted-tool-use",
+        "excessive-agency:wildcard-tool-grant"
+      ]
+    },
+    "exfil": {
+      "detectors": [
+        "assembled-cmd-pipe-shell",
+        "base64-pipe-shell",
+        "credential-file-upload",
+        "env-dump-post",
+        "env-grep-secret",
+        "env-iterate-all",
+        "env-secret-index",
+        "env-var-fanout",
+        "eval-fetch",
+        "fetch-pipe-shell",
+        "hex-pipe-shell",
+        "http-post-external",
+        "reverse-shell-nc",
+        "url-command-substitution-exfil"
+      ],
+      "whyTags": [
+        "exfil:assembled-cmd-pipe-shell",
+        "exfil:base64-pipe-shell",
+        "exfil:credential-file-upload",
+        "exfil:env-dump-post",
+        "exfil:env-grep-secret",
+        "exfil:env-iterate-all",
+        "exfil:env-secret-index",
+        "exfil:env-var-fanout",
+        "exfil:eval-fetch",
+        "exfil:fetch-pipe-shell",
+        "exfil:hex-pipe-shell",
+        "exfil:http-post-external",
+        "exfil:reverse-shell-nc",
+        "exfil:url-command-substitution-exfil"
+      ]
+    },
+    "injection": {
+      "detectors": [
+        "disregard-previous",
+        "do-not-follow-rules",
+        "fake-system-tag",
+        "forget-instructions",
+        "ignore-previous",
+        "jailbreak-dan",
+        "jailbreak-doc-prose",
+        "jailbreak-mode",
+        "new-instructions-are",
+        "override-rules",
+        "role-claim",
+        "set-aside-prior"
+      ],
+      "whyTags": [
+        "injection:disregard-previous",
+        "injection:do-not-follow-rules",
+        "injection:fake-system-tag",
+        "injection:forget-instructions",
+        "injection:ignore-previous",
+        "injection:jailbreak-dan",
+        "injection:jailbreak-doc-prose",
+        "injection:jailbreak-mode",
+        "injection:new-instructions-are",
+        "injection:override-rules",
+        "injection:role-claim",
+        "injection:set-aside-prior"
+      ]
+    },
+    "memory-poisoning": {
+      "detectors": [
+        "context-stuffing",
+        "evict-system-prompt",
+        "inject-false-memory",
+        "permanent-override",
+        "persist-into-memory",
+        "remember-across-sessions",
+        "wipe-memory"
+      ],
+      "whyTags": [
+        "memory-poisoning:context-stuffing",
+        "memory-poisoning:evict-system-prompt",
+        "memory-poisoning:inject-false-memory",
+        "memory-poisoning:permanent-override",
+        "memory-poisoning:persist-into-memory",
+        "memory-poisoning:remember-across-sessions",
+        "memory-poisoning:wipe-memory"
+      ]
+    },
+    "obfuscation": {
+      "detectors": [
+        "bidi-override",
+        "eval-of-string-payload",
+        "homoglyph-identifier",
+        "zero-width-char"
+      ],
+      "whyTags": [
+        "obfuscation:bidi-override",
+        "obfuscation:eval-of-string-payload",
+        "obfuscation:homoglyph-identifier",
+        "obfuscation:zero-width-char"
+      ]
+    },
+    "output-handling": {
+      "detectors": [
+        "exec-model-output",
+        "model-output-to-dom",
+        "model-output-to-sql",
+        "pipe-output-to-shell",
+        "unbounded-output"
+      ],
+      "whyTags": [
+        "output-handling:exec-model-output",
+        "output-handling:model-output-to-dom",
+        "output-handling:model-output-to-sql",
+        "output-handling:pipe-output-to-shell",
+        "output-handling:unbounded-output"
+      ]
+    },
+    "output-injection": {
+      "detectors": [
+        "promo-footer",
+        "promo-in-output-position"
+      ],
+      "whyTags": [
+        "output-injection:promo-footer",
+        "output-injection:promo-in-output-position"
+      ]
+    },
+    "privilege-escalation": {
+      "detectors": [
+        "browser-credential-store",
+        "cloud-credentials-path",
+        "demand-full-access",
+        "escalate-privileges",
+        "etc-shadow-passwd",
+        "setuid-chmod",
+        "ssh-private-key-path",
+        "sudo-interactive-shell"
+      ],
+      "whyTags": [
+        "privilege-escalation:browser-credential-store",
+        "privilege-escalation:cloud-credentials-path",
+        "privilege-escalation:demand-full-access",
+        "privilege-escalation:escalate-privileges",
+        "privilege-escalation:etc-shadow-passwd",
+        "privilege-escalation:setuid-chmod",
+        "privilege-escalation:ssh-private-key-path",
+        "privilege-escalation:sudo-interactive-shell"
+      ]
+    },
+    "prompt-leak": {
+      "detectors": [
+        "disclose-hidden-prompt",
+        "encode-system-prompt",
+        "exfil-system-prompt",
+        "output-text-above",
+        "persist-system-prompt",
+        "reveal-system-prompt"
+      ],
+      "whyTags": [
+        "prompt-leak:disclose-hidden-prompt",
+        "prompt-leak:encode-system-prompt",
+        "prompt-leak:exfil-system-prompt",
+        "prompt-leak:output-text-above",
+        "prompt-leak:persist-system-prompt",
+        "prompt-leak:reveal-system-prompt"
+      ]
+    },
+    "risky-call": {
+      "detectors": [
+        "latex-input-pipe",
+        "latex-lua-exec",
+        "latex-shell-escape"
+      ],
+      "whyTags": [
+        "risky-call:latex-input-pipe",
+        "risky-call:latex-lua-exec",
+        "risky-call:latex-shell-escape"
+      ]
+    },
+    "rogue-agent": {
+      "detectors": [
+        "cron-persistence",
+        "disable-safety-check",
+        "install-startup-task",
+        "modify-own-code",
+        "self-write-file",
+        "service-persistence",
+        "shellrc-persistence"
+      ],
+      "whyTags": [
+        "rogue-agent:cron-persistence",
+        "rogue-agent:disable-safety-check",
+        "rogue-agent:install-startup-task",
+        "rogue-agent:modify-own-code",
+        "rogue-agent:self-write-file",
+        "rogue-agent:service-persistence",
+        "rogue-agent:shellrc-persistence"
+      ]
+    },
+    "secret": {
+      "detectors": [
+        "anthropic-api-key",
+        "aws-access-key-live",
+        "aws-secret-access-key",
+        "bearer-token",
+        "generic-api-key",
+        "github-pat-classic",
+        "github-pat-fine-grained",
+        "google-api-key",
+        "openai-api-key",
+        "pem-private-key",
+        "slack-bot-token-live",
+        "stripe-secret-live"
+      ],
+      "whyTags": [
+        "secret:anthropic-api-key",
+        "secret:aws-access-key-live",
+        "secret:aws-secret-access-key",
+        "secret:bearer-token",
+        "secret:generic-api-key",
+        "secret:github-pat-classic",
+        "secret:github-pat-fine-grained",
+        "secret:google-api-key",
+        "secret:openai-api-key",
+        "secret:pem-private-key",
+        "secret:slack-bot-token-live",
+        "secret:stripe-secret-live"
+      ]
+    },
+    "supply-chain": {
+      "detectors": [
+        "dynamic-os-import",
+        "exec-decoded-payload",
+        "exec-fetched-alias",
+        "exec-fetched-body",
+        "fetch-file-then-run",
+        "fetch-pipe-interpreter",
+        "fetch-then-exec",
+        "unpinned-dependency"
+      ],
+      "whyTags": [
+        "supply-chain:dynamic-os-import",
+        "supply-chain:exec-decoded-payload",
+        "supply-chain:exec-fetched-alias",
+        "supply-chain:exec-fetched-body",
+        "supply-chain:fetch-file-then-run",
+        "supply-chain:fetch-pipe-interpreter",
+        "supply-chain:fetch-then-exec",
+        "supply-chain:unpinned-dependency"
+      ]
+    },
+    "tool-misuse": {
+      "detectors": [
+        "auth-disabled",
+        "chain-fetch-shell",
+        "force-skip-flag",
+        "git-destructive-flag",
+        "insecure-transport-flag",
+        "pipe-to-privileged",
+        "shell-true",
+        "tls-verify-disabled"
+      ],
+      "whyTags": [
+        "tool-misuse:auth-disabled",
+        "tool-misuse:chain-fetch-shell",
+        "tool-misuse:force-skip-flag",
+        "tool-misuse:git-destructive-flag",
+        "tool-misuse:insecure-transport-flag",
+        "tool-misuse:pipe-to-privileged",
+        "tool-misuse:shell-true",
+        "tool-misuse:tls-verify-disabled"
+      ]
+    }
+  },
+  "capabilities": [
+    "connects-mcp-server",
+    "deletes-files",
+    "executes-generated",
+    "injects-output-content",
+    "install-hooks",
+    "network",
+    "reads-secrets",
+    "runs-shell",
+    "writes-files"
+  ],
+  "partialDetectors": [
+    "risky-call"
+  ]
+}

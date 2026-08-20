@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Skillet syncs skills in your agent folders. Allow access if an agent folder lives here.</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Skillet syncs skills in your agent folders. Allow access if an agent folder lives here.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Skillet syncs skills in your agent folders. Allow access if an agent folder lives here.</string>
+</dict>
+</plist>

@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "declaration-property-value-allowed-list": {
+      "/^border(-[a-z]+)?-radius$/": [
+        "/^var\\(--radius-/",
+        "0",
+        "50%",
+        "inherit",
+        "unset"
+      ]
+    }
+  }
+}

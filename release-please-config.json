@@ -1,0 +1,56 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "node",
+  "include-component-in-tag": true,
+  "separate-pull-requests": true,
+  "pull-request-title-pattern": "chore: release ${component} ${version}",
+  "changelog-sections": [
+    { "type": "feat", "section": "Added" },
+    { "type": "fix", "section": "Fixed" },
+    { "type": "perf", "section": "Changed" },
+    { "type": "refactor", "section": "Changed" },
+    { "type": "polish", "section": "Changed" },
+    { "type": "refine", "section": "Changed" },
+    { "type": "revert", "section": "Removed" },
+    { "type": "docs", "section": "Miscellaneous", "hidden": true },
+    { "type": "test", "section": "Miscellaneous", "hidden": true },
+    { "type": "build", "section": "Miscellaneous", "hidden": true },
+    { "type": "ci", "section": "Miscellaneous", "hidden": true },
+    { "type": "chore", "section": "Miscellaneous", "hidden": true },
+    { "type": "style", "section": "Miscellaneous", "hidden": true }
+  ],
+  "packages": {
+    "packages/cli": { "component": "cli" },
+    "packages/cli-darwin-arm64": { "component": "cli-darwin-arm64" },
+    "packages/cli-darwin-x64": { "component": "cli-darwin-x64" },
+    "packages/cli-linux-arm64": { "component": "cli-linux-arm64" },
+    "packages/cli-linux-x64": { "component": "cli-linux-x64" },
+    "packages/cli-win32-x64": { "component": "cli-win32-x64" },
+    "packages/core": { "component": "core" },
+    "packages/protocol": { "component": "protocol" },
+    "packages/registry": { "component": "registry" },
+    "packages/mcp": { "component": "mcp" },
+    "packages/adapters/claude-code": { "component": "adapters-claude-code" },
+    "packages/adapters/codex": { "component": "adapters-codex" },
+    "packages/adapters/cursor": { "component": "adapters-cursor" },
+    "packages/adapters/devin": { "component": "adapters-devin" },
+    "packages/adapters/hermes": { "component": "adapters-hermes" },
+    "packages/adapters/openclaw": { "component": "adapters-openclaw" },
+    "packages/adapters/opencode": { "component": "adapters-opencode" },
+    "packages/adapters/windsurf": { "component": "adapters-windsurf" }
+  },
+  "plugins": [
+    {
+      "type": "linked-versions",
+      "groupName": "cli",
+      "components": [
+        "cli",
+        "cli-darwin-arm64",
+        "cli-darwin-x64",
+        "cli-linux-arm64",
+        "cli-linux-x64",
+        "cli-win32-x64"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+#!/usr/bin/env sh
+cd "$(dirname "$0")/.." || exit 1
+
+# GitHub Desktop / GUI git often skip shell rc files — load nvm so hooks use .nvmrc.
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  # shellcheck source=/dev/null
+  . "$NVM_DIR/nvm.sh"
+  nvm use --silent 2>/dev/null || nvm use
+fi
+
+# Git for Windows hooks (Cursor, GitHub Desktop) often run with a stripped PATH.
+if ! command -v node >/dev/null 2>&1; then
+  case "$(uname -s 2>/dev/null)" in
+    MINGW*|MSYS*|CYGWIN*)
+      for dir in "/c/Program Files/nodejs" "/c/Program Files (x86)/nodejs"; do
+        if [ -x "$dir/node.exe" ]; then
+          export PATH="$dir:$PATH"
+          break
+        fi
+      done
+      npm_bin="$HOME/AppData/Roaming/npm"
+      if [ -d "$npm_bin" ]; then
+        export PATH="$npm_bin:$PATH"
+      fi
+      ;;
+  esac
+fi
+
+node scripts/check-node-version.mjs || exit 1
+node scripts/check-line-endings.mjs || exit 1
+node scripts/check-no-tracker-ids.mjs || exit 1
+node scripts/check-machine-identity-leak.mjs || exit 1
+
+pnpm typecheck
+pnpm lint
+pnpm test

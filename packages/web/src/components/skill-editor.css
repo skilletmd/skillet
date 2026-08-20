@@ -1,0 +1,242 @@
+/* Single-surface skill editor styles — extracted from globals.css so this
+   editor-only block loads with the editor route instead of render-blocking
+   every page. Scoped .skill-editor-* / .skill-rail-scroll selectors, no
+   @apply; uses the global design tokens still defined in globals.css.
+   Imported by the editor shell (components/skill-files-editor.tsx) and the
+   /internal/design showcase. */
+
+/* Single-surface skill editor */
+.skill-editor-doc {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  width: 100%;
+  padding: 40px clamp(20px, 6%, 64px) 36px;
+}
+
+.skill-editor-doc-inner {
+  margin: 0 auto;
+  max-width: 720px;
+}
+
+/* Name + description match the read-only FrontmatterCard exactly: name in mono,
+   description in sans, same sizes/weights, so edit and view read the same. */
+.skill-editor-title {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  outline: none;
+}
+
+.skill-editor-subtitle {
+  display: block;
+  width: 100%;
+  margin-top: 0.375rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  outline: none;
+  /* A textarea so a long description wraps instead of clipping to one line. */
+  resize: none;
+  overflow: hidden;
+}
+
+/* Frontmatter header block: name + description + the remaining YAML fields,
+   closed with a divider before the body (mirrors the read-only FrontmatterCard). */
+.skill-editor-frontmatter {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 20px;
+}
+
+.skill-editor-fm-rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  margin-top: 14px;
+}
+
+.skill-editor-fm-rows dt {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.skill-editor-fm-rows dd {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink);
+  white-space: pre-line;
+}
+
+.skill-editor-title::placeholder,
+.skill-editor-subtitle::placeholder {
+  color: color-mix(in srgb, var(--ink-2) 48%, transparent);
+}
+
+.skill-editor-body {
+  margin-top: 28px;
+  min-height: 220px;
+  padding: 0;
+  /* Match the read-only view body (.skill-document .blog-markdown). */
+  font-size: 15px;
+  line-height: 1.62;
+}
+
+/* Without the name/description fields (non-entrypoint files) the body opens
+   the doc — the field-separator margin would just be dead space. */
+.skill-editor-body:first-child {
+  margin-top: 0;
+}
+
+.skill-editor-bubble {
+  z-index: var(--z-dropdown);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: 0 12px 34px rgba(17, 17, 14, 0.18);
+}
+
+.skill-editor-bubble-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink-2);
+  transition:
+    background-color 140ms var(--ease),
+    color 140ms var(--ease);
+}
+
+.skill-editor-bubble-button:hover {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* A flagged line, flashed when you jump to it from a security finding. */
+.skill-line-flash {
+  animation: skill-line-flash 1.8s ease-out;
+  scroll-margin-block: 40%;
+}
+@keyframes skill-line-flash {
+  0%,
+  35% {
+    background: color-mix(in srgb, var(--warning) 30%, transparent);
+    box-shadow: inset 3px 0 0 var(--warning);
+  }
+  100% {
+    background: transparent;
+    box-shadow: inset 3px 0 0 transparent;
+  }
+}
+
+.skill-rail-item {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 3.5px 12px 3.5px 16px;
+  text-align: left;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.4;
+  transition: color 140ms var(--ease);
+}
+
+.skill-rail-item:hover {
+  color: var(--ink);
+}
+
+.skill-rail-item[data-active='true'] {
+  color: var(--ink);
+  font-weight: 550;
+}
+
+.skill-rail-item[data-active='true']::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: var(--radius-xs);
+  background: var(--accent);
+}
+
+.skill-editor-bubble-button[data-active='true'] {
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  color: var(--ink);
+}
+
+.skill-editor-bubble-button[data-active='true']:hover {
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+}
+
+/* The scan-jump flash: a transient amber bar over the flagged line (matches
+   the finding dots), held briefly then faded. Positioned by use-reveal-line. */
+.skill-editor-reveal-flash {
+  position: absolute;
+  left: 0;
+  pointer-events: none;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--caution) 28%, transparent);
+  animation: skill-editor-reveal-fade 1.6s ease forwards;
+}
+
+@keyframes skill-editor-reveal-fade {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Thin, quiet scrollbars for the editor surfaces. */
+.skill-editor-doc,
+.skill-editor-textarea,
+.skill-rail-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink-2) 32%, transparent) transparent;
+}
+
+.skill-editor-doc::-webkit-scrollbar,
+.skill-editor-textarea::-webkit-scrollbar,
+.skill-rail-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.skill-editor-doc::-webkit-scrollbar-thumb,
+.skill-editor-textarea::-webkit-scrollbar-thumb,
+.skill-rail-scroll::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-pill);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  background-color: color-mix(in srgb, var(--ink-2) 26%, transparent);
+}
+
+.skill-editor-doc::-webkit-scrollbar-thumb:hover,
+.skill-editor-textarea::-webkit-scrollbar-thumb:hover,
+.skill-rail-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--ink-2) 44%, transparent);
+}

@@ -1,0 +1,70 @@
+name: docs-setup
+
+# Guards the documented onboarding path: a fresh checkout following the README must
+# migrate + seed + boot the registry and serve the seeded catalog. This is how the
+# broken seed:dev would have been caught. Scoped to setup-affecting changes to stay cheap.
+
+on:
+  pull_request:
+    paths:
+      - README.md
+      - package.json
+      - pnpm-lock.yaml
+      - "packages/registry/**"
+      - scripts/verify-setup.mjs
+      - docker-compose.mysql.yml
+      - .github/workflows/docs-setup.yml
+  push:
+    branches: [main]
+    paths:
+      - README.md
+      - "packages/registry/**"
+      - scripts/verify-setup.mjs
+      - .github/workflows/docs-setup.yml
+  workflow_dispatch:
+
+jobs:
+  verify-setup:
+    name: Verify documented setup
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: skillet
+          MYSQL_DATABASE: skillet_registry
+          MYSQL_USER: skillet
+          MYSQL_PASSWORD: skillet
+        ports:
+          - 3306:3306
+        # MySQL 8.x defaults to utf8mb4; wait until it answers before the steps run.
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pskillet"
+          --health-interval=3s
+          --health-timeout=3s
+          --health-retries=40
+
+    env:
+      DATABASE_URL: mysql://skillet:skillet@127.0.0.1:3306/skillet_registry
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4 # version comes from package.json "packageManager"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Build the registry and its workspace deps (protocol/core/mcp); the registry build
+      # also runs `prisma generate`, which the seed + boot need.
+      - name: Build registry + deps
+        run: pnpm --filter "@skillet/registry..." build
+
+      - name: Verify the documented setup flow
+        run: node scripts/verify-setup.mjs

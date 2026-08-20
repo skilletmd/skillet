@@ -1,0 +1,20 @@
+{
+  "name": "skillet",
+  "version": "0.1.0",
+  "description": "Summon anyone's public skills by handle, or route a task to the best skill in your own kit",
+  "author": {
+    "name": "Skillet",
+    "url": "https://skillet.md"
+  },
+  "homepage": "https://skillet.md",
+  "repository": "https://github.com/skilletmd/skillet",
+  "license": "Apache-2.0",
+  "keywords": [
+    "skills",
+    "skill-routing",
+    "registry",
+    "sync",
+    "discovery"
+  ],
+  "skills": ["./skillet-route"]
+}

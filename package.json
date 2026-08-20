@@ -1,0 +1,53 @@
+{
+  "name": "skillet-root",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.18.0",
+  "scripts": {
+    "dev": "node scripts/check-node-version.mjs && node scripts/free-dev-ports.mjs && pnpm --parallel --filter @skillet/registry --filter @skillet/web dev",
+    "dev:all": "node scripts/check-node-version.mjs && node scripts/free-dev-ports.mjs && pnpm --parallel --filter @skillet/registry --filter @skillet/web --filter @skillet/protocol --filter @skillet/desktop dev",
+    "dev:web": "pnpm --filter @skillet/web dev",
+    "dev:registry": "pnpm --filter @skillet/registry dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "verify:setup": "node scripts/verify-setup.mjs",
+    "lint": "eslint \"packages/*/src/**/*.{ts,tsx}\" \"packages/adapters/*/src/**/*.ts\"",
+    "format": "prettier --write \"packages/web/src/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"packages/web/src/**/*.{ts,tsx}\"",
+    "typecheck": "pnpm --filter=\"!@skillet/web\" -r build && pnpm -r typecheck",
+    "check:registry": "node scripts/check-registry-health.mjs",
+    "check:web-csp": "node scripts/check-web-csp.mjs",
+    "check:tracker-ids": "node scripts/check-no-tracker-ids.mjs",
+    "check:line-endings": "node scripts/check-line-endings.mjs",
+    "check:registry-api": "node scripts/gen-registry-api.mjs --check",
+    "gen:registry-api": "node scripts/gen-registry-api.mjs",
+    "pm2:start": "pnpm exec pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pnpm exec pm2 stop ecosystem.config.cjs",
+    "pm2:restart": "pnpm exec pm2 restart ecosystem.config.cjs",
+    "pm2:delete": "pnpm exec pm2 delete ecosystem.config.cjs",
+    "pm2:logs": "pnpm exec pm2 logs",
+    "pm2:logs:web": "pnpm exec pm2 logs web web-1 web-2",
+    "pm2:logs:registry": "pnpm exec pm2 logs registry",
+    "pm2:status": "pnpm exec pm2 status",
+    "evals": "pnpm --filter @skillet/protocol exec node --import tsx/esm --test test/eval.test.ts",
+    "clean": "pnpm -r clean",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "eslint-plugin-unicorn": "^64.0.0",
+    "husky": "^9.0.0",
+    "pm2": "^6.0.14",
+    "prettier": "^3.8.4",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "license": "Apache-2.0"
+}

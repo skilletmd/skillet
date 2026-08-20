@@ -1,0 +1,21 @@
+{
+  "name": "@skillet/core-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cross-package end-to-end suites exercising core against a live registry",
+  "type": "module",
+  "scripts": {
+    "test:e2e": "pnpm --filter @skillet/registry --filter @skillet/core build && node --import tsx/esm --test --test-concurrency=1 tests/e2e/device-enrollment-loop.test.ts && node --import tsx/esm --test --test-concurrency=1 tests/e2e/session-upload-loop.test.ts && node --import tsx/esm --test --test-concurrency=1 tests/e2e/share-loop.test.ts && node --import tsx/esm --test --test-concurrency=1 tests/e2e/team-share-loop.test.ts",
+    "test:mysql": "node scripts/test-mysql.mjs"
+  },
+  "dependencies": {
+    "@skillet/core": "workspace:*",
+    "@skillet/protocol": "workspace:*",
+    "@skillet/registry": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.11.0"
+  },
+  "license": "Apache-2.0"
+}

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.DS_Store
+src-tauri/target/
+src-tauri/gen/
+# runtime-materialized skills (dev `skillet sync` writes these into the cwd)
+.windsurf/
+.cursor/
+.claude/
+.codex/
+skillet.lock
+# local lockfile is redundant — desktop is a workspace package
+pnpm-lock.yaml

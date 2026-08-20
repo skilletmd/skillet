@@ -1,0 +1,20 @@
+{
+  "packages/cli": "0.1.34",
+  "packages/cli-darwin-arm64": "0.1.34",
+  "packages/cli-darwin-x64": "0.1.34",
+  "packages/cli-linux-arm64": "0.1.34",
+  "packages/cli-linux-x64": "0.1.34",
+  "packages/cli-win32-x64": "0.1.34",
+  "packages/core": "1.0.0",
+  "packages/protocol": "1.0.0",
+  "packages/registry": "1.0.0",
+  "packages/mcp": "1.0.0",
+  "packages/adapters/claude-code": "1.0.0",
+  "packages/adapters/codex": "1.0.0",
+  "packages/adapters/cursor": "1.0.0",
+  "packages/adapters/devin": "1.0.0",
+  "packages/adapters/hermes": "1.0.0",
+  "packages/adapters/openclaw": "1.0.0",
+  "packages/adapters/opencode": "1.0.0",
+  "packages/adapters/windsurf": "1.0.0"
+}

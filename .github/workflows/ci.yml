@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Scans the checked-out tree for committed secrets. Pinned, redacted, and
+      # config-driven so example-file placeholders don't false-positive.
+      # NOTE: this scans the working tree only. The full git-history scan is a
+      # manual pre-publish gate — see CONTRIBUTING.md before flipping public.
+      - name: gitleaks
+        uses: docker://ghcr.io/gitleaks/gitleaks:v8.21.2
+        with:
+          args: >-
+            detect
+            --source=/github/workspace
+            --config=/github/workspace/.gitleaks.toml
+            --no-git
+            --redact
+            --no-banner
+            --verbose
+
+      # Fast, dependency-free guard: fail if any internal tracker ID or the
+      # trademark TODO is committed. Exemptions are documented in the script
+      # (docs/plans/**, pnpm-lock.yaml, the script).
+      - name: No internal tracker IDs
+        run: node scripts/check-no-tracker-ids.mjs
+
+      # The registry HTTP API doc is generated from source — fail if it drifted.
+      - name: Registry API doc is current
+        run: node scripts/gen-registry-api.mjs --check
+
+  ci:
+    name: Install → Build → Lint → Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Lint CSS (radius scale)
+        run: pnpm --filter @skillet/web lint:css
+
+  # Windows is a first-class desktop target, and the bugs it surfaces do not
+  # reproduce on Linux: POSIX-only PATH splitting, missing `.exe` suffixes, bare
+  # `.cmd` spawns, symlink and path-separator assumptions. Those compile clean
+  # and fail at runtime, so only running the suites here catches them.
+  #
+  # This job deliberately does NOT run the whole `pnpm test`. Two Windows
+  # blockers are environmental and would land it permanently red, which is worse
+  # than not having it:
+  #   1. Concurrent `prisma generate` races on query_engine-windows.dll.node
+  #      (EPERM). Needs `-r --workspace-concurrency=1` to serialise.
+  #   2. adapters/codex: on Windows `tmpdir()` lives inside the home dir, so
+  #      findProjectRoot walks up out of its fixture into the real ~/.codex.
+  # Until those are fixed, this runs the suites verified green on Windows plus
+  # the whole cross-platform toolchain. Widen it as the blockers are cleared.
+  ci-windows:
+    name: Windows (build, typecheck, desktop + CLI suites)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+      - uses: swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: packages/desktop/src-tauri
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Catches the POSIX-ism class in build scripts: `set -a && . ./.env`,
+      # bare `pnpm` spawns, and anything else cmd.exe cannot run.
+      - name: Build
+        run: pnpm build
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Desktop tests
+        run: pnpm --filter @skillet/desktop test
+
+      - name: CLI tests
+        run: pnpm --filter skilletmd test
+
+      # The Rust side: PATH resolution, `.exe` suffixes and the no-console-window
+      # spawn flags are all cfg'd per platform, so they are only really exercised
+      # on a Windows runner.
+      - name: Desktop Rust tests
+        run: cargo test --manifest-path packages/desktop/src-tauri/Cargo.toml --no-default-features

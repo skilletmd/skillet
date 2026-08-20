@@ -1,0 +1,955 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model alerts {
+  id           String @id
+  kind         String
+  user_id      String?
+  payload_json String @db.LongText
+  raised_at    Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  users        users?  @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([kind, user_id], map: "idx_alerts_kind_user")
+  @@index([raised_at], map: "idx_alerts_raised_at")
+}
+
+model author_delegations {
+  device_key_id      String @id
+  user_id            String
+  author_key_id      String
+  device_pub         String @db.LongText
+  scopes             String @db.Text
+  cert_json          String @db.LongText
+  cert_sig_alg       String
+  cert_sig_key_id    String
+  cert_sig_b64       String @db.LongText
+  label              String? @db.Text
+  issued_at          Int
+  expires_at         Int
+  revoked_at         Int?
+  revocation_sig_b64 String? @db.LongText
+  revocation_json    String? @db.LongText
+  created_at         Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  users              users   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([author_key_id], map: "idx_author_delegations_author_key")
+  @@index([user_id], map: "idx_author_delegations_user")
+}
+
+model author_keys {
+  id         String @id
+  user_id    String
+  key_id     String
+  public_key String @db.LongText
+  label      String  @default("unnamed") @db.VarChar(512)
+  created_at Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  revoked_at Int?
+  users      users   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, key_id], map: "uniq_author_keys_2")
+  @@index([user_id], map: "idx_author_keys_user_id")
+}
+
+model authors {
+  id                                                                     String                    @id
+  name                                                                   String @db.Text
+  avatar_url                                                             String? @db.Text
+  bio                                                                    String? @db.Text
+  profile_url                                                            String? @db.Text
+  created_at                                                             Int                        @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  is_mirror                                                              Int                        @default(0)
+  mirror_source_url                                                      String? @db.Text
+  mirror_claimed_at                                                      Int?
+  agents_public                                                          Int                        @default(1)
+  x_handle                                                               String?
+  source_owner_type                                                      String?
+  shown_agents                                                           String? @db.Text
+  kit_subscriptions                                                      kit_subscriptions[]
+  kit_versions                                                           kit_versions[]
+  kits                                                                   kits[]
+  skill_proposals_skill_proposals_decided_byToauthors                    skill_proposals[]          @relation("skill_proposals_decided_byToauthors")
+  skill_proposals_skill_proposals_proposer_author_idToauthors            skill_proposals[]          @relation("skill_proposals_proposer_author_idToauthors")
+  skill_version_provenance_skill_version_provenance_approved_byToauthors skill_version_provenance[] @relation("skill_version_provenance_approved_byToauthors")
+  skill_version_provenance_skill_version_provenance_proposed_byToauthors skill_version_provenance[] @relation("skill_version_provenance_proposed_byToauthors")
+  skill_versions                                                         skill_versions[]
+  skills                                                                 skills[]
+}
+
+model blobs {
+  hash                String               @id
+  bytes Bytes?
+  size                Int
+  created_at          Int                   @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  storage_loc         String                @default("inline")
+  proposal_files      proposal_files[]
+  skill_version_files skill_version_files[]
+}
+
+model capability_result_cache {
+  content_key        String
+  capability_version Int
+  capabilities_json  String @db.LongText
+  computed_at        Int    @default(dbgenerated("(UNIX_TIMESTAMP())"))
+
+  @@id([content_key, capability_version])
+  @@index([capability_version], map: "idx_capability_result_cache_version")
+}
+
+model connected_repos {
+  id              String @id
+  user_id         String
+  owner           String
+  repo            String
+  default_branch  String?
+  token_enc       String? @db.LongText
+  last_synced_sha String?
+  last_synced_at  Int?
+  status          String  @default("active")
+  created_at      Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  selected_dirs   String? @db.Text
+  as_kit          Int     @default(1)
+  publish_as      String?
+  users           users   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, owner, repo], map: "uniq_connected_repos_2")
+  @@index([user_id], map: "idx_connected_repos_user")
+}
+
+model device_kit_excludes {
+  device_id  String
+  source_key String
+  devices    devices @relation(fields: [device_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([device_id, source_key])
+}
+
+// Per-user opt-out of a team (org) kit's auto-sync. A row means the user has
+// muted that team kit: its skills drop from the sync manifest, the pending queue,
+// and the /approvals coverage set together. Standalone (no FK relations) — a
+// stale row after a user/kit delete is harmless.
+model muted_team_kits {
+  user_id  String
+  kit_id   String
+  muted_at Int    @default(dbgenerated("(UNIX_TIMESTAMP())"))
+
+  @@id([user_id, kit_id])
+  @@index([user_id], map: "idx_muted_team_kits_user_id")
+}
+
+model device_skill_edits {
+  device_id        String
+  user_id          String
+  skill_id         String
+  baseline_version String?
+  baseline_hash    String
+  edited_at        Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  users            users   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  devices          devices @relation(fields: [device_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([device_id, skill_id], map: "uniq_device_skill_edits_1")
+  @@index([user_id, skill_id], map: "idx_device_skill_edits_user")
+}
+
+model device_skill_materializations {
+  device_id   String
+  skill_slug  String
+  runtime     String
+  status      String
+  reported_at Int
+
+  @@id([device_id, skill_slug, runtime])
+  @@index([device_id, reported_at], map: "idx_dsm_device_reported")
+}
+
+model devices {
+  id                  String               @id
+  token_hash          String                @unique(map: "uniq_devices_2")
+  user_id             String
+  label               String? @db.Text
+  created_at          Int                   @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  last_seen_at        Int?
+  revoked_at          Int?
+  expires_at          Int?
+  detected_agents     String? @db.Text
+  agents_reported_at  Int?
+  client_kind         String?
+  client_platform     String?
+  machine_id          String?
+  client_kinds        String? @db.Text
+  device_kit_excludes device_kit_excludes[]
+  device_skill_edits  device_skill_edits[]
+  users               users                 @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([user_id, machine_id], map: "idx_devices_user_machine")
+  @@index([user_id], map: "idx_devices_user_id")
+}
+
+model email_login_codes {
+  id          String @id
+  email       String
+  code_hash   String
+  request_ip  String?
+  expires_at  Int
+  consumed_at Int?
+  attempts    Int     @default(0)
+  created_at  Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+
+  @@index([email, created_at], map: "idx_email_login_codes_email")
+}
+
+model events {
+  id        String @id
+  name      String
+  initiator String
+  user_id   String?
+  device_id String?
+  meta      String? @db.Text
+  ts        Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  users     users?  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, ts], map: "idx_events_user_ts")
+  @@index([name, ts], map: "idx_events_name_ts")
+}
+
+model follow_counts {
+  subject_kind String
+  subject_id   String
+  followers    Int    @default(0)
+  subscribers  Int    @default(0)
+
+  @@id([subject_kind, subject_id])
+}
+
+model follows {
+  follower_user_id String
+  subject_kind     String
+  subject_id       String
+  is_private       Int    @default(0)
+  created_at       Int    @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  users            users  @relation(fields: [follower_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([follower_user_id, subject_kind, subject_id])
+  @@index([subject_kind, subject_id], map: "idx_follows_subject")
+}
+
+model handle_aliases {
+  old_handle String @id
+  new_handle String
+  created_at Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+}
+
+model key_bind_attempts {
+  id           String @id
+  user_id      String
+  attempted_at Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  users        users   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([user_id, attempted_at], map: "idx_key_bind_attempts_user_time")
+}
+
+model key_bind_nonces {
+  id          String @id
+  user_id     String
+  nonce       String  @unique(map: "uniq_key_bind_nonces_2")
+  expires_at  Int
+  consumed_at Int?
+  users       users   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, expires_at], map: "idx_key_bind_nonces_user")
+}
+
+model kit_invites {
+  id          String   @id
+  kit_id      String
+  kind        String
+  email       String?
+  handle      String?
+  label       String? @db.Text
+  invited_by  String
+  expires_at  Int?
+  created_at  Int       @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  redeemed_at Int?
+  kit_key_id  String?
+  kit_keys    kit_keys? @relation(fields: [kit_key_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users       users     @relation(fields: [invited_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  kits        kits      @relation(fields: [kit_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([email], map: "idx_kit_invites_email")
+  @@index([handle], map: "idx_kit_invites_handle")
+}
+
+model kit_keys {
+  id          String       @id
+  kit_id      String
+  token_hash  String        @unique(map: "uniq_kit_keys_2")
+  label       String @db.Text
+  created_by  String
+  created_at  Int           @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  expires_at  Int?
+  revoked_at  Int?
+  kit_invites kit_invites[]
+  users       users         @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  kits        kits          @relation(fields: [kit_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([kit_id], map: "idx_kit_keys_kit_id")
+}
+
+model kit_members {
+  kit_id                              String
+  user_id                             String
+  invited_by                          String?
+  invited_at                          Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  accepted_at                         Int?
+  users_kit_members_invited_byTousers users?  @relation("kit_members_invited_byTousers", fields: [invited_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_kit_members_user_idTousers    users   @relation("kit_members_user_idTousers", fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  kits                                kits    @relation(fields: [kit_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([kit_id, user_id])
+  @@index([user_id], map: "idx_kit_members_user_id")
+}
+
+model kit_skills {
+  kit_id         String
+  skill_id       String
+  pinned_hash    String?
+  added_at       Int             @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  skill_versions skill_versions? @relation(fields: [skill_id, pinned_hash], references: [skill_id, hash], onDelete: NoAction, onUpdate: NoAction)
+  skills         skills          @relation(fields: [skill_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  kits           kits            @relation(fields: [kit_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([kit_id, skill_id])
+}
+
+model kit_slug_aliases {
+  owner_id   String
+  slug       String
+  kit_id     String
+  created_at Int    @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  kits       kits   @relation(fields: [kit_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([owner_id, slug])
+  @@index([kit_id], map: "idx_kit_slug_aliases_kit")
+}
+
+model kit_subscriptions {
+  id         String  @id
+  user_id    String
+  kind       String
+  kit_id     String?
+  author_id  String?
+  created_at Int      @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  trust_mode String?
+  authors    authors? @relation(fields: [author_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  kits       kits?    @relation(fields: [kit_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([kit_id, kind, created_at], map: "idx_kit_sub_kit_kind")
+  @@index([author_id, kind, created_at], map: "idx_kit_sub_author_kind")
+}
+
+model kit_versions {
+  id            String  @id
+  kit_id        String
+  version       Int
+  snapshot_json String @db.LongText
+  summary       String? @db.Text
+  editor_id     String?
+  created_at    Int      @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  major         Int      @default(1)
+  minor         Int      @default(0)
+  authors       authors? @relation(fields: [editor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  kits          kits     @relation(fields: [kit_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([kit_id, version], map: "uniq_kit_versions_2")
+  @@index([kit_id, version(sort: Desc)], map: "idx_kit_versions_kit")
+}
+
+model kits {
+  id                String             @id
+  owner_id          String
+  name              String @db.Text
+  description       String? @db.Text
+  visibility        String              @default("private")
+  profile_hidden    Int                 @default(0)
+  created_at        Int                 @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  org_id            String?
+  source_type       String              @default("owned")
+  source_repo       String? @db.VarChar(512)
+  source_ref        String? @db.VarChar(512)
+  source_path       String? @db.Text
+  last_synced_sha   String?
+  kind              String              @default("manual")
+  slug              String?
+  moderation_status String              @default("none")
+  is_featured       Int                 @default(0)
+  kit_invites       kit_invites[]
+  kit_keys          kit_keys[]
+  kit_members       kit_members[]
+  kit_skills        kit_skills[]
+  kit_slug_aliases  kit_slug_aliases[]
+  kit_subscriptions kit_subscriptions[]
+  kit_versions      kit_versions[]
+  organizations     organizations?      @relation(fields: [org_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  authors           authors             @relation(fields: [owner_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([owner_id, slug], map: "idx_kits_owner_slug")
+}
+
+model machine_pair_codes {
+  code               String @id
+  user_id            String
+  created_at         Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  expires_at         Int
+  redeemed_at        Int?
+  redeemed_device_id String?
+  users              users   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, expires_at], map: "idx_machine_pair_codes_user")
+}
+
+model mcp_call_attempts {
+  id           String @id
+  ip           String
+  attempted_at Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  link_id      String?
+
+  @@index([attempted_at], map: "idx_mcp_call_attempts_time")
+  @@index([link_id, attempted_at], map: "idx_mcp_call_attempts_link_time")
+  @@index([ip, attempted_at], map: "idx_mcp_call_attempts_ip_time")
+}
+
+model mcp_link_clients {
+  link_id       String
+  client        String
+  first_used_at Int
+  last_used_at  Int
+  mcp_links     mcp_links @relation(fields: [link_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([link_id, client])
+}
+
+model mcp_links {
+  id               String            @id
+  user_id          String
+  token_hash       String             @unique(map: "uniq_mcp_links_2")
+  token_secret_enc String @db.LongText
+  created_at       Int                @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  revoked_at       Int?
+  last_used_at     Int?
+  mcp_link_clients mcp_link_clients[]
+  users            users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, revoked_at], map: "idx_mcp_links_user")
+}
+
+// NOTE: the table also carries `inflight_repo_key`, a STORED GENERATED column
+// with a unique index (migration 20260728120000) enforcing one in-flight row
+// per normalized_repo_key. It is deliberately NOT modeled here — Prisma would
+// try to write generated columns on create. `prisma db pull` / `migrate dev`
+// will flag it as drift; do not let a generated diff drop it. Its status list
+// must stay in lockstep with IN_FLIGHT in src/routes/mirror-queue.ts.
+model mirror_review_queue {
+  id                  String @id
+  source_repo         String @db.VarChar(512)
+  normalized_repo_key String
+  source_owner_login  String?
+  source_owner_id     Int?
+  derived_handle      String?
+  owner_type          String?
+  license             String? @db.Text
+  status              String
+  submitted_by        String?
+  screen_notes        String? @db.Text
+  decided_by          String?
+  decided_at          Int?
+  created_at          Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+
+  @@index([status], map: "idx_mirror_review_queue_status")
+}
+
+model oauth_states {
+  state       String @id
+  pickup_id   String?
+  created_at  Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  expires_at  Int
+  consumed_at Int?
+
+  @@index([expires_at], map: "idx_oauth_states_expires")
+}
+
+model organization_invites {
+  id            String       @id
+  org_id        String
+  email         String?
+  handle        String?
+  role          String        @default("member")
+  invited_by    String
+  expires_at    Int?
+  created_at    Int           @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  redeemed_at   Int?
+  users         users         @relation(fields: [invited_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([email], map: "idx_organization_invites_email")
+  @@index([handle], map: "idx_organization_invites_handle")
+}
+
+model organization_members {
+  org_id                                       String
+  user_id                                      String
+  role                                         String        @default("member")
+  invited_by                                   String?
+  invited_at                                   Int           @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  accepted_at                                  Int?
+  users_organization_members_invited_byTousers users?        @relation("organization_members_invited_byTousers", fields: [invited_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_organization_members_user_idTousers    users         @relation("organization_members_user_idTousers", fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations                                organizations @relation(fields: [org_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([org_id, user_id])
+  @@index([user_id], map: "idx_organization_members_user_id")
+}
+
+model organizations {
+  id                   String                @id
+  slug                 String                 @unique(map: "uniq_organizations_2")
+  name                 String @db.Text
+  owner_user_id        String?
+  source_owner_id      Int?
+  created_at           Int                    @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  kits                 kits[]                
+  organization_invites organization_invites[]
+  organization_members organization_members[]
+  users                users?                 @relation(fields: [owner_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  skills               skills[]
+
+  @@index([slug], map: "idx_organizations_slug")
+}
+
+model pair_claim_attempts {
+  id           String @id
+  ip           String
+  attempted_at Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+
+  @@index([ip, attempted_at], map: "idx_pair_claim_attempts_ip_time")
+}
+
+model platform_keys {
+  purpose    String @id
+  key_id     String
+  public_key String @db.LongText
+  secret_pem String @db.LongText
+  created_at Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+}
+
+model proposal_files {
+  proposal_id     String
+  path            String
+  blob_hash       String
+  blobs           blobs           @relation(fields: [blob_hash], references: [hash], onDelete: NoAction, onUpdate: NoAction)
+  skill_proposals skill_proposals @relation(fields: [proposal_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([proposal_id, path])
+  @@index([blob_hash], map: "idx_proposal_files_blob")
+}
+
+model proposal_scans {
+  proposal_id     String          @id
+  status          String
+  findings_json   String           @db.LongText
+  scanned_at      Int?
+  skill_proposals skill_proposals? @relation(fields: [proposal_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model publish_log {
+  id           String @id
+  user_id      String
+  skill_id     String
+  content_hash String
+  published_at Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  skills       skills  @relation(fields: [skill_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users        users   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([user_id, published_at], map: "idx_publish_log_user_time")
+}
+
+model scan_cache_metrics {
+  corpus_version Int @id @default(autoincrement())
+  hits           Int @default(0)
+  misses         Int @default(0)
+}
+
+model scan_result_cache {
+  content_key    String
+  corpus_version Int
+  status         String
+  findings_json  String @db.LongText
+  scanned_at     Int    @default(dbgenerated("(UNIX_TIMESTAMP())"))
+
+  @@id([content_key, corpus_version])
+  @@index([corpus_version], map: "idx_scan_result_cache_corpus")
+}
+
+
+model search_source_counts {
+  day    String
+  source String
+  count  Int    @default(0)
+
+  @@id([day, source])
+}
+
+model summon_demand_tokens {
+  day   String
+  token String
+  count Int    @default(0)
+
+  @@id([day, token])
+}
+
+model sessions {
+  id         String @id
+  user_id    String
+  token_hash String  @unique(map: "uniq_sessions_2")
+  created_at Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  expires_at Int?
+  revoked_at Int?
+  device_id  String?
+  users      users   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([user_id], map: "idx_sessions_user_id")
+}
+
+model skill_aliases {
+  from_skill_id String @id
+  to_skill_id   String
+  created_at    Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  skills        skills  @relation(fields: [to_skill_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model skill_installers {
+  skill_id       String
+  installer_kind String
+  installer_id   String
+  installed_at   Int    @default(dbgenerated("(UNIX_TIMESTAMP())"))
+
+  @@id([skill_id, installer_kind, installer_id])
+  @@index([skill_id], map: "idx_skill_installers_skill")
+}
+
+model skill_mirrors {
+  skill_id      String @id
+  source_repo   String @db.VarChar(512)
+  source_ref    String? @db.VarChar(512)
+  source_path   String? @db.Text
+  source_url    String? @db.Text
+  license       String? @db.Text
+  computed_hash String
+  synced_at     Int
+  blocked_hash  String?
+
+  @@index([source_repo], map: "idx_skill_mirrors_repo")
+}
+
+model skill_moderation_actions {
+  id            String @id
+  skill_id      String
+  action        String
+  public_reason String? @db.Text
+  acted_by      String
+  created_at    Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  users         users   @relation(fields: [acted_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  skills        skills  @relation(fields: [skill_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([skill_id, created_at], map: "idx_skill_moderation_actions_skill")
+}
+
+model skill_proposals {
+  id                                                  String                    @id
+  skill_id                                            String
+  base_hash                                           String?
+  proposed_hash                                       String
+  state                                               String                     @default("pending")
+  proposer_author_id                                  String
+  signature_alg                                       String?
+  signature_key_id                                    String?
+  signature_b64                                       String? @db.LongText
+  author_key_id                                       String?
+  created_at                                          Int                        @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  decided_by                                          String?
+  decided_at                                          Int?
+  decision_note                                       String? @db.Text
+  proposal_files                                      proposal_files[]
+  proposal_scans                                      proposal_scans?
+  authors_skill_proposals_decided_byToauthors         authors?                   @relation("skill_proposals_decided_byToauthors", fields: [decided_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  authors_skill_proposals_proposer_author_idToauthors authors                    @relation("skill_proposals_proposer_author_idToauthors", fields: [proposer_author_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  skills                                              skills                     @relation(fields: [skill_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  skill_version_provenance                            skill_version_provenance[]
+
+  @@index([skill_id, state], map: "idx_skill_proposals_skill")
+}
+
+model skill_reports {
+  id               String @id
+  skill_id         String
+  version_hash     String?
+  reported_by      String
+  category         String
+  reason           String? @db.Text
+  claims_ownership Int?
+  status           String  @default("open")
+  admin_notes      String? @db.Text
+  created_at       Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  resolved_at      Int?
+  users            users   @relation(fields: [reported_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  skills           skills  @relation(fields: [skill_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([reported_by, created_at], map: "idx_skill_reports_reporter")
+  @@index([skill_id], map: "idx_skill_reports_skill")
+  @@index([status], map: "idx_skill_reports_status")
+}
+
+model skill_runtime_availability {
+  user_id   String
+  skill_ref String
+  runtime   String
+  last_seen Int    @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  users     users  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user_id, skill_ref, runtime])
+  @@index([skill_ref, runtime], map: "idx_availability_skill_runtime")
+}
+
+model skill_version_files {
+  skill_id       String
+  version_hash   String
+  path           String
+  blob_hash      String
+  skill_versions skill_versions @relation(fields: [skill_id, version_hash], references: [skill_id, hash], onDelete: Cascade, onUpdate: NoAction)
+  blobs          blobs          @relation(fields: [blob_hash], references: [hash], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([skill_id, version_hash, path])
+  @@index([blob_hash], map: "idx_skill_version_files_blob")
+}
+
+model skill_version_provenance {
+  skill_id                                              String
+  version_hash                                          String
+  proposed_by                                           String
+  approved_by                                           String
+  proposal_id                                           String?
+  skill_versions                                        skill_versions   @relation(fields: [skill_id, version_hash], references: [skill_id, hash], onDelete: Cascade, onUpdate: NoAction)
+  skill_proposals                                       skill_proposals? @relation(fields: [proposal_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  authors_skill_version_provenance_approved_byToauthors authors          @relation("skill_version_provenance_approved_byToauthors", fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  authors_skill_version_provenance_proposed_byToauthors authors          @relation("skill_version_provenance_proposed_byToauthors", fields: [proposed_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([skill_id, version_hash])
+}
+
+model skill_version_scans {
+  skill_id             String
+  skill_version_id     String
+  status               String
+  findings_json        String         @db.LongText
+  scanned_at           Int?
+  capabilities_json    String? @db.LongText
+  capabilities_version Int?
+  detector_corpus_version Int?
+  skill_versions       skill_versions @relation(fields: [skill_id, skill_version_id], references: [skill_id, hash], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([skill_id, skill_version_id])
+}
+
+model skill_versions {
+  hash                     String
+  skill_id                 String
+  signature_alg            String?
+  signature_key_id         String?
+  signature_b64            String? @db.LongText
+  author_key_id            String?
+  metadata_json            String @db.LongText
+  published_at             Int                       @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  published_by             String
+  delegation_json          String? @db.LongText
+  yanked_at                Int?
+  yank_reason              String? @db.Text
+  sig_version              Int?
+  major                    Int                       @default(1)
+  minor                    Int                       @default(0)
+  patch                    Int                       @default(0)
+  token_count              Int?
+  token_ambient            Int?
+  token_bundle             Int?
+  token_method             String?
+  kit_skills               kit_skills[]
+  skill_version_files      skill_version_files[]
+  skill_version_provenance skill_version_provenance?
+  skill_version_scans      skill_version_scans?
+  authors                  authors                   @relation(fields: [published_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  skills                   skills                    @relation(fields: [skill_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([skill_id, hash])
+}
+
+model skills {
+  id                       String                    @id
+  author_id                String
+  slug                     String
+  description              String? @db.Text
+  latest_hash              String?
+  visibility               String                     @default("private")
+  install_count            Int                        @default(0)
+  created_at               Int                        @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  org_id                   String?
+  created_by_user_id       String?
+  deprecated_at            Int?
+  deprecation_message      String? @db.Text
+  category                 String?
+  source_repo              String? @db.VarChar(512)
+  source_url               String? @db.Text
+  moderation_status        String                     @default("none")
+  is_featured              Int                        @default(0)
+  kit_skills               kit_skills[]
+  publish_log              publish_log[]             
+  skill_aliases            skill_aliases[]           
+  skill_moderation_actions skill_moderation_actions[]
+  skill_proposals          skill_proposals[]         
+  skill_reports            skill_reports[]           
+  skill_versions           skill_versions[]
+  users                    users?                     @relation(fields: [created_by_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  organizations            organizations?             @relation(fields: [org_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  authors                  authors                    @relation(fields: [author_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([author_id, slug], map: "uniq_skills_2")
+  @@index([category], map: "idx_skills_category")
+}
+
+model update_decisions {
+  id           String @id
+  user_id      String
+  skill_id     String
+  version_hash String
+  state        String
+  source       String
+  decided_at   Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  users        users   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, skill_id, version_hash], map: "uniq_update_decisions_2")
+  @@index([user_id, state, decided_at], map: "idx_update_decisions_decided")
+  @@index([user_id, state], map: "idx_update_decisions_user")
+}
+
+model removal_decisions {
+  id         String @id
+  user_id    String
+  skill_id   String
+  kit_id     String
+  action     String
+  decided_at Int    @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  users      users  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, skill_id, kit_id], map: "uniq_removal_decisions")
+  @@index([user_id, decided_at], map: "idx_removal_decisions_user")
+}
+
+model user_github_tokens {
+  user_id    String @id
+  token_enc  String @db.LongText
+  updated_at Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  users      users?  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model user_identities {
+  user_id             String
+  provider            String
+  provider_subject_id String
+  email               String?
+  email_verified      Int     @default(0)
+  created_at          Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  provider_login      String?
+  display_name        String? @db.Text
+  avatar_url          String? @db.Text
+  users               users   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([provider, provider_subject_id])
+  @@index([user_id], map: "idx_user_identities_user_id")
+}
+
+model users {
+  id                                                          String                      @id
+  handle                                                      String?                      @unique(map: "uniq_users_2")
+  author_key_id                                               String?
+  author_public_key                                           String? @db.LongText
+  github_id                                                   String?                      @unique(map: "uniq_users_3")
+  two_factor                                                  Int                          @default(0)
+  created_at                                                  Int                          @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  suspended_at                                                Int?
+  is_admin                                                    Int                          @default(0)
+  activity_private                                            Int                          @default(0)
+  notifications_seen_at                                       Int?
+  update_mode                                                 String                       @default("manual")
+  attention_seq                                               Int                          @default(0)
+  device_sync_seq                                             Int                          @default(0)
+  alerts                                                      alerts[]
+  author_delegations                                          author_delegations[]
+  author_keys                                                 author_keys[]
+  connected_repos                                             connected_repos[]
+  device_skill_edits                                          device_skill_edits[]
+  devices                                                     devices[]
+  events                                                      events[]
+  follows                                                     follows[]
+  key_bind_attempts                                           key_bind_attempts[]
+  key_bind_nonces                                             key_bind_nonces[]
+  kit_invites                                                 kit_invites[]
+  kit_keys                                                    kit_keys[]
+  kit_members_kit_members_invited_byTousers                   kit_members[]                @relation("kit_members_invited_byTousers")
+  kit_members_kit_members_user_idTousers                      kit_members[]                @relation("kit_members_user_idTousers")
+  kit_subscriptions                                           kit_subscriptions[]
+  machine_pair_codes                                          machine_pair_codes[]
+  mcp_links                                                   mcp_links[]
+  organization_invites                                        organization_invites[]
+  organization_members_organization_members_invited_byTousers organization_members[]       @relation("organization_members_invited_byTousers")
+  organization_members_organization_members_user_idTousers    organization_members[]       @relation("organization_members_user_idTousers")
+  organizations                                               organizations[]
+  publish_log                                                 publish_log[]
+  removal_decisions                                           removal_decisions[]
+  sessions                                                    sessions[]
+  skill_moderation_actions                                    skill_moderation_actions[]
+  skill_reports                                               skill_reports[]
+  skill_runtime_availability                                  skill_runtime_availability[]
+  skills                                                      skills[]
+  update_decisions                                            update_decisions[]
+  user_github_tokens                                          user_github_tokens?
+  user_identities                                             user_identities[]
+}
+
+model version_scan_notices {
+  version_hash String @id
+  skill_id     String
+  author_id    String?
+  reason       String @db.Text
+  created_at   Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+
+  @@index([author_id, created_at], map: "idx_version_scan_notices_author")
+}
+
+// Summon reach counter (#011 / plan 012 U6). Aggregate-by-construction: no PII,
+// no per-summoner rows, no client_id, no IP. One tally per (skill, curating
+// handle, day). Reach = SUM per skill_id; per-handle reach = SUM per via_handle;
+// growth = the day buckets. Standalone (no FK) so a count for a since-deleted
+// skill is harmless. Fed only by a summon-marked content fetch (?src=summon).
+model skill_summon_counts {
+  skill_id   String
+  via_handle String @default("")
+  day        Int
+  count      Int    @default(0)
+
+  @@id([skill_id, via_handle, day])
+  @@index([day], map: "idx_skill_summon_counts_day")
+  @@index([skill_id], map: "idx_skill_summon_counts_skill")
+}

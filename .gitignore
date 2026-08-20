@@ -1,0 +1,65 @@
+.next/
+out/
+node_modules/
+next-env.d.ts
+dist/
+packages/desktop/dist-installers/
+.deepsec/
+*.tsbuildinfo
+.DS_Store
+.env
+.env.local
+
+# Security audit — documents account-takeover exploit chains. Kept locally for
+# maintainers; never committed to the public tree.
+docs/security-audit.md
+
+# Cursor IDE local state (chat history, indexes, etc.) — keep out of git.
+# Team slash commands + rules under .cursor/commands and .cursor/rules ARE tracked
+# so merges from old branches cannot delete them from the working tree.
+.cursor/*
+!.cursor/commands/
+!.cursor/commands/**
+!.cursor/rules/**
+# Internal Multica tracker tooling — leaks a private host + workspace id; keep
+# local, never track (re-ignored after the .cursor un-ignore above).
+.cursor/commands/multica*.md
+.cursor/rules/multica-commands.mdc
+scripts/multica-skillet.sh
+
+# Local SQLite registry (created by pnpm dev / @skillet/registry)
+packages/registry/registry.db
+packages/registry/registry.db-wal
+packages/registry/registry.db-shm
+**/registry.db
+**/*.db-wal
+**/*.db-shm
+
+# PM2 process logs (ecosystem.config.cjs)
+logs/
+
+# Internal process artifacts — planning, brainstorming, generated reports, and
+# solution write-ups. These belong in the maintainers' private repo, never here.
+# The ignores stay as a guard so a workflow tool cannot drop one into the public
+# tree by accident. docs/ is contributor reference material only.
+docs/plans/
+docs/brainstorms/
+docs/reports/
+docs/solutions/
+docs/internal/
+
+# Deep-security review outputs (dated report + bundle) — kept local, not shared.
+docs/security/deepsec-review-*/
+docs/security/deepsec-review-*.md
+docs/security/deepsec-review-*.zip
+
+skillet.lock
+# Per-developer skill lockfile (skillet sync) — not shared.
+skills-lock.json
+# Locally-installed agent skills (npx skills add) — per-developer, not shared.
+.agents/
+
+# Claude Code — transient/personal (keep shareable .claude/ config like commands/ or settings.json committable)
+.claude/worktrees/
+.claude/settings.local.json
+.claude/skills/

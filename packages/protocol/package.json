@@ -1,0 +1,62 @@
+{
+  "name": "@skillet/protocol",
+  "version": "0.1.0",
+  "description": "Skillet shared protocol types and constants",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./covers": {
+      "import": "./dist/covers.js",
+      "types": "./dist/covers.d.ts"
+    },
+    "./cover-canvas": {
+      "import": "./dist/cover-canvas.js",
+      "types": "./dist/cover-canvas.d.ts"
+    },
+    "./untrusted-href": {
+      "import": "./dist/untrusted-href.js",
+      "types": "./dist/untrusted-href.d.ts"
+    },
+    "./skill-id": {
+      "import": "./dist/skill-id.js",
+      "types": "./dist/skill-id.d.ts"
+    },
+    "./device-sync-events": {
+      "import": "./dist/device-sync-events.js",
+      "types": "./dist/device-sync-events.d.ts"
+    },
+    "./device-collapse": {
+      "import": "./dist/device-collapse.js",
+      "types": "./dist/device-collapse.d.ts"
+    },
+    "./attention-events": {
+      "import": "./dist/attention-events.js",
+      "types": "./dist/attention-events.d.ts"
+    },
+    "./inline-images": {
+      "import": "./dist/inline-images.js",
+      "types": "./dist/inline-images.d.ts"
+    },
+    "./scan-vocabulary": {
+      "import": "./dist/scan-vocabulary.js",
+      "types": "./dist/scan-vocabulary.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "node --import tsx/esm --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.4.0"
+  },
+  "license": "Apache-2.0"
+}

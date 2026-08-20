@@ -1,0 +1,24 @@
+{
+  "name": "@skilletmd/cli-win32-x64",
+  "version": "0.1.34",
+  "description": "Skillet CLI native binary for win32 x64",
+  "type": "module",
+  "files": [
+    "bin/skillet"
+  ],
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/skilletmd/skillet.git",
+    "directory": "packages/cli-win32-x64"
+  },
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "license": "Apache-2.0"
+}

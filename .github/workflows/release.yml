@@ -1,0 +1,163 @@
+name: Desktop release (signed + auto-update)
+
+# Tag-driven release: build the Skillet desktop app for macOS + Windows, sign +
+# notarize (macOS) / Azure-Trusted-Sign (Windows), minisign the update artifacts,
+# and publish the installers + latest.json to this repo's GitHub Releases. The
+# in-app updater reads https://skillet.md/desktop/latest.json, which redirects to
+# the newest release's latest.json (so a repo/org rename never breaks installed apps).
+#
+# Cut a release: bump packages/desktop/src-tauri/tauri.conf.json `version`, then
+#   git tag vX.Y.Z && git push origin vX.Y.Z
+# The tag version MUST match the tauri.conf.json version (guarded below).
+#
+# Prerequisites — provide these as repository/organization secrets:
+#   Apple (macOS):   APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD,
+#                    APPLE_SIGNING_IDENTITY, APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
+#   Azure (Windows): AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
+#                    (Azure Trusted Signing account + certificate profile)
+#   Updater (both):  TAURI_SIGNING_PRIVATE_KEY, TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+#
+# Windows/Linux note: Linux auto-update is deferred (macOS + Windows at launch).
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  guard-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Release must be triggered from a version tag
+        run: |
+          # workflow_dispatch from a branch would otherwise release under the
+          # branch name; require a tag ref for both dispatch and push.
+          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+            echo "::error::Run this workflow from a vX.Y.Z tag, not ${GITHUB_REF_NAME} (a ${GITHUB_REF_TYPE})."
+            exit 1
+          fi
+      - name: Tag must match tauri.conf.json version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          conf=$(node -p "require('./packages/desktop/src-tauri/tauri.conf.json').version")
+          echo "tag=$tag conf=$conf"
+          if [ "$tag" != "$conf" ]; then
+            echo "::error::Tag v$tag does not match tauri.conf.json version $conf"
+            exit 1
+          fi
+      - name: Signing placeholders must be replaced
+        run: |
+          # The dev updater pubkey and the Windows cert-profile placeholder are
+          # committed on purpose (so the app builds); this gate stops a real
+          # release from shipping them — a placeholder pubkey either bricks
+          # auto-update or, worse, verifies a forged update.
+          if grep -q "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY5NDgzQUM5QUI2QTlBODc" packages/desktop/src-tauri/tauri.conf.json; then
+            echo "::error::tauri.conf.json still has the PLACEHOLDER updater pubkey — replace it with the production key before releasing."
+            exit 1
+          fi
+          if grep -q "REPLACE_WITH_CERT_PROFILE_NAME" packages/desktop/src-tauri/tauri.windows-signing.conf.json; then
+            echo "::error::Windows signing overlay still has REPLACE_WITH_CERT_PROFILE_NAME — set the Azure certificate profile name before releasing."
+            exit 1
+          fi
+
+  release:
+    needs: guard-version
+    permissions:
+      contents: write # create the GitHub Release + upload assets
+    strategy:
+      fail-fast: false
+      # Serialize the platforms: both legs upload to the SAME draft release, and
+      # tauri-action's latest.json handling is a read-merge-write. Running them
+      # concurrently can race — the second read misses the first's write and one
+      # platform is dropped from latest.json. One-at-a-time removes the race;
+      # releases are rare, so the extra wall-clock is worth the correctness.
+      max-parallel: 1
+      matrix:
+        include:
+          - { os: macos-latest, name: macos }
+          - { os: windows-latest, name: windows }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with: { version: 10 }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+      - uses: swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with: { workspaces: "packages/desktop/src-tauri -> target" }
+
+      - run: pnpm install --frozen-lockfile
+
+      # Windows OS code-signing runs INSIDE the tauri build via a signCommand
+      # overlay (tauri.windows-signing.conf.json), so Azure Trusted Signing signs
+      # the installer BEFORE the updater minisig is computed over it. Install the
+      # signer CLI; it reads the AZURE_* creds from the environment.
+      - name: Install Trusted Signing CLI (Windows)
+        if: matrix.name == 'windows'
+        # Pinned + --locked: this runs in the secrets-bearing job, so don't pull
+        # an unversioned crate fresh from crates.io each release.
+        run: cargo install trusted-signing-cli --version 0.11.0 --locked
+
+      # tauri-action builds, signs (Apple env on macOS; the Windows overlay's
+      # signCommand on Windows), minisigns the update artifacts, generates
+      # latest.json, and creates/updates the GitHub Release for this tag.
+      - name: Build, sign, and publish
+        # SHA-pinned (like every other action here): this step sees ALL signing
+        # secrets, so a moved @v0 tag could exfiltrate them + publish a malicious
+        # signed release.
+        uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # action-v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # --- Apple code-signing + notarization (macOS) ---
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # --- Azure Trusted Signing (Windows) — read by trusted-signing-cli ---
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          # --- Updater artifact signing (minisign; both platforms) ---
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: packages/desktop
+          tagName: ${{ github.ref_name }}
+          releaseName: "Skillet ${{ github.ref_name }}"
+          # Draft, NOT published: both platform legs upload their installers +
+          # merge latest.json into this draft. The separate `publish` job flips
+          # it public only after EVERY leg succeeds, so the live updater endpoint
+          # (releases/latest/download/latest.json) never sees a half-built
+          # release. A failed leg leaves the draft unpublished for inspection.
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true
+          # On Windows, merge the Azure Trusted Signing signCommand overlay.
+          args: ${{ matrix.name == 'windows' && '--config src-tauri/tauri.windows-signing.conf.json' || '' }}
+
+  publish:
+    # Only reached when the release job succeeded for ALL platforms (a matrix job
+    # succeeds only if every leg does). Flipping the draft public here is the
+    # atomic barrier: partial or failed builds never become the "latest" release.
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # publish the draft + mark it latest
+    steps:
+      - name: Publish the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --draft=false \
+            --latest

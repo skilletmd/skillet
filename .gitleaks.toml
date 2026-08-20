@@ -1,0 +1,22 @@
+# gitleaks configuration — used by the CI "Secret scan" job and the manual
+# full-history pre-publish gate (see CONTRIBUTING.md).
+#
+# Extends the built-in ruleset and allowlists the example env files, which hold
+# empty placeholders and generation hints (e.g. `openssl rand -hex 32`), never
+# real secrets.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Example env files contain placeholders and generation hints, not real secrets"
+paths = [
+  '''.*\.env\.example$''',
+  '''.*\.env\.local\.example$''',
+]
+
+[[allowlists]]
+description = "Scanner corpora hold synthetic secret-shaped strings ON PURPOSE — they are the fixtures the harm-scanner's own detectors are tested against, not real credentials."
+paths = [
+  '''packages/registry/src/scanner/.*corpus.*\.ts$''',
+]

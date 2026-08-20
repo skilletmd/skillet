@@ -1,0 +1,86 @@
+[
+  {
+    "name": "single SKILL.md",
+    "files": {
+      "SKILL.md": {
+        "enc": "utf8",
+        "data": "# Hello\nworld\n"
+      }
+    },
+    "expected": "sha256:d04f932d232c199c433161b06e40ca4b8235953edc639b6780027d82fbd6f291"
+  },
+  {
+    "name": "empty file content",
+    "files": {
+      "SKILL.md": {
+        "enc": "utf8",
+        "data": ""
+      }
+    },
+    "expected": "sha256:112c8defc8c7819fa990874d64d93c2fbefac041ad84acd6d9783375db7de7a2"
+  },
+  {
+    "name": "multiple text files",
+    "files": {
+      "SKILL.md": {
+        "enc": "utf8",
+        "data": "# Skill\n"
+      },
+      "scripts/run.sh": {
+        "enc": "utf8",
+        "data": "#!/bin/sh\necho hi\n"
+      },
+      "docs/readme.md": {
+        "enc": "utf8",
+        "data": "docs\n"
+      }
+    },
+    "expected": "sha256:da0c4ab39a3092fad35f46d7acbdaae242bed21461c1d197a8f3fe79a7a36719"
+  },
+  {
+    "name": "binary file with NUL bytes",
+    "files": {
+      "SKILL.md": {
+        "enc": "utf8",
+        "data": "bin\n"
+      },
+      "assets/blob.bin": {
+        "enc": "base64",
+        "data": "AAECAP/+AA=="
+      }
+    },
+    "expected": "sha256:bd712f91ca59d67377d5a79a778b959c1a9bc1dd3034366def16f707eb55ebef"
+  },
+  {
+    "name": "unicode path and content",
+    "files": {
+      "SKILL.md": {
+        "enc": "utf8",
+        "data": "café ☕ — naïve\n"
+      },
+      "café/résumé.md": {
+        "enc": "utf8",
+        "data": "über\n"
+      }
+    },
+    "expected": "sha256:80715cc3ae67b6dd1cdecf76739be8caeb5a50e77f52b5272a9670e5c87b2889"
+  },
+  {
+    "name": "utf8-byte-order vs utf16 divergence",
+    "files": {
+      "SKILL.md": {
+        "enc": "utf8",
+        "data": "x\n"
+      },
+      "Ａ.md": {
+        "enc": "utf8",
+        "data": "fullwidth-A\n"
+      },
+      "😀.md": {
+        "enc": "utf8",
+        "data": "grinning\n"
+      }
+    },
+    "expected": "sha256:8efc47f1141ce097a38f82137f81453a25cde1ae282fd78eda6b9570c863c2a2"
+  }
+]

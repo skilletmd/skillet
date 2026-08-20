@@ -1,0 +1,962 @@
+/* Skillet desktop — system fonts, calm translucent panels, light/dark adaptive. */
+/* Web token names + values (packages/web/src/app/globals.css). Names must stay
+   in lockstep with web; --ink-3 (fainter third ink level) is desktop-only.
+   Dark mode follows the OS (prefers-color-scheme), unlike web's [data-theme]. */
+:root {
+  --accent: #2a2622;
+  --accent-bg: #eae5da;
+  --success: #12b76a;
+  --caution: #f59e0b;
+  --danger: #b42318;
+  --ink: #1a1915;
+  --ink-2: #646258;
+  --ink-3: #9b978c;
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --card-pop: #ffffff; /* floating menu surface — lifts */
+  --card-soft: #f0ece1; /* warm receding cards + hover */
+  --line: #e6e4dd;
+  --radius-2xl: 16px; /* web radius scale — panel corners */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #ece6da;
+    --accent-bg: #262019;
+    --success: #6ce9a6;
+    --caution: #fbbf24;
+    --danger: #f97066;
+    --ink: #edebe6;
+    --ink-2: #9c9a92;
+    --ink-3: #6f6d65;
+    --bg: #0e0e0c;
+    --surface: #161614;
+    --card-pop: #1f1c18;
+    --card-soft: #1c1a16;
+    --line: #26251f;
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { background: transparent; overflow: hidden; user-select: none; -webkit-user-select: none; }
+body { color: var(--ink); -webkit-font-smoothing: antialiased; }
+.spacer { flex: 1 1 auto; }
+
+/* Chef mascot — shared with web (`/brand/skillet-mascot-logo.svg`). */
+.brand-mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  background-color: currentColor;
+  mask-image: url("/brand/skillet-mascot-logo.svg");
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-image: url("/brand/skillet-mascot-logo.svg");
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+/* Windows 11 clips top-level windows at its own 8px radius, so a 16px panel
+   curve leaves the painted surface visible outside the border stroke at each
+   corner. Match the window instead of fighting it — this is also the native
+   Windows radius, so the panel reads correctly against system surfaces.
+   macOS keeps the 16px web scale. */
+:root[data-platform='windows'] .panel { border-radius: 8px; }
+
+.panel {
+  background: var(--card-pop);
+  border: 0.5px solid var(--line);
+  border-radius: var(--radius-2xl);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* The window hugs its content height (`.panel.tray` is height:auto below), so the
+   main railed tabs (Latest/Skills/Agents) get a FIXED panel height — every tab is
+   then the same window size, with long lists scrolling inside. Three classes so it
+   outranks `.panel.tray { height: auto }`. */
+.panel.tray.tray-railed { height: 400px; min-height: 400px; }
+/* menubar UI: no focus ring on mouse click; keyboard focus (:focus-visible) still rings */
+button:focus { outline: none; }
+/* base reset for text-link buttons so unscoped `.link` never shows a native border */
+button.link { appearance: none; -webkit-appearance: none; background: none; border: none; font-family: inherit; color: inherit; cursor: pointer; }
+
+/* ---------- Palette ---------- */
+.search {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 18px;
+}
+.search svg { width: 17px; height: 17px; color: var(--ink-2); flex: none; }
+.search input {
+  flex: 1; border: none; outline: none; background: transparent;
+  font-size: 18px; color: var(--ink); font-family: inherit;
+}
+.search input::placeholder { color: var(--ink-3); }
+
+.results { flex: 1; overflow-y: auto; padding: 6px; }
+.results::-webkit-scrollbar { width: 0; }
+
+.row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: 8px; cursor: default;
+}
+.row .glyph { width: 16px; text-align: center; color: var(--ink-2); flex: none; }
+.row.pinned .glyph { color: var(--accent); }
+.row .meta { flex: 1; min-width: 0; }
+.row .name { font-size: 14px; font-weight: 500; }
+.row .summary {
+  font-size: 11px; color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.row .author { font-size: 11px; color: var(--ink-3); flex: none; }
+.row.sel { background: var(--accent-bg); }
+.empty { padding: 18px; font-size: 13px; color: var(--ink-2); }
+
+.footer {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 16px; border-top: 0.5px solid var(--line);
+  font-size: 11px; color: var(--ink-2);
+}
+.footer .spacer { flex: 1; }
+.kbd {
+  font-size: 10px; font-weight: 500; color: var(--ink-2);
+  background: var(--card-soft); border-radius: 4px; padding: 2px 6px;
+}
+
+/* Palette before pairing — same fixed 560x392 overlay, gate content. Escape and
+   blur hide it exactly like the picker; never a Quit-only surface. */
+.palette-gate {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 16px 84px; text-align: center;
+}
+.palette-gate-mark { width: 36px; height: 42px; color: var(--ink); margin-bottom: 2px; }
+.palette-gate-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.palette-gate-sub { font-size: 12px; color: var(--ink-2); line-height: 1.5; max-width: 340px; }
+.palette-gate .gate-link { font-size: 12px; }
+.palette-gate .code-boxes { width: 100%; max-width: 330px; margin-top: 6px; }
+.palette-gate .appr-msg:empty { display: none; }
+.palette-gate .act.fill {
+  /* .act's flex: 1 is for side-by-side rows; here the button is a direct child
+     of the gate's stretched column and would absorb all leftover height. */
+  flex: none;
+  width: 100%; max-width: 330px; padding: 10px;
+  font-size: 13px; font-weight: 600; border-radius: 8px;
+}
+
+/* ---------- Tray dropdown ---------- */
+.tray { width: 360px; font-size: 13px; }
+.tray .head { display: flex; align-items: center; gap: 9px; padding: 13px 16px 11px; }
+.tray .head .logo { width: 19px; height: 25px; color: var(--accent); }
+.tray .head .brand { font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }
+
+/* icon wrapper — all inline SVGs tint via currentColor */
+.ico { display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; flex: none; }
+.ico svg { width: 17px; height: 17px; }
+.ico.mut { color: var(--ink-3); }
+.ico.chev { width: 15px; height: 15px; color: var(--ink-3); }
+.ico.chev svg { width: 15px; height: 15px; }
+.ico.ck { width: 13px; height: 13px; }
+.ico.ck svg { width: 13px; height: 13px; }
+.mut { color: var(--ink-2); font-weight: 400; }
+
+/* graded-diff approval */
+.auth-gate { padding: 10px 18px 18px; gap: 15px; }
+.auth-gate .appr-actions { margin-top: 4px; }
+.auth-gate .act.fill { padding: 13px; font-size: 15px; font-weight: 600; border-radius: 12px; transition: background-color 0.18s ease, color 0.18s ease; }
+/* Resting until the code is whole — a button that can't work shouldn't dress
+   like one that can. Completing the code snaps it to the committed fill. */
+.auth-gate .act.fill:disabled {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink-2);
+}
+.auth-gate .appr-msg:empty { display: none; }
+.auth-gate-intro { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
+.auth-gate-intro b { font-size: 15px; font-weight: 600; }
+.auth-gate-intro span { font-size: 12px; color: var(--ink-2); line-height: 1.45; }
+.appr { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.appr-actions { display: flex; gap: 8px; }
+.act { flex: 1; padding: 7px; border-radius: 6px; border: 0.5px solid var(--line); background: transparent; color: var(--ink); font-size: 12px; font-weight: 500; cursor: default; font-family: inherit; }
+.act.fill { background: var(--accent); color: var(--bg); border-color: transparent; }
+
+/* Kit feed — each kit a distinct, expandable row (a kit is a cluster of skills) */
+.kit-browser { display: flex; flex-direction: column; max-height: 340px; overflow-y: auto; padding: 2px 6px 0; }
+/* Segmented pair-code input (tray gate + onboarding), split 4–4 like a real
+   pairing code. */
+.code-boxes { display: flex; gap: 6px; align-items: center; }
+.code-dash {
+  width: 7px; height: 2px; border-radius: 2px; flex: none; margin: 0 1px;
+  background: color-mix(in srgb, var(--ink) 30%, transparent);
+}
+.code-cell {
+  flex: 1; min-width: 0; box-sizing: border-box; text-align: center;
+  font-family: ui-monospace, monospace; font-size: 16px; font-weight: 600;
+  padding: 11px 0; border-radius: 9px; text-transform: uppercase;
+  border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  color: var(--ink); outline: none; caret-color: var(--accent);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
+}
+.code-cell:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.code-cell.filled {
+  border-color: color-mix(in srgb, var(--ink) 42%, transparent);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+/* A landing character springs its cell; bulk fills stagger via inline
+   animation-delay so a paste pours in left to right. */
+.code-cell.pop { animation: cell-pop 240ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards; }
+@keyframes cell-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.09); }
+  100% { transform: scale(1); }
+}
+
+/* Numbered steps on the sign-in gate. */
+.gate-step { display: flex; gap: 9px; align-items: center; font-size: 13px; color: var(--ink); }
+/* The link is the real first step, so it reads pressable: a quiet chip that
+   inks up on hover instead of body text with a secret underline. */
+.gate-link {
+  background: var(--accent-bg); border: none; padding: 3px 9px; border-radius: 7px;
+  font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink); cursor: default;
+  transition: background-color 0.14s ease;
+}
+.gate-link:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.ob-msg { font-size: 12px; color: var(--negative, #c44); min-height: 1.2em; text-align: center; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* generic row — full-width with full-width hover, text aligned to the 16px inset
+   (macOS menu standard). Cards (insert, banner, update) are the deliberate exceptions. */
+.row { display: flex; align-items: center; gap: 9px; padding: 7px 16px; width: 100%; }
+.row .nm { font-size: 13px; }
+.row.action { padding: 7px 16px; border: none; background: none; cursor: default; text-align: left; font-family: inherit; color: var(--ink); }
+.row.action:hover { background: var(--card-soft); }
+.row.action .bcol { display: flex; flex-direction: column; gap: 1px; }
+.row.action .bcol b { font-size: 12.5px; font-weight: 500; }
+.row.action .bcol span { font-size: 11px; color: var(--ink-2); }
+/* reconcile note — neutral card; the work already happened, this is just FYI */
+.row.action.syncissue { width: calc(100% - 24px); margin: 0 12px 6px; padding: 9px 12px; border-radius: 8px; background: var(--card-soft); }
+.row.action.syncissue:hover { background: var(--card-soft); }
+
+/* quiet "customized" row flag — you're running your own copy (R9 honesty) */
+
+.agent-logo { width: 20px; height: 20px; flex: none; color: var(--ink); display: flex; align-items: center; justify-content: center; }
+.agent-logo svg { width: 18px; height: 18px; }
+.agent-logo-fallback {
+  width: 20px; height: 20px; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-bg); color: var(--ink-2); font-size: 11px; font-weight: 600; text-transform: uppercase;
+}
+.empty-row { font-size: 11px; color: var(--ink-2); padding: 6px 16px; }
+
+/* footer */
+.tray .foot { display: flex; align-items: center; padding: 11px 16px; border-top: 0.5px solid var(--line); margin-top: 5px; }
+.tray .foot .footright { display: flex; gap: 16px; }
+.tray .foot .link { background: none; border: none; font: inherit; font-size: 12px; color: var(--ink-2); cursor: default; padding: 0; }
+.tray .foot .link:hover { color: var(--ink); }
+
+/* ---------- Activity status block (sync + agents together) ---------- */
+.status-text { font-size: 13px; font-weight: 500; color: var(--ink-2); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* recently-synced skills as a feed — inset rounded rows (hover floats off the edges) */
+.feed { padding: 6px 6px 0; }
+.feed-col { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.feed-name { font-size: 13px; color: var(--ink); }
+.feed-sub { font-size: 11px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* refresh glyph folded into the status text — subtle at rest, brightens on hover */
+.status-sync { display: inline-flex; align-items: center; color: var(--ink-2); transition: color 0.15s; transform: translateY(1px); }
+.status-sync svg { width: 14px; height: 14px; }
+.status-sync.spin { opacity: 0.9; }
+.status-sync.spin svg { animation: spin 0.9s linear infinite; }
+.status-sync.ok { opacity: 1; color: var(--success); }
+
+/* Attention items pinned to the bottom */
+.home-footer { margin-top: auto; }
+
+/* ---------- Left nav rail (persistent, Dropbox-style) ---------- */
+.tray-railed { flex-direction: row; align-items: stretch; }
+.rail {
+  width: 64px; flex: none; display: flex; flex-direction: column; align-items: center;
+  gap: 1px; padding: 10px 8px; border-right: 0.5px solid var(--line); background: var(--card-soft);
+}
+/* brand logo pinned at the top (Dropbox-style) — free to be larger, not a button */
+.rail-brand { display: flex; align-items: center; justify-content: center; padding: 4px 0 10px; }
+.rail-brand-mark { width: 34px; height: 42px; color: var(--ink); }
+.rail-nav { display: flex; flex-direction: column; gap: 5px; width: 100%; }
+.rail-item {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  width: 100%; padding: 6px 0; border: none; background: none; color: var(--ink-2);
+  font-family: inherit; cursor: pointer; border-radius: 8px;
+}
+.rail-item .rail-ico { position: relative; display: flex; align-items: center; justify-content: center; height: 20px; }
+.rail-item .rail-ico svg { width: 18px; height: 18px; }
+.rail-badge { position: absolute; top: -2px; right: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--caution); box-shadow: 0 0 0 2px var(--card-soft); }
+.rail-label { font-size: 9.5px; }
+.rail-item:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.rail-item.on { color: var(--ink); background: color-mix(in srgb, var(--ink) 9%, transparent); }
+/* bottom group: account avatar → Settings (Dropbox-style) */
+.rail-bottom { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; }
+.rail-avatar {
+  position: relative;
+  border: none; background: none; cursor: pointer; padding: 4px;
+  border-radius: 999px; display: flex; align-items: center; justify-content: center;
+}
+.rail-avatar:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.rail-avatar.on { background: color-mix(in srgb, var(--ink) 9%, transparent); }
+/* Passive "app update ready" cue on the account avatar (opens Settings, where the
+   relaunch bar lives). Green = ready/go, distinct from the amber Home bell; the
+   double ring keeps it legible over any avatar photo (light, dark, or busy). */
+.rail-avatar-dot {
+  position: absolute; top: 3px; right: 3px; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--success);
+  box-shadow: 0 0 0 1.5px var(--card-soft), 0 0 0 2.5px color-mix(in srgb, var(--ink) 18%, transparent);
+}
+.avatar-mono {
+  width: 27px; height: 27px; border-radius: 50%; background: var(--accent-bg); color: var(--ink-2);
+  display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; text-transform: uppercase;
+}
+.rail-avatar-img { width: 27px; height: 27px; border-radius: 50%; object-fit: cover; display: block; }
+
+/* Content column beside the rail */
+.view { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative; }
+/* sub-view lists get bottom breathing room; footers glue flush */
+.kit-browser { padding-bottom: 6px; }
+.view-head { padding: 15px 16px 8px; min-height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.view-head b { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+/* Kits / Skills segmented toggle */
+.lib-toggle { display: inline-flex; flex: none; background: var(--card-soft); border-radius: 6px; padding: 2px; gap: 2px; }
+.lib-toggle-btn { font-family: inherit; font-size: 11px; font-weight: 500; color: var(--ink-2); border: none; background: none; padding: 3px 10px; border-radius: 4px; cursor: pointer; transition: background-color 0.12s ease, color 0.12s ease; }
+.lib-toggle-btn:hover { color: var(--ink); }
+.lib-toggle-btn.on { background: var(--bg); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.lib-toggle-n { font-size: 10.5px; opacity: 0.55; margin-left: 1px; font-variant-numeric: tabular-nums; }
+.view-head-sub { font-size: 12px; color: var(--ink-2); }
+/* Activity header: sync time + refresh, floated right (mirrors the Skills toggle) */
+.latest-sync { display: inline-flex; align-items: center; gap: 6px; flex: none; border: none; background: none; cursor: pointer; font-family: inherit; padding: 3px 6px; margin: -3px -6px; border-radius: 6px; transition: background-color 0.12s ease; }
+.latest-sync:hover { background: var(--card-soft); }
+.latest-sync:hover .status-text,
+.latest-sync:hover .status-sync { color: var(--ink); }
+.set-body { padding: 2px 0; }
+
+/* settings — relocated footer links */
+/* Account action (Sign out) — subtle text that gets a hover pill. */
+.set-action {
+  flex: none; white-space: nowrap;
+  border: none; background: none; font-family: inherit; font-size: 12.5px; color: var(--ink-2);
+  padding: 5px 10px; border-radius: 6px; cursor: pointer;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+.set-action:hover { background: var(--card-soft); color: var(--ink); }
+.set-action:active { background: var(--accent-bg); }
+/* Quit pinned to the very bottom — full-bleed bar, darkens on press. */
+.set-foot {
+  margin-top: auto; display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 16px; border-top: 0.5px solid var(--line);
+}
+.set-foot-link {
+  background: none; border: none; font-family: inherit; font-size: 13px;
+  color: var(--ink-2); cursor: pointer; padding: 0; transition: color 0.14s ease;
+}
+.set-foot-link:hover { color: var(--ink); }
+.update-ready-bar {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 11px 16px; border: none; border-top: 0.5px solid var(--line);
+  background: none; font-family: inherit; font-size: 12.5px; font-weight: 500;
+  color: var(--ink); cursor: default; text-align: left; transition: background-color 0.14s ease;
+}
+.update-ready-bar:hover { background: var(--card-soft); }
+.update-ready-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); flex: none; }
+.update-block {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; height: 100%; gap: 10px; padding: 32px 28px; box-sizing: border-box;
+}
+.update-block-ico { color: var(--ink-3); }
+.update-block-ico svg { width: 30px; height: 30px; }
+.update-block-title { font-size: 15px; }
+.update-block-sub { font-size: 12.5px; color: var(--ink-2); line-height: 1.45; max-width: 260px; }
+.update-block-cta {
+  /* .act's flex: 1 is for side-by-side rows; here the button is a child of the
+     block's stretched column and would absorb all leftover height. */
+  flex: none;
+  margin-top: 6px; width: auto; padding: 9px 20px;
+}
+.update-block-foot { display: flex; gap: 16px; margin-top: 4px; }
+.update-block-foot .link:disabled { opacity: 0.6; cursor: default; }
+
+/* ---------- Onboarding ---------- */
+.onboarding { padding: 28px 26px; gap: 18px; align-items: stretch; position: relative; }
+.ob-close {
+  position: absolute; top: 10px; right: 10px; width: 24px; height: 24px;
+  border: none; background: none; color: var(--ink-3); font-size: 17px; line-height: 1;
+  border-radius: 6px; cursor: default; font-family: inherit; padding: 0;
+}
+.ob-close:hover { background: var(--card-soft); color: var(--ink); }
+.ob-head { text-align: center; display: flex; flex-direction: column; gap: 6px; align-items: center; margin-bottom: 4px; }
+.ob-logo { width: 52px; height: 68px; }
+.ob-brand { color: var(--ink); }
+.ob-title { font-size: 22px; font-weight: 600; }
+.ob-sub { font-size: 13px; color: var(--ink-2); }
+.ob-card {
+  background: var(--card-soft); border-radius: 12px; padding: 16px;
+  display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px;
+}
+.ob-card.center { align-items: center; text-align: center; gap: 6px; }
+.ob-card.center b { font-size: 15px; }
+.ob-big { font-size: 26px; }
+.ob-sub2 { font-size: 12px; color: var(--ink-2); line-height: 1.4; }
+.ob-cap { font-size: 10px; font-weight: 600; color: var(--ink-3); letter-spacing: 0.04em; }
+.ob-row { font-size: 13px; display: flex; gap: 8px; align-items: center; }
+.ob-row .done { color: var(--success); }
+.ob-row .todo { color: var(--ink-2); }
+.ob-note { font-size: 12px; color: var(--ink-2); text-align: center; line-height: 1.4; margin-bottom: 4px; }
+.ob-cta {
+  background: var(--accent); color: var(--bg); border: none; border-radius: 8px;
+  padding: 11px; font-size: 14px; font-weight: 600; cursor: default; font-family: inherit;
+}
+/* Whole header is a drag handle — children must not swallow the mousedown. */
+.ob-head > * { pointer-events: none; }
+.ob-skip { background: none; border: none; color: var(--ink-2); font-size: 11px; cursor: default; margin-top: 8px; font-family: inherit; }
+.ob-fine { font-size: 10px; color: var(--ink-3); text-align: center; margin-top: 6px; line-height: 1.4; }
+.dots { display: flex; gap: 6px; justify-content: center; margin-top: auto; }
+.dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); }
+.dots span.on { background: var(--accent); }
+
+/* account + sign-in + publish */
+.appr-msg { font-size: 11px; color: var(--accent); min-height: 14px; }
+
+/* settings */
+.set-body { padding: 4px 0 6px; }
+.set-row { display: flex; align-items: center; padding: 8px 16px; }
+.set-row .nm { font-size: 13px; font-weight: 500; }
+.set-account { margin-top: 4px; padding-top: 10px; }
+/* Navigation rows (Open web, Help & docs) — full-width tappable rows with an
+   external-link glyph, set off from the account block by spacing (no hairline). */
+.set-links { margin-top: 10px; }
+.set-link {
+  display: flex; align-items: center; width: 100%; text-align: left;
+  padding: 9px 16px; border: none; background: none; font-family: inherit;
+  font-size: 13px; color: var(--ink); cursor: pointer;
+  transition: background-color 0.14s ease;
+}
+.set-link:hover { background: var(--card-soft); }
+.set-link .nm { font-size: 13px; font-weight: 500; }
+.set-ext { display: flex; color: var(--ink-3); }
+.set-ext svg { width: 15px; height: 15px; }
+.set-link:hover .set-ext { color: var(--ink-2); }
+/* Footer: version (informational) on the left, Quit on the right. */
+.set-version { font-size: 12px; color: var(--ink-3); letter-spacing: 0.01em; }
+.set-quit:hover { color: var(--danger); }
+.set-account-col { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+/* Inline device rename (Settings row). The label doubles as a click target. */
+#devicelabel { cursor: default; }
+#devicelabel:hover { color: var(--ink); }
+.set-device-input {
+  box-sizing: border-box; width: 180px; margin-top: 1px; padding: 3px 7px;
+  font: inherit; font-size: 12px; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--accent); border-radius: 7px;
+  outline: none; caret-color: var(--accent);
+}
+.set-device-input:disabled { opacity: 0.55; }
+.set-device-err { font-size: 11px; color: var(--negative, #c44); }
+.set-device-err:empty { display: none; }
+.set-account-col .nm { font-size: 13px; font-weight: 500; }
+.set-account-sub { font-size: 12px; color: var(--ink-2); }
+.set-account .link { font-size: 12.5px; color: var(--ink-2); }
+.set-account .link:hover { color: var(--ink); }
+
+/* tray sizes to its content (window resizes to match — no clipped footer, no dead space) */
+/* content-sized, but a min-height so switching tabs doesn't jump around */
+.panel.tray { height: auto; min-height: 332px; }
+
+/* ---------- Motion: eased, physical, restrained (Emil-style) ---------- */
+/* Everything interactive eases in/out rather than snapping. */
+.rail-item, .rail-avatar,
+.row.action {
+  transition: background-color 0.14s ease, color 0.14s ease, transform 0.08s ease;
+}
+/* Inset/pill tap targets press with a subtle scale — they float off the edges,
+   so scaling never exposes the panel corners. */
+.rail-item:active, .rail-avatar:active { transform: scale(0.985); }
+
+/* Expand animates the container's SIZE only — content is revealed as it grows,
+   no per-row movement (that read as jiggle). */
+/* Expand: fade + grow (Emil — "nothing appears from nothing"), strong ease-out,
+   under 300ms. Custom curve, not a built-in (built-ins are too weak). */
+@keyframes expand-down { from { max-height: 0; opacity: 0; } to { max-height: 600px; opacity: 1; } }
+
+/* Panel entrance — scales/fades in each time the tray opens. */
+
+/* New-notification pulse on the bell dot. */
+@keyframes badge-pulse { 0% { transform: scale(1); } 40% { transform: scale(1.9); } 100% { transform: scale(1); } }
+.rail-badge.pulse { animation: badge-pulse 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Drill-in navigation: a screen pushes in from the right (›), back pops from the
+   left — iOS-style, so a drill-in doesn't read as an instant janky swap. */
+@keyframes view-push { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes view-pop { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+.view.anim-push { animation: view-push 0.2s cubic-bezier(0.23, 1, 0.32, 1); }
+.view.anim-pop { animation: view-pop 0.2s cubic-bezier(0.23, 1, 0.32, 1); }
+
+/* Keyboard focus rings (only on keyboard nav, never on click). */
+.rail-item:focus-visible, .rail-avatar:focus-visible, .link:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--ink) 55%, transparent); outline-offset: -2px; border-radius: 8px;
+}
+
+/* Respect the system setting — no motion when the user asks for none. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* ---------- Upload skills view ---------- */
+/* Drill-in header: back arrow + title on ONE line, pixel-identical height to the
+   tab headers (inherits .view-head's padding + 46px min-height). No description —
+   that belongs in the body, not the nav bar. */
+.drill-head { justify-content: flex-start; gap: 4px; }
+.back-ico {
+  flex: none; width: 24px; height: 24px; margin-left: -4px; border: none; background: none;
+  color: var(--ink-2); cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 6px; transition: background-color 0.14s ease, color 0.14s ease;
+}
+.back-ico svg { width: 18px; height: 18px; }
+.back-ico:hover { background: var(--card-soft); color: var(--ink); }
+
+/* Controls row: select-all (checkbox aligns with the rows) + find-folder icon. */
+.up-controls { display: flex; align-items: center; padding: 4px 12px 8px; }
+.up-selectall {
+  display: inline-flex; align-items: center; gap: 10px; border: none; background: none;
+  font-family: inherit; font-size: 12.5px; color: var(--ink-2); cursor: pointer;
+  padding: 5px 8px; margin-left: -8px; border-radius: 6px;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+.up-selectall:hover { background: var(--card-soft); color: var(--ink); }
+.up-selectall.on { color: var(--ink); }
+.up-find {
+  flex: none; width: 30px; height: 30px; border-radius: 8px; border: none; background: none;
+  color: var(--ink-2); cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+.up-find:hover { background: var(--card-soft); color: var(--ink); }
+.up-find .ico { width: 17px; height: 17px; }
+.up-find .ico.spin svg { animation: spin 0.9s linear infinite; }
+
+/* checkbox */
+.up-check {
+  flex: none; width: 19px; height: 19px; border-radius: 6px; padding: 0;
+  border: 1.5px solid var(--line); background: var(--surface);
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  color: var(--bg); transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.up-row.on .up-check, .up-selectall.on .up-check { background: var(--accent); border-color: var(--accent); }
+.up-check .ico.ck { width: 12px; height: 12px; }
+.up-check .ico.ck svg { width: 12px; height: 12px; stroke-width: 3; }
+
+/* selectable, openable skill rows — one grid so checkbox/avatar/name align across rows */
+.up-list { padding: 0 6px; max-height: 244px; overflow-y: auto; }
+.up-row {
+  display: grid; grid-template-columns: 19px 26px 1fr auto; align-items: center; gap: 10px;
+  padding: 5px 10px 5px 6px; border-radius: 8px; cursor: pointer;
+  transition: background-color 0.14s ease;
+}
+.up-row:hover { background: var(--card-soft); }
+.up-ext { opacity: 0; transition: opacity 0.14s ease; background: none; border: none; padding: 2px; cursor: default; color: inherit; flex: none; }
+.up-row:hover .up-ext { opacity: 1; }
+.up-ext:hover { color: var(--ink); }
+
+/* Privacy reassurance, just above Upload. Uploads are always private. */
+.up-privacy { margin-top: 6px; padding: 10px 16px 2px; border-top: 0.5px solid var(--line); flex-shrink: 0; }
+.up-note { font-size: 11.5px; color: var(--ink-2); line-height: 1.45; }
+.up-note .up-lock { display: inline-flex; width: 12px; height: 12px; vertical-align: -1.5px; margin-right: 6px; }
+.up-note .up-lock svg { width: 12px; height: 12px; }
+.up-msg { padding: 6px 16px 0; font-size: 12px; color: var(--ink-2); flex-shrink: 0; }
+
+/* Post-upload result pane (takes over the checklist): one section per outcome —
+   uploaded, blocked (with evidence + fix line), flagged-but-published. */
+.up-result { padding: 8px 16px; display: flex; flex-direction: column; gap: 18px; }
+.up-result-sec { display: flex; flex-direction: column; gap: 3px; }
+.up-result-title { font-size: 12.5px; font-weight: 600; color: var(--ink); margin-bottom: 3px; }
+.up-result-err { color: var(--danger); }
+/* Skill names render identically in every section; the explanation and the
+   section note share the quiet grey so the names carry the eye. */
+.up-result-skill { font-size: 12px; font-weight: 500; color: var(--ink); margin-top: 3px; }
+.up-result-why { font-size: 11.5px; color: var(--ink-2); line-height: 1.5; }
+.up-result-note { font-size: 11.5px; color: var(--ink-2); line-height: 1.5; margin-top: 8px; }
+.up-actions { display: flex; flex-direction: column; gap: 8px; padding: 10px 16px 14px; margin-top: auto; }
+.up-actions .act { padding: 10px; font-size: 13px; }
+
+/* Centered state when there's no feed (offline / syncing / no skills yet). */
+.tray-empty {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 24px 24px 32px; text-align: center;
+}
+.tray-empty-ico { width: 30px; height: 30px; color: var(--ink-3); }
+.tray-empty-ico svg { width: 30px; height: 30px; }
+.tray-empty-ico.spin svg { animation: spin 0.9s linear infinite; }
+.tray-empty-sub { font-size: 12.5px; color: var(--ink-2); line-height: 1.45; max-width: 220px; }
+.tray-empty-retry { flex: none; margin-top: 4px; padding: 8px 20px; }
+
+/* ---------- Skill/kit covers (deterministic gradient, iOS-squircle clip) ---------- */
+/* The gradient background is set inline (see covers.ts); this clips it to the
+   superellipse — the shape for "things" (skills/kits). People stay circular. */
+.cover {
+  flex: none;
+  mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'><path d='M100 50 L99.9 68.21 L99.58 74.57 L99.05 79.2 L98.31 82.93 L97.34 86.05 L96.14 88.72 L94.7 91.02 L93.01 93.01 L91.02 94.7 L88.72 96.14 L86.05 97.34 L82.93 98.31 L79.2 99.05 L74.57 99.58 L68.21 99.9 L50 100 L31.79 99.9 L25.43 99.58 L20.8 99.05 L17.07 98.31 L13.95 97.34 L11.28 96.14 L8.98 94.7 L6.99 93.01 L5.3 91.02 L3.86 88.72 L2.66 86.05 L1.69 82.93 L0.95 79.2 L0.42 74.57 L0.1 68.21 L0 50 L0.1 31.79 L0.42 25.43 L0.95 20.8 L1.69 17.07 L2.66 13.95 L3.86 11.28 L5.3 8.98 L6.99 6.99 L8.98 5.3 L11.28 3.86 L13.95 2.66 L17.07 1.69 L20.8 0.95 L25.43 0.42 L31.79 0.1 L50 0 L68.21 0.1 L74.57 0.42 L79.2 0.95 L82.93 1.69 L86.05 2.66 L88.72 3.86 L91.02 5.3 L93.01 6.99 L94.7 8.98 L96.14 11.28 L97.34 13.95 L98.31 17.07 L99.05 20.8 L99.58 25.43 L99.9 31.79 L100 50 Z' fill='%23000'/></svg>");
+  -webkit-mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'><path d='M100 50 L99.9 68.21 L99.58 74.57 L99.05 79.2 L98.31 82.93 L97.34 86.05 L96.14 88.72 L94.7 91.02 L93.01 93.01 L91.02 94.7 L88.72 96.14 L86.05 97.34 L82.93 98.31 L79.2 99.05 L74.57 99.58 L68.21 99.9 L50 100 L31.79 99.9 L25.43 99.58 L20.8 99.05 L17.07 98.31 L13.95 97.34 L11.28 96.14 L8.98 94.7 L6.99 93.01 L5.3 91.02 L3.86 88.72 L2.66 86.05 L1.69 82.93 L0.95 79.2 L0.42 74.57 L0.1 68.21 L0 50 L0.1 31.79 L0.42 25.43 L0.95 20.8 L1.69 17.07 L2.66 13.95 L3.86 11.28 L5.3 8.98 L6.99 6.99 L8.98 5.3 L11.28 3.86 L13.95 2.66 L17.07 1.69 L20.8 0.95 L25.43 0.42 L31.79 0.1 L50 0 L68.21 0.1 L74.57 0.42 L79.2 0.95 L82.93 1.69 L86.05 2.66 L88.72 3.86 L91.02 5.3 L93.01 6.99 L94.7 8.98 L96.14 11.28 L97.34 13.95 L98.31 17.07 L99.05 20.8 L99.58 25.43 L99.9 31.79 L100 50 Z' fill='%23000'/></svg>");
+  mask-size: 100% 100%; -webkit-mask-size: 100% 100%;
+  mask-repeat: no-repeat; -webkit-mask-repeat: no-repeat;
+}
+
+/* ---------- Unified skill/kit library list (Activity + Skills share this) ---------- */
+/* Fill the fixed-height panel and scroll — the railed tabs pin the panel height
+   (`.panel.tray.tray-railed`), so the list flexes into whatever space is left below
+   the header and scrolls when the feed is long. */
+.lib-list { padding: 6px 6px 0; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+/* Soft bottom fade so a peeking half-row dissolves (signals "scroll for more").
+   Applied only while there IS more below (JS toggles `.more-below` on scroll), so
+   it never dims the last row or the "N more in Skills" footer at the end. */
+.lib-list.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
+}
+.lib-list::-webkit-scrollbar { width: 0; }
+.lib-list.kit-browser { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-bottom: 6px; }
+.lib-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box;
+  padding: 6px 10px; border: none; border-radius: 8px; background: none;
+  cursor: pointer; text-align: left; font-family: inherit; color: var(--ink);
+  transition: background-color 0.14s ease, transform 0.08s ease;
+}
+.lib-row:hover { background: var(--card-soft); }
+.lib-row:active { transform: scale(0.985); }
+.lib-cover { width: 34px; height: 34px; }
+.up-cover { width: 28px; height: 28px; }
+/* One spacing system: each section breathes 10px top/bottom, a hairline divides
+   them, and no horizontal margin shifts one section relative to the other. */
+.agents-view { padding: 6px 6px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.agents-view::-webkit-scrollbar { width: 0; }
+.agents-sec { padding: 10px 10px; }
+/* Synced status bar — green-check confirmation AND an expand disclosure: the ⌄
+   reveals the synced folders inline (accordion). Same .lib-row metrics as Latest's
+   updates bar; green cover vs amber. Interactive, so it keeps lib-row's hover. */
+.synced-bar .ico.chev { transition: transform 0.15s ease; }
+.synced-bar.off { cursor: default; }
+.synced-bar.off:hover { background: none; }
+.synced-bar.off:active { transform: none; }
+.lib-cover.synced { display: flex; align-items: center; justify-content: center; border-radius: 9px; color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }
+.lib-cover.synced svg { width: 18px; height: 18px; }
+/* A trailing "opens the web" glyph (↗) — distinct from the › drill-in chevron. */
+.lib-ext { display: flex; flex: none; width: 15px; height: 15px; color: var(--ink-3); }
+.lib-ext svg { width: 15px; height: 15px; }
+/* "How to use" — quiet label above the two invocation methods. */
+.how-label { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); padding: 16px 10px 0; }
+/* First section aligns to the same gap as the Skills list (lib-list 6px +
+   lib-row 6px = 12px); agents-view already contributes 6px, so add 6px. */
+.agents-sec:first-child { padding-top: 6px; }
+.agents-sec + .agents-sec { padding-top: 8px; }
+/* Section title — a plain descriptive heading, not a cryptic uppercase eyebrow. */
+.sec-title { font-size: 13px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; padding: 0 10px; margin-bottom: 5px; }
+.sec-content { flex: 1; min-width: 0; }
+/* Inside the content column, drop each element's own horizontal padding. */
+.sec-content .sec-title { padding: 0; }
+.sec-content .chan-cap { padding: 0; }
+.sec-content .folder-row { padding: 8px 6px; }
+.sec-content .cmd-grant { margin: 10px 0 0; }
+/* Same horizontal inset as .lib-list (6px) so the folder-row hover is an inset
+   rounded pill, not edge-to-edge — consistent with every other list in the tray. */
+.folder-list { display: flex; flex-direction: column; padding: 6px 6px 0; }
+.folder-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px;
+  background: none; border: none; border-radius: 8px; cursor: pointer; font: inherit;
+  color: inherit; text-align: left; transition: background-color 0.14s ease;
+}
+.folder-row:hover { background: var(--card-soft); }
+.folder-glyph { display: inline-flex; width: 18px; flex: none; color: var(--ink); }
+.folder-glyph .agent-logo, .folder-glyph .agent-logo svg { width: 16px; height: 16px; }
+.folder-col { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.folder-name { font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--ink-3);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Secondary caption under each channel: the manual way to invoke. Two command
+   kinds, deliberately different — /skillet is text you TYPE (plain near-black
+   inline, no pill), the shortcut is a key you PRESS (a keycap chip). */
+.chan-cap { font-size: 12px; color: var(--ink-2); line-height: 1.5; padding: 8px 10px 0; }
+/* Command on its own row (the chip), with a short muted caption BELOW it — same
+   shape as the Grant Access button + "Requires accessibility access." note. */
+.chan-cmd { margin-top: 14px; }
+.chan-cmd-note { font-size: 12px; color: var(--ink-3); padding-top: 7px; }
+/* A typeable command — flat monospace pill (no keycap cue = you type it, not press). */
+.cmd-ref {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--ink);
+  background: var(--card-soft); border-radius: 6px; padding: 4px 9px; letter-spacing: -0.01em; white-space: nowrap;
+}
+.cmd-ref .cmd-arg { color: var(--ink-3); }
+/* A pressable keyboard shortcut — same pill + a keycap bottom border (you press it). */
+.cmd-key {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--ink-2);
+  background: var(--card-soft); border: none; border-radius: 6px; padding: 3px 8px; white-space: nowrap;
+  border-bottom: 1.5px solid color-mix(in srgb, var(--ink) 14%, transparent);
+}
+/* The shortcut keycap is rebindable — clicking it records a new combo. */
+.cmd-key-btn { cursor: pointer; transition: background-color 0.14s ease; }
+.cmd-key-btn:hover { background: color-mix(in srgb, var(--ink) 9%, var(--card-soft)); }
+/* Grant: demoted from a solid fill to a tinted button — the primary row, not a
+   one-time permission prompt, should be the loudest thing on the panel. */
+.cmd-grant {
+  display: inline-block; margin: 10px 10px 0; font-size: 12px; font-weight: 600;
+  color: var(--accent); background: var(--accent-bg); border-radius: 6px; padding: 6px 12px;
+  border: 0.5px solid color-mix(in srgb, var(--accent) 28%, transparent); cursor: default;
+  transition: background-color 0.14s ease;
+}
+.cmd-grant:hover { background: color-mix(in srgb, var(--accent) 12%, var(--accent-bg)); }
+.lib-name-col { display: flex; flex-direction: column; justify-content: center; min-width: 0; gap: 1px; }
+.lib-name { font-size: 13px; line-height: 1.3; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-kit-name { font-weight: 600; }
+.lib-sub { font-size: 11px; line-height: 1.3; color: var(--ink-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Split subtitle (@author + "Edited locally"): the author truncates, the label
+   never does, so the state stays readable even when a timestamp shares the row. */
+.lib-sub-split { display: flex; align-items: baseline; overflow: visible; }
+.lib-sub-split .lib-sub-author { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-sub-split .lib-edited-wrap { flex: 0 0 auto; white-space: nowrap; }
+/* "Edited locally" — quiet state on the same muted subtitle line as the @author.
+   No hover affordance; the full meaning lives in the viewer ("See changes"). */
+.lib-edited { color: var(--ink-2); }
+.lib-time { font-size: 12px; color: var(--ink-3); white-space: nowrap; flex: none; }
+/* Quiet end-cap on the capped Latest feed — "N more in Skills". */
+.lib-more { justify-content: center; padding: 8px 10px; }
+.lib-tail { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.lib-open { display: none; align-items: center; gap: 3px; font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+.lib-open-ico { display: inline-flex; }
+.lib-open-ico svg { width: 12px; height: 12px; }
+/* Viewer rows swap the timestamp for "Open ↗" on hover — the ↗ means "opens a
+   separate window" (the MD viewer), same as the updates bar's ↗ opens the web. */
+.lib-localview:hover .lib-time { display: none; }
+.lib-localview:hover .lib-open { display: inline-flex; }
+/* Folder rows do the same: hover reveals "Open ↗" (opens the folder in Finder). */
+.folder-row:hover .lib-open { display: inline-flex; }
+/* Skills tab: row opens the local viewer (pointer), with a quiet ↗ to the web
+   page that only appears on row hover — the local view is the primary gesture. */
+.lib-localview { cursor: pointer; }
+.lib-count { font-size: 12px; color: var(--ink-3); flex: none; }
+.lib-chev { flex: none; color: var(--ink-3); transition: transform 0.15s ease; }
+/* Accordion disclosure: ⌄ collapsed → ⌃ expanded (down-chevron = "expands here",
+   distinct from the › drill-in chevron that pushes a screen). */
+.lib-chev.open { transform: rotate(180deg); }
+.lib-kit-skills.animate-in { overflow: hidden; animation: expand-down 0.24s cubic-bezier(0.23, 1, 0.32, 1); }
+/* Member skills read as nested under their kit: indent + a slightly smaller cover. */
+/* Nested skills indent so their cover aligns with the KIT TITLE, not the kit cover:
+   row padding (10) + kit cover (34) + gap (10) = 54px. Clear parent→child hierarchy. */
+.lib-kit-skills .lib-skill { padding-left: 54px; }
+.lib-kit-skills .lib-cover { width: 30px; height: 30px; }
+.lib-skill .s.skip { font-size: 11px; color: var(--ink-3); flex: none; }
+
+/* Descendant, not child: the painted-cover span now wraps the svg. */
+.cover svg { display: block; width: 100%; height: 100%; }
+
+/* ── Viewer window (?view=viewer) ────────────────────────────────────────────
+   A real, decorated, resizable window — the only place the local edit is shown.
+   Renders YOUR edited markdown (rendered/raw) plus the yours-vs-theirs diff. */
+/* Fixed to the viewport (html/body are overflow:hidden for the tray): a static
+   header, then .vw-main fills the rest with an optional file sidebar and the
+   scrolling content pane. Each of .vw-sidebar / .vw-scroll scrolls on its own. */
+.viewer { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: var(--bg); color: var(--ink); }
+.vw-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 20px; border-bottom: 1px solid var(--line);
+  flex: none; background: var(--bg); z-index: 2;
+}
+.vw-main { display: flex; flex: 1; min-height: 0; }
+.vw-scroll { flex: 1; min-width: 0; overflow-y: auto; }
+/* File sidebar — a collapsible folder tree (SKILL.md first). Own scroll. */
+.vw-sidebar {
+  flex: none; width: 210px; overflow-y: auto; padding: 8px 6px;
+  background: var(--surface);
+  display: flex; flex-direction: column; gap: 1px;
+}
+/* Draggable divider between the sidebar and the content pane. */
+.vw-resizer { flex: none; width: 6px; margin: 0 -3px; cursor: col-resize; background: transparent; z-index: 1; border-left: 1px solid var(--line); }
+.vw-resizer:hover, .vw-resizer.dragging { border-left-color: var(--ink-3); }
+.vw-file, .vw-tree-dir {
+  display: flex; align-items: center; gap: 4px;
+  width: 100%; text-align: left; font: inherit; font-size: 12px; color: var(--ink-2);
+  padding: 6px 8px; border: none; border-radius: 6px; background: transparent; cursor: pointer;
+}
+.vw-file { justify-content: space-between; }
+.vw-file:hover, .vw-tree-dir:hover { background: var(--card-soft); }
+.vw-file.on { background: var(--card-soft); color: var(--ink); font-weight: 500; }
+.vw-tree-dir { color: var(--ink); font-weight: 500; }
+.vw-tree-chev { flex: none; display: inline-flex; color: var(--ink-3); transition: transform 0.12s ease; }
+.vw-tree-chev.open { transform: rotate(90deg); }
+.vw-tree-chev svg { width: 12px; height: 12px; }
+.vw-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.vw-file-size { flex: none; font-size: 11px; color: var(--ink-3); }
+.vw-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.vw-name { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vw-author { font-size: 12px; color: var(--ink-3); }
+/* Right-side header actions: the rendered/raw toggle. */
+.vw-actions { display: flex; align-items: center; gap: 12px; flex: none; }
+/* Quiet header link-buttons: Folder (reveal in Finder) + Web (registry page). */
+.vw-link {
+  font: inherit; font-size: 12px; font-weight: 500; color: var(--ink-2);
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 4px 8px; border: none; border-radius: 6px; background: transparent; cursor: pointer; flex: none;
+}
+.vw-link:hover { color: var(--ink); background: var(--card-soft); }
+.vw-link-ico { display: inline-flex; }
+.vw-link-ico svg { width: 12px; height: 12px; }
+/* Square icon buttons: sidebar-collapse (in the title) + </> source toggle. */
+.vw-icon {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: none; border-radius: 6px;
+  background: transparent; color: var(--ink-2); cursor: pointer;
+}
+.vw-icon:hover { background: var(--card-soft); color: var(--ink); }
+.vw-icon.on { background: var(--card-soft); color: var(--ink); }
+.vw-icon svg { width: 16px; height: 16px; }
+#vw-sidebar-toggle { margin-left: -6px; }
+/* Collapsed sidebar — hide the tree + its resizer, content takes the full width. */
+.viewer.sidebar-collapsed .vw-sidebar,
+.viewer.sidebar-collapsed .vw-resizer { display: none; }
+.vw-body { padding: 20px; }
+/* Frontmatter header card — description + a key/value table above the body. */
+.vw-fm { margin-bottom: 22px; }
+.vw-fm-desc { font-size: 14px; line-height: 1.6; color: var(--ink); margin: 0 0 14px; }
+.vw-fm-fields { display: grid; grid-template-columns: max-content 1fr; gap: 4px 20px; margin: 0; }
+.vw-fm-row { display: contents; }
+.vw-fm-key { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; color: var(--ink-3); }
+.vw-fm-val { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; color: var(--ink); word-break: break-word; }
+/* Footer status bar — file count · total size (left), current file size (right). */
+.vw-foot {
+  flex: none; display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 16px; border-top: 1px solid var(--line);
+  font-size: 12px; color: var(--ink-3); background: var(--bg);
+}
+.vw-raw {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word; color: var(--ink);
+}
+.vw-empty { font-size: 13px; color: var(--ink-2); padding: 8px 0; }
+
+/* diff — one block per changed file (yours vs the author's) */
+/* "Your changes" is a collapsible panel pinned at the TOP of the scroll pane
+   (open by default) so the diff — the reason you opened an edited skill — is the
+   first thing you see, with a border-BOTTOM separating it from the doc below. */
+.vw-diff-wrap { padding: 4px 20px 18px; border-bottom: 1px solid var(--line); }
+.vw-diff-title { display: flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; user-select: none; font-size: 12px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.04em; margin: 14px 0 6px; }
+.vw-diff-title::-webkit-details-marker { display: none; }
+.vw-diff-chevron { display: inline-flex; width: 12px; height: 12px; color: var(--ink-3); transition: transform 0.15s ease; }
+.vw-diff-chevron svg { width: 12px; height: 12px; }
+details.vw-diff-wrap[open] > .vw-diff-title .vw-diff-chevron { transform: rotate(90deg); }
+.vw-diff-sub { font-size: 12px; color: var(--ink-3); line-height: 1.45; margin: 0 0 12px; }
+.vw-diff { display: flex; flex-direction: column; gap: 8px; }
+.vw-diff-file { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.vw-diff-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 12.5px; }
+.vw-diff-note { padding: 6px 12px 10px; font-size: 12px; color: var(--ink-3); }
+.vw-diff-empty { font-size: 13px; color: var(--ink-2); padding: 10px 0; }
+.vw-hunk { border-top: 1px solid var(--line); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.55; overflow-x: auto; }
+.vw-line { display: flex; gap: 8px; padding: 0 12px; white-space: pre; }
+.vw-line-sign { width: 8px; flex: none; color: var(--ink-3); }
+.vw-line-add { background: color-mix(in srgb, var(--success) 12%, transparent); }
+.vw-line-del { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.vw-line-add .vw-line-sign { color: var(--success); }
+.vw-line-del .vw-line-sign { color: var(--danger); }
+
+/* ── Markdown type scale ─────────────────────────────────────────────────────
+   Ported from web MarkdownContent (compact variant) onto the desktop --ink-*
+   vars — a SKILL.md reads as a dense doc, not a blog article. */
+.markdown { font-size: 14px; line-height: 1.65; color: var(--ink); word-wrap: break-word; }
+.markdown > :first-child { margin-top: 0; }
+.markdown h1 { font-size: 20px; font-weight: 600; line-height: 1.25; letter-spacing: -0.01em; margin: 0 0 12px; }
+.markdown h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; margin: 28px 0 8px; }
+.markdown h3 { font-size: 16px; font-weight: 600; margin: 20px 0 6px; }
+.markdown h4, .markdown h5, .markdown h6 { font-size: 14px; font-weight: 600; margin: 16px 0 4px; }
+.markdown p { margin: 0 0 16px; }
+.markdown ul { list-style: disc; padding-left: 24px; margin: 0 0 16px; }
+.markdown ol { list-style: decimal; padding-left: 24px; margin: 0 0 16px; }
+.markdown li { margin-bottom: 4px; }
+.markdown blockquote { border-left: 2px solid var(--line); padding-left: 16px; margin: 16px 0; color: var(--ink-2); font-style: italic; }
+.markdown a { color: var(--accent); text-underline-offset: 2px; }
+.markdown a:hover { text-decoration: underline; }
+.markdown strong { font-weight: 600; }
+.markdown hr { border: none; border-top: 1px solid var(--line); margin: 24px 0; }
+.markdown img { max-width: 100%; height: auto; }
+.markdown :not(pre) > code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+.markdown pre { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin: 16px 0; overflow-x: auto; }
+.markdown pre code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+.markdown table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 13px; }
+.markdown th { border-bottom: 1px solid var(--line); padding: 8px 12px; text-align: left; vertical-align: top; font-weight: 600; }
+.markdown td { border-bottom: 1px solid var(--line); padding: 8px 12px; vertical-align: top; }
+
+/* One-time skill-stats ask card (home feed, stacked so it never truncates) */
+.stats-ask-card { display: flex; flex-direction: column; gap: 5px; background: var(--card-soft); border-radius: 10px; padding: 10px 12px; margin: 0 6px 8px; }
+.stats-ask-title { font-size: 13px; font-weight: 600; }
+.stats-ask-sub { font-size: 11.5px; color: var(--ink-2); line-height: 1.45; }
+/* Apple onboarding stack: full-width primary, decline as quiet text below.
+   Both actions stay one tap, but the layout makes the recommended path obvious. */
+.stats-ask-actions { display: flex; flex-direction: column; gap: 1px; margin-top: 5px; }
+.stats-ask-btn {
+  border: none; border-radius: 8px;
+  font-family: inherit; text-align: center; cursor: default;
+  transition: transform 100ms ease-out, opacity 0.14s ease, color 0.14s ease;
+}
+.stats-ask-btn:active { transform: scale(0.97); }
+.stats-ask-yes { background: var(--ink); color: var(--bg); font: 700 13px/1.4 inherit; padding: 7px 0; }
+.stats-ask-yes:hover { opacity: 0.88; }
+.stats-ask-no { background: none; color: var(--ink-2); font: 600 12px/1.4 inherit; padding: 5px 0; }
+.stats-ask-no:hover { color: var(--ink); }
+
+/* Onboarding v2: welcome moment + honest pairing screen */
+.ob-logo-sm { width: 36px; height: 47px; }
+.ob-ok { color: var(--success); }
+.ob-link {
+  background: none; border: none; padding: 0; font: inherit; font-size: 12px;
+  color: var(--accent); cursor: default; text-decoration: underline;
+  text-decoration-style: dotted; text-underline-offset: 3px;
+}
+.ob-link:hover { text-decoration-style: solid; }
+.ob-privacy { font-size: 11.5px; color: var(--ink-2); text-align: center; margin-top: 10px; }
+.ob-cta:disabled { opacity: 0.45; }
+.code-boxes.shake { animation: ob-shake 0.4s ease; }
+@keyframes ob-shake {
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+
+/* Welcome proof: the agents Skillet already sees on this machine */
+.ob-agents { display: flex; gap: 7px 18px; flex-wrap: wrap; justify-content: center; margin: 2px 0 4px; }
+.ob-agent {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 13px;
+  font-weight: 500; color: var(--ink); white-space: nowrap;
+}
+.ob-agent svg { width: 15px; height: 15px; }
+
+/* Apple-design pass: step motion, press response, type tracking, reduced motion */
+.ob-step { display: flex; flex-direction: column; gap: 18px; align-items: stretch; margin-top: auto; }
+.ob-enter { animation: ob-enter 280ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes ob-enter { from { opacity: 0; transform: translateY(10px); } }
+.ob-title { letter-spacing: -0.02em; }
+.ob-cta { transition: transform 110ms ease-out; }
+.ob-cta:active:not(:disabled) { transform: scale(0.98); }
+.ob-link:active { opacity: 0.6; }
+/* Fine print is the button's caption — couple them (flex gap alone reads detached) */
+.ob-step .ob-fine { margin-top: -8px; }
+@media (prefers-reduced-motion: reduce) {
+  .ob-enter { animation: ob-fade 160ms ease both; }
+  .code-cell.pop, .code-boxes.shake { animation: none; }
+}
+@keyframes ob-fade { from { opacity: 0; } }
+.ob-agent-more { color: var(--ink-3); font-weight: 400; }
+
+/* Tray auth gate aligned with onboarding materials */
+.gate-link { background: none; border: none; padding: 0; font: inherit; color: var(--accent); cursor: default; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+.gate-link:hover { text-decoration-style: solid; }
+.gate-fine { font-size: 10.5px; color: var(--ink-3); text-align: center; margin-top: 8px; line-height: 1.4; }
+
+/* Payoff: agent rows land with a stagger as the sync answers */
+.ob-row-in { animation: ob-row-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: calc(var(--i) * 80ms); }
+@keyframes ob-row-in { from { opacity: 0; transform: translateX(-6px); } }
+@media (prefers-reduced-motion: reduce) { .ob-row-in { animation: ob-fade 160ms ease both; } }

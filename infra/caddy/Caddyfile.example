@@ -1,0 +1,20 @@
+# Example Caddy config for self-hosted Skillet.
+# Web (Next.js) and registry (Fastify) run under PM2 on loopback; Caddy terminates TLS.
+# Replace email and ensure DNS A/CNAME records point at this host before reload.
+#
+#   caddy validate --config /etc/caddy/Caddyfile
+#   systemctl reload caddy
+
+{
+	email ops@skillet.md
+}
+
+skillet.md, www.skillet.md {
+	encode gzip
+	reverse_proxy 127.0.0.1:3480
+}
+
+registry.skillet.md {
+	encode gzip
+	reverse_proxy 127.0.0.1:3481
+}

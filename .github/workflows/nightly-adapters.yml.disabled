@@ -1,0 +1,45 @@
+name: Nightly Adapter Matrix
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  adapter-matrix:
+    name: "${{ matrix.adapter }} adapter"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        adapter:
+          - codex
+          - openclaw
+          - hermes
+          - cursor
+          - windsurf
+          - env-add
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build core
+        run: pnpm --filter @skillet/core build
+
+      - name: Build adapter
+        run: pnpm --filter "@skillet/adapters-${{ matrix.adapter }}" build
+
+      - name: Test adapter
+        run: pnpm --filter "@skillet/adapters-${{ matrix.adapter }}" test

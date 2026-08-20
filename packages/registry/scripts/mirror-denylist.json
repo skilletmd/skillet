@@ -1,0 +1,4 @@
+{
+  "_comment": "Repos discovery must never propose, keyed by normalized owner/repo (lowercase). Intentionally empty in the public tree: suppression decisions belong to per-review-queue actions, not a published list. loadDenylist() treats an empty list (or a missing file) as a no-op.",
+  "deny": []
+}

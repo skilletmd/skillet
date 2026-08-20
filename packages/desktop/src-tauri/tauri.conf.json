@@ -1,0 +1,112 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Skillet",
+  "version": "0.1.0",
+  "identifier": "sh.skillet.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build && node scripts/prepare-skillet-sidecar.mjs"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "palette",
+        "url": "index.html?view=palette",
+        "title": "Skillet",
+        "width": 560,
+        "height": 392,
+        "decorations": false,
+        "transparent": true,
+        "visible": false,
+        "center": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": true,
+        "resizable": false
+      },
+      {
+        "label": "tray",
+        "url": "index.html?view=tray",
+        "title": "Skillet",
+        "width": 360,
+        "height": 400,
+        "decorations": false,
+        "transparent": true,
+        "visible": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": true,
+        "resizable": false
+      },
+      {
+        "label": "onboarding",
+        "url": "index.html?view=onboarding",
+        "title": "Welcome to Skillet",
+        "width": 400,
+        "height": 520,
+        "decorations": false,
+        "transparent": true,
+        "visible": false,
+        "center": true,
+        "skipTaskbar": false,
+        "shadow": true,
+        "resizable": false
+      },
+      {
+        "label": "viewer",
+        "url": "index.html?view=viewer",
+        "title": "Skillet Viewer",
+        "width": 720,
+        "height": 600,
+        "minWidth": 480,
+        "minHeight": 380,
+        "decorations": true,
+        "visible": false,
+        "center": true,
+        "skipTaskbar": false,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' asset: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://registry.skillet.md; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "externalBin": ["binaries/skillet"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "dmg": {
+        "background": "installer/dmg-background.png",
+        "windowSize": { "width": 600, "height": 428 },
+        "appPosition": { "x": 186, "y": 198 },
+        "applicationFolderPosition": { "x": 412, "y": 198 }
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://skillet.md/desktop/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY5NDgzQUM5QUI2QTlBODcKUldTSG1tcXJ5VHBJYVpIRXM3c0YzaXBZRDQ3cHpHZDR3blVWL1EzdkJ6WjBVTCsyNi93M2JFQS8K"
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": ["skillet"]
+      }
+    }
+  }
+}

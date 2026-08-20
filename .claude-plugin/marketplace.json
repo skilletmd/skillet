@@ -1,0 +1,31 @@
+{
+  "name": "skillet",
+  "owner": {
+    "name": "Skillet",
+    "url": "https://skillet.md"
+  },
+  "metadata": {
+    "description": "Skillet — publish a skill once, run it in every agent runtime",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "skillet",
+      "description": "Summon anyone's public skills by handle, or route a task to the best skill in your own kit",
+      "source": "./packages/cli/bundled-skills",
+      "author": {
+        "name": "Skillet",
+        "url": "https://skillet.md"
+      },
+      "homepage": "https://skillet.md",
+      "license": "Apache-2.0",
+      "keywords": [
+        "skills",
+        "skill-routing",
+        "registry",
+        "sync",
+        "discovery"
+      ]
+    }
+  ]
+}

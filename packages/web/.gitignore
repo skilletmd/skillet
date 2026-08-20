@@ -1,0 +1,9 @@
+.next/
+out/
+next-env.d.ts
+node_modules/
+
+# blog sqlite store (seeded from blog-seed.json)
+content/blog.db
+content/blog.db-wal
+content/blog.db-shm

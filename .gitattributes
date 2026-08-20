@@ -1,0 +1,24 @@
+# Hard LF standard: every text file is LF in git and on checkout.
+# Editors: see .editorconfig (end_of_line = lf).
+# Windows launchers are the only CRLF exception.
+* text eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary — never line-ending normalize.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.exe binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+*.sqlite binary
+*.db binary
+*.zip binary
+*.wasm binary

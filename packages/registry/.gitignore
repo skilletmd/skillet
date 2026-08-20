@@ -1,0 +1,7 @@
+registry.db
+registry.db-*
+*.db
+*.db.*
+*.db-shm
+*.db-wal
+.magic-links.log

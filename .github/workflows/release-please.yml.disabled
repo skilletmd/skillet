@@ -1,0 +1,43 @@
+name: release-please
+
+# DISABLED on the private dev repo (throwaway history). ACTIVATE at the 1.0
+# launch on the new public org:
+#   1. Rename this file to `release-please.yml` (drop `.disabled`).
+#   2. Confirm .release-please-manifest.json seeds every package at the launch
+#      version (currently 1.0.0).
+#   3. Repo setting: Settings → Actions → General → Workflow permissions →
+#      enable "Allow GitHub Actions to create and approve pull requests".
+#   4. First push to `main`: release-please opens the 1.0.0 release PRs. Merge
+#      them to publish the baseline tags + changelogs.
+# On a fresh repo there is no prior history to sweep, so no bootstrap-sha is
+# needed — the changelog starts clean at 1.0.0.
+#
+# Maintains a per-package "release PR" that writes CHANGELOG.md (Keep a
+# Changelog format, driven by Conventional Commits) and bumps package.json.
+# Merging a release PR creates its GitHub release + a component-prefixed tag:
+#   cli-vX.Y.Z        -> ALSO triggers .github/workflows/cli-publish.yml (npm)
+#   core-vX.Y.Z, ...  -> changelog/tag only, nothing publishes
+# The bare `vX.Y.Z` tag is reserved for the signed desktop release (release.yml)
+# and is never produced here (include-component-in-tag keeps every tag prefixed).
+#
+# Repo setting required once: Settings → Actions → General → Workflow
+# permissions → enable "Allow GitHub Actions to create and approve pull
+# requests" (release-please opens the release PRs with GITHUB_TOKEN).
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
