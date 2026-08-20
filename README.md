@@ -154,10 +154,3 @@ Setup, conventions, and the checks to run before pushing are in
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 Licensed under [Apache-2.0](LICENSE).
-
-## Credits
-
-The generative kit cover art is inspired by [Zeh Fernandes](https://zehfernandes.com)'
-[World Cup 2023 generative posters](https://github.com/zehfernandes/worldcup2023-posters)
-— the alternating gradient rows and grid-of-marks idea. Our implementation is
-original (no code, colors, or assets from that project are used).
