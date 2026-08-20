@@ -124,10 +124,10 @@ nonce checks to reject replays. **The nonce store is in-memory and per-process.*
   unset, the registry boots with a warning that the routes rely solely on the
   signing secret.
 
-**Pre-publish secret-scan gate.** Run a [gitleaks](https://github.com/gitleaks/gitleaks)
-scan of the working tree before publishing. (CI enforcement is wired in `ci.yml`, which is
-currently disabled — re-enable it before going public.) Also run a full git-*history* scan
-and confirm it is clean — committed secrets survive in history even after deletion:
+**Secret-scan gate.** CI runs [gitleaks](https://github.com/gitleaks/gitleaks) against the
+working tree on every push to `main` and every pull request (the `secret-scan` job in
+`ci.yml`). That covers the tree, not history, so run a full git-*history* scan yourself
+before publishing — committed secrets survive in history even after deletion:
 
 ```bash
 gitleaks detect --redact --config=.gitleaks.toml
