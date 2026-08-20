@@ -7,7 +7,7 @@
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build && node scripts/prepare-skillet-sidecar.mjs"
+    "beforeBuildCommand": "node scripts/prepare-skillet-sidecar.mjs && pnpm build"
   },
   "app": {
     "macOSPrivateApi": true,
