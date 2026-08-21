@@ -1,13 +1,14 @@
 name: docs-setup
 
-# Guards the documented onboarding path: a fresh checkout following the README must
-# migrate + seed + boot the registry and serve the seeded catalog. This is how the
-# broken seed:dev would have been caught. Scoped to setup-affecting changes to stay cheap.
+# Guards the documented onboarding path: a fresh checkout following CONTRIBUTING's
+# Setup must migrate + seed + boot the registry and serve the seeded catalog. This is
+# how the broken seed:dev would have been caught. Scoped to setup-affecting changes to
+# stay cheap. (The steps live in CONTRIBUTING.md; the README only links to them.)
 
 on:
   pull_request:
     paths:
-      - README.md
+      - CONTRIBUTING.md
       - package.json
       - pnpm-lock.yaml
       - "packages/registry/**"
@@ -17,7 +18,7 @@ on:
   push:
     branches: [main]
     paths:
-      - README.md
+      - CONTRIBUTING.md
       - "packages/registry/**"
       - scripts/verify-setup.mjs
       - .github/workflows/docs-setup.yml

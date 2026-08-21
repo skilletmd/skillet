@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Prove the documented setup path works end to end, so onboarding can't silently rot
-// (which is how seed:dev broke unnoticed). Runs the README steps against the DATABASE_URL
+// (which is how seed:dev broke unnoticed). Runs the CONTRIBUTING Setup steps against DATABASE_URL
 // in the environment: migrate -> seed -> boot the registry -> assert it serves seeded data.
 //
 //   Local:  DATABASE_URL=mysql://skillet:skillet@127.0.0.1:3306/skillet_registry \
@@ -24,7 +24,7 @@ function fail(msg) {
 }
 
 if (!(process.env.DATABASE_URL || '').trim()) {
-  fail('DATABASE_URL is not set. Point it at a MySQL you can migrate (see the README Quickstart).')
+  fail('DATABASE_URL is not set. Point it at a MySQL you can migrate (see CONTRIBUTING.md → Setup).')
 }
 
 function step(name, cmd, args) {
