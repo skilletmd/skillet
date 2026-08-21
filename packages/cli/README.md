@@ -1,10 +1,11 @@
 # skilletmd
 
-Your skills, everywhere. `skillet` is the command-line client for
-[Skillet](https://skillet.md) — a package manager for agent skills. Author your
-skills once as `SKILL.md` folders (the open [agentskills.io](https://agentskills.io)
-format) and sync them to every computer, agent, and surface you use, then share
-them with people you trust.
+`skillet` is the command-line client for [Skillet](https://skillet.md), a package
+manager for agent skills. Author a skill once and sync it to every computer,
+agent, and surface you use, then share it with people you trust.
+
+Skills are `SKILL.md` folders, in the open
+[agentskills.io](https://agentskills.io) format.
 
 ## Install
 

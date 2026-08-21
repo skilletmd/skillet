@@ -50,15 +50,16 @@ Both are code-signed and auto-update. Installers are also attached to every
 
 ## Why
 
-A skill is a folder with a `SKILL.md` in it, in the open
-[agentskills.io](https://agentskills.io) format: a prompt, a tool, a playbook.
-They multiply fast, then scatter across machines and runtimes, and the good one
+Skills multiply fast, then scatter across machines and runtimes, and the good one
 is always on the laptop you don't have.
 
 Skillet treats a skill like a package. One canonical, versioned, signed artifact,
 synced everywhere and shareable as a link. The registry is the source of truth,
 your editor or a linked GitHub repo is where you author, and the CLI and desktop
 app keep every surface current.
+
+A skill itself is just a folder with a `SKILL.md` in it: a prompt, a tool, a
+playbook, in the open [agentskills.io](https://agentskills.io) format.
 
 ## Runs where you already work
 
