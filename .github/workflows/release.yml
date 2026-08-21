@@ -173,6 +173,35 @@ jobs:
           # On Windows, merge the Azure Trusted Signing signCommand overlay.
           args: ${{ matrix.name == 'windows' && '--config src-tauri/tauri.windows-signing.conf.json' || '' }}
 
+      # tauri notarizes and staples the .app, then wraps an UNNOTARIZED .dmg
+      # around it: the dmg carries a Developer ID signature but no ticket of its
+      # own, and `spctl --assess --type open` (what Finder runs when you
+      # double-click a disk image) rejects it. v0.1.1 shipped that way and had to
+      # be stapled by hand after the fact. The local build never hit this because
+      # it ran `pnpm notarize:macos` as a second step; the CI path had no
+      # equivalent. Staple the dmg here, then replace the copy tauri-action
+      # already uploaded to the draft.
+      - name: Notarize and staple the dmg (macOS)
+        if: matrix.name == 'macos'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          set -euo pipefail
+          dmg=$(ls packages/desktop/src-tauri/target/release/bundle/dmg/*.dmg)
+          xcrun notarytool submit "$dmg" \
+            --key "$APPLE_API_KEY_PATH" \
+            --key-id "$APPLE_API_KEY" \
+            --issuer "$APPLE_API_ISSUER" \
+            --wait
+          xcrun stapler staple "$dmg"
+          # The real gate. `notarytool submit` can exit 0 on a rejected
+          # submission, and stapling a ticketless dmg is the failure we are
+          # guarding against, so assert Gatekeeper's own verdict before upload.
+          spctl --assess --type open --context context:primary-signature -vv "$dmg"
+          gh release upload "${GITHUB_REF_NAME}" "$dmg" --clobber --repo "$GITHUB_REPOSITORY"
+
   publish:
     # Only reached when the release job succeeded for ALL platforms (a matrix job
     # succeeds only if every leg does). Flipping the draft public here is the
