@@ -113,6 +113,19 @@ jobs:
       # tauri-action builds, signs (Apple env on macOS; the Windows overlay's
       # signCommand on Windows), minisigns the update artifacts, generates
       # latest.json, and creates/updates the GitHub Release for this tag.
+      # tauri notarizes with an App Store Connect API key, and wants a PATH to
+      # the .p8 rather than its contents — so the secret holds base64 and this
+      # materializes it into the runner's temp dir. Same credential the local
+      # build uses, so there is one Apple credential set rather than two.
+      - name: Stage the App Store Connect key (macOS)
+        if: matrix.name == 'macos' && env.KEY_B64 != ''
+        env:
+          KEY_B64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+        run: |
+          printf '%s' "$KEY_B64" | base64 --decode > "$RUNNER_TEMP/asc-key.p8"
+          chmod 600 "$RUNNER_TEMP/asc-key.p8"
+          echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/asc-key.p8" >> "$GITHUB_ENV"
+
       - name: Build, sign, and publish
         # SHA-pinned (like every other action here): this step sees ALL signing
         # secrets, so a moved @v0 tag could exfiltrate them + publish a malicious
@@ -124,9 +137,14 @@ jobs:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Notarization via App Store Connect API key (not an Apple ID +
+          # app-specific password): fewer credentials, and the same ones the
+          # local build already uses. APPLE_API_KEY is the 10-char Key ID and
+          # APPLE_API_ISSUER the issuer UUID — both identifiers, useless without
+          # the .p8 staged above.
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           # --- Azure Trusted Signing (Windows) — read by trusted-signing-cli ---
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
