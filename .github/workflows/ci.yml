@@ -1,44 +1,32 @@
 name: CI
 
+# Docs-only changes skip this workflow: it is a ~9-minute build (Linux install +
+# build + lint + test, plus a Windows Rust compile), and a Markdown edit cannot
+# break any of it. The cheap always-on checks — gitleaks, tracker IDs, generated
+# registry-api drift — live in guards.yml precisely so they still run here.
+# `paths-ignore` skips only when EVERY changed file matches, so a commit that
+# touches code and a doc together still runs in full. Note `*.md` is root-level
+# only: a Markdown file inside packages/ can be a test fixture, so those still
+# trigger a run.
 on:
   push:
     branches: [main, "feat/**"]
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+      - ".github/assets/**"
+      - LICENSE
   pull_request:
     branches: [main]
+    # Repeated verbatim, not aliased: GitHub Actions does not support YAML
+    # anchors, and it fails the workflow rather than ignoring them.
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+      - ".github/assets/**"
+      - LICENSE
 
 jobs:
-  secret-scan:
-    name: Secret scan (gitleaks)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      # Scans the checked-out tree for committed secrets. Pinned, redacted, and
-      # config-driven so example-file placeholders don't false-positive.
-      # NOTE: this scans the working tree only. The full git-history scan is a
-      # manual pre-publish gate — see CONTRIBUTING.md before flipping public.
-      - name: gitleaks
-        uses: docker://ghcr.io/gitleaks/gitleaks:v8.30.1
-        with:
-          args: >-
-            detect
-            --source=/github/workspace
-            --config=/github/workspace/.gitleaks.toml
-            --no-git
-            --redact
-            --no-banner
-            --verbose
-
-      # Fast, dependency-free guard: fail if any internal tracker ID or the
-      # trademark TODO is committed. Exemptions are documented in the script
-      # (docs/plans/**, pnpm-lock.yaml, the script).
-      - name: No internal tracker IDs
-        run: node scripts/check-no-tracker-ids.mjs
-
-      # The registry HTTP API doc is generated from source — fail if it drifted.
-      - name: Registry API doc is current
-        run: node scripts/gen-registry-api.mjs --check
-
   ci:
     name: Install → Build → Lint → Test
     runs-on: ubuntu-latest

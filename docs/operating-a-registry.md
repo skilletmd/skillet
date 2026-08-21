@@ -187,7 +187,7 @@ the desktop app never hosts its own approval UI.
 - **Secret hygiene.** CI runs
   [gitleaks](https://github.com/gitleaks/gitleaks) against the working tree on
   every push to `main` and every pull request (the `secret-scan` job in
-  `ci.yml`). That covers the tree, not history, so run a full git-*history* scan
+  `guards.yml`). That covers the tree, not history, so run a full git-*history* scan
   yourself before publishing — committed secrets survive in history even after
   deletion:
 

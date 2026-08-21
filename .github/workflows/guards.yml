@@ -1,0 +1,45 @@
+name: Guards
+
+# Cheap, always-on checks (~20s). Deliberately NOT in ci.yml: ci.yml skips
+# docs-only pushes to avoid a 9-minute build for a Markdown change, but these
+# three must run on every change, docs included. A secret can be pasted into a
+# doc, a tracker ID can land in a comment, and docs/registry-api.md is itself a
+# generated doc.
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Scans the checked-out tree for committed secrets. Pinned, redacted, and
+      # config-driven so example-file placeholders don't false-positive.
+      # NOTE: this scans the working tree only. The full git-history scan is a
+      # manual pre-publish gate — see CONTRIBUTING.md before flipping public.
+      - name: gitleaks
+        uses: docker://ghcr.io/gitleaks/gitleaks:v8.30.1
+        with:
+          args: >-
+            detect
+            --source=/github/workspace
+            --config=/github/workspace/.gitleaks.toml
+            --no-git
+            --redact
+            --no-banner
+            --verbose
+
+      # Fast, dependency-free guard: fail if any internal tracker ID or the
+      # trademark TODO is committed. Exemptions are documented in the script
+      # (docs/plans/**, pnpm-lock.yaml, the script).
+      - name: No internal tracker IDs
+        run: node scripts/check-no-tracker-ids.mjs
+
+      # The registry HTTP API doc is generated from source — fail if it drifted.
+      - name: Registry API doc is current
+        run: node scripts/gen-registry-api.mjs --check
