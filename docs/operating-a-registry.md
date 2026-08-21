@@ -167,19 +167,33 @@ the desktop app never hosts its own approval UI.
 ## Security invariants (do not skip)
 
 - **Internal signing routes must never be internet-routable.** Keep them on a
-  private network and set `SKILLET_INTERNAL_ORIGIN_ALLOWLIST` (trusted
-  IPs/CIDRs); behind a proxy, pair with Authenticated Origin Pulls / mTLS. See
-  the root [README](../README.md) → **Operations**.
-- **Replay protection is per-process (in-memory nonce store).** Run a **single**
-  registry instance, or add a shared nonce backend, until one lands — a replay
-  can otherwise land on a different instance and pass. Keep clocks in NTP sync.
+  private network and enforce it in code with `SKILLET_INTERNAL_ORIGIN_ALLOWLIST`
+  (trusted TCP peers, comma-separated IPs/CIDRs): the registry 404s those routes
+  for any other peer, so a leaked signing secret alone is not enough. Behind a
+  proxy (e.g. Cloudflare) pair it with Authenticated Origin Pulls / mTLS. Left
+  unset, the registry boots with a warning that the routes rely solely on the
+  signing secret.
+- **Replay protection is per-process (in-memory nonce store).** The registry's
+  HMAC request-signing (web BFF → registry) includes timestamp and nonce checks
+  to reject replays, but **the nonce store does not span registry instances**.
+  Under horizontal scaling a replayed request can land on a different instance
+  than the original and pass the nonce check. Run a **single** registry instance,
+  or add a shared nonce backend (e.g. Redis), until one lands. The ±30s timestamp
+  window still bounds the replay surface, and clocks must stay in NTP sync.
 - **`TRUST_PROXY` must match your topology.** OFF behind a proxy collapses the
   per-IP sign-in cap into one global bucket (self-DoS); ON with no proxy lets
   callers spoof `X-Forwarded-For`. Set it to the proxy hop count. Details in the
   registry README's deployment contract.
-- **Secret hygiene.** Run `gitleaks` on the working tree *and* full history
-  before publishing (root README → Operations). CI enforcement lives in
-  `ci.yml` (currently disabled — re-enable before going public).
+- **Secret hygiene.** CI runs
+  [gitleaks](https://github.com/gitleaks/gitleaks) against the working tree on
+  every push to `main` and every pull request (the `secret-scan` job in
+  `ci.yml`). That covers the tree, not history, so run a full git-*history* scan
+  yourself before publishing — committed secrets survive in history even after
+  deletion:
+
+  ```bash
+  gitleaks detect --redact --config=.gitleaks.toml
+  ```
 
 ---
 
@@ -200,7 +214,7 @@ the desktop app never hosts its own approval UI.
 | Registry env vars, run, rate limits, R2 cutover, scanner backfill | [`packages/registry/README.md`](../packages/registry/README.md) |
 | Process topology, ports, cron, worker fan-out | [`ecosystem.config.cjs`](../ecosystem.config.cjs) |
 | Container build + the production env key set | [`packages/registry/Dockerfile`](../packages/registry/Dockerfile), [`packages/registry/README.md`](../packages/registry/README.md) |
-| Signing-route / replay / secret-scan invariants | [root README](../README.md) → Operations |
+| Signing-route / replay / secret-scan invariants | [Security invariants](#security-invariants-do-not-skip), above |
 | HTTP route map | [docs/registry-api.md](registry-api.md) |
 | Published-ref stability (yank / alias / ban) | [docs/reference-stability-policy.md](reference-stability-policy.md) |
 | Repo-wide build reality and invariants (agents) | [CLAUDE.md](../CLAUDE.md), [packages/registry/CLAUDE.md](../packages/registry/CLAUDE.md) |
