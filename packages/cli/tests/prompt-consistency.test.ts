@@ -59,6 +59,7 @@ test("non-TTY import -y completes without prompting (tray path)", () => {
   const env: Record<string, string> = {
     ...process.env,
     HOME: home,
+    USERPROFILE: home,
     SKILLET_DIR: join(home, ".skillet"),
     XDG_CONFIG_HOME: join(home, ".config"),
   } as Record<string, string>;

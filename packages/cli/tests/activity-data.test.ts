@@ -14,7 +14,7 @@ async function withTestKit(fn: (env: NodeJS.ProcessEnv) => void | Promise<void>)
     `skillet-activity-data-${process.pid}-${Date.now()}`,
   );
   await rm(root, { recursive: true, force: true });
-  const env = { ...process.env, HOME: root, SKILLET_DIR: join(root, ".skillet"), SKILLET_ACTIVITY: "0" };
+  const env = { ...process.env, HOME: root, USERPROFILE: root, SKILLET_DIR: join(root, ".skillet"), SKILLET_ACTIVITY: "0" };
   delete (env as Record<string, unknown>)["SKILLET_TOKEN"]; // anonymous — no server side
   try {
     await fn(env);

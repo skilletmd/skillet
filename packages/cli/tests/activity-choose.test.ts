@@ -16,7 +16,7 @@ async function withSandbox(fn: (env: NodeJS.ProcessEnv, skilletDir: string) => v
   );
   const skilletDir = join(root, ".skillet");
   await mkdir(skilletDir, { recursive: true });
-  const env = { ...process.env, HOME: root, SKILLET_DIR: skilletDir };
+  const env = { ...process.env, HOME: root, USERPROFILE: root, SKILLET_DIR: skilletDir };
   // Anonymous sandbox: no token, so the best-effort server flag is a no-op.
   delete (env as Record<string, unknown>)["SKILLET_TOKEN"];
   delete (env as Record<string, unknown>)["SKILLET_ACTIVITY"];

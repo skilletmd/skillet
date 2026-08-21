@@ -40,6 +40,7 @@ function isolatedEnv(extra: Record<string, string> = {}): {
       SKILLET_DIR: skilletDir,
       SKILLET_TOKEN: "",
       HOME: home,
+      USERPROFILE: home,
       SKILLET_WEB_URL: "https://skillet.md",
       ...extra,
     },

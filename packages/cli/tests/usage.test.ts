@@ -17,6 +17,7 @@ async function withTestKit(fn: (env: NodeJS.ProcessEnv) => void | Promise<void>)
   const env = {
     ...process.env,
     HOME: root,
+    USERPROFILE: root,
     SKILLET_DIR: join(root, ".skillet"),
     SKILLET_ACTIVITY: "0", // anonymous — nothing uploads
   };

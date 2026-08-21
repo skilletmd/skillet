@@ -3346,7 +3346,7 @@ select.ui-input {
   align-items: center;
   justify-content: center;
   border: 1.5px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 11px;
   line-height: 1;
   transition:

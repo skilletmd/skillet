@@ -16,6 +16,7 @@ function coldStartEnv(root: string): NodeJS.ProcessEnv {
   const env = {
     ...process.env,
     HOME: root,
+    USERPROFILE: root,
     SKILLET_DIR: join(root, ".skillet"),
     SKILLET_ACTIVITY: "0",
   };

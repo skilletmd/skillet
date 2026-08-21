@@ -196,7 +196,7 @@
   position: absolute;
   left: 0;
   pointer-events: none;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   background: color-mix(in srgb, var(--caution) 28%, transparent);
   animation: skill-editor-reveal-fade 1.6s ease forwards;
 }

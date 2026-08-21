@@ -20,6 +20,7 @@ function isolatedEnv(): Record<string, string> {
   const env: Record<string, string> = {
     ...process.env,
     HOME: home,
+    USERPROFILE: home,
     SKILLET_DIR: skilletDir,
     XDG_CONFIG_HOME: join(home, ".config"),
     // publish is legacy-gated; the consent contract still must hold there.

@@ -26,6 +26,7 @@ function pairedEnv(): { env: NodeJS.ProcessEnv; skilletDir: string; home: string
       SKILLET_DIR: skilletDir,
       SKILLET_TOKEN: "",
       HOME: home,
+      USERPROFILE: home,
       SKILLET_WEB_URL: "https://skillet.md",
       SKILLET_REGISTRY_URL: "http://127.0.0.1:1",
     },

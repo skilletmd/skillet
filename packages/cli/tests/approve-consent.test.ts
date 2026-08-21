@@ -57,6 +57,7 @@ function seedQuarantined(): { env: Record<string, string>; home: string; slug: s
   const env: Record<string, string> = {
     ...process.env,
     HOME: home,
+    USERPROFILE: home,
     SKILLET_DIR: skilletDir,
     XDG_CONFIG_HOME: join(home, ".config"),
     XDG_DATA_HOME: join(home, ".local", "share"),
