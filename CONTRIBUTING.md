@@ -5,22 +5,69 @@ conventions we hold the line on.
 
 ## Setup
 
-**Requires Node 24+** (`.nvmrc` / `.node-version` pin 24.16.0; `nvm use` or
-`fnm use` picks it up). On an older Node the registry exits at startup with a
-clear message. Live registry MySQL proofs (`pnpm --filter @skillet/registry
-test:mysql`) need a disposable `DATABASE_URL`: Docker compose
-(`docker compose -f docker-compose.mysql.yml up -d` → `:3307`) or native
-MySQL 8.x on `:3306`. Default `pnpm test` stays hermetic without MySQL.
+**Requires Node 24+** — pinned in `.nvmrc` / `.node-version` (`24.16.0`). The
+registry asserts the major at startup and exits with a clear message on an older
+Node. **pnpm** comes from Corepack (bundled with Node); its version is pinned by
+the `packageManager` field, so you never pick one.
 
 ```bash
+# 1. Node 24 (any manager that reads .nvmrc: nvm / fnm / asdf).
+nvm install        # fnm: `fnm install`  ·  asdf: `asdf install`
+corepack enable    # provisions the pinned pnpm — run once per machine
+
+# 2. Install dependencies, then BUILD the workspace. The build is required:
+#    packages resolve to their gitignored dist/, and `pnpm dev` does not build it
+#    for you, so a fresh clone fails to start without this step.
 pnpm install
-cp packages/registry/.env.example packages/registry/.env   # registry config
-cp packages/web/.env.example packages/web/.env.local        # web config (auth, OAuth)
-pnpm dev          # web app on http://localhost:3000, registry on :3481
+pnpm build         # skipping this => "Failed to resolve entry for @skillet/protocol"
+
+# 3. Start MySQL (the registry needs it before `pnpm dev`). Pick ONE.
+#    Docker — matches the registry/.env.example default (:3307):
+docker compose -f docker-compose.mysql.yml up -d
+#    Native — MySQL 8.4+ (9.x works) on :3306; create the db + user once:
+mysql -uroot <<'SQL'
+CREATE DATABASE IF NOT EXISTS skillet_registry CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'skillet'@'%' IDENTIFIED BY 'skillet';
+GRANT ALL PRIVILEGES ON skillet_registry.* TO 'skillet'@'%';
+FLUSH PRIVILEGES;
+SQL
+
+# 4. Copy the env templates (the *.env.example files ship empty placeholders).
+#    NATIVE MySQL: switch DATABASE_URL in registry/.env to the :3306 line.
+cp .env.example .env                                 # monorepo reference
+cp packages/registry/.env.example packages/registry/.env
+cp packages/web/.env.example packages/web/.env.local
+
+# 5. Create the schema:
+pnpm --filter @skillet/registry exec prisma migrate deploy
+
+# 6. Optional: seed a demo catalog so browse / feed / profiles are not empty.
+pnpm --filter @skillet/registry seed:dev
+
+# 7. Run
+pnpm dev           # web on http://localhost:3000, registry on http://localhost:3481
 ```
 
+**Minimum to boot:** only `DATABASE_URL` is required for the registry to start
+and serve browse/feed. Social sign-in and publish additionally need the OAuth and
+signing values filled into the `.env` files; each template documents what it
+needs. A fresh database has **no skills** until you publish or run the demo seed.
+
+Live registry MySQL proofs (`pnpm --filter @skillet/registry test:mysql`) need a
+disposable `DATABASE_URL`. Default `pnpm test` stays hermetic without MySQL.
+
 Monorepo layout (pnpm workspaces): `packages/web` (Next.js app), `registry`
-(Fastify + Prisma/MySQL API), `cli`, `desktop`, `core`, `adapters/*`.
+(Fastify + Prisma/MySQL API), `cli`, `desktop`, `core`, `protocol`, `mcp`,
+`adapters/*`.
+
+Useful scripts:
+
+```bash
+pnpm build         # build every package
+pnpm test          # run every package's tests
+pnpm typecheck     # typecheck the workspace
+pnpm lint
+```
 
 ## Checks (run before pushing)
 
