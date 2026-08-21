@@ -125,5 +125,18 @@ jobs:
       # The Rust side: PATH resolution, `.exe` suffixes and the no-console-window
       # spawn flags are all cfg'd per platform, so they are only really exercised
       # on a Windows runner.
+      # tauri's build script refuses to compile unless every declared externalBin
+      # resource exists on disk, and the real sidecar is a Bun-compiled binary
+      # produced by prepare-skillet-sidecar.mjs during a full app build. These
+      # are 15 pure-logic unit tests that never spawn it, so an empty placeholder
+      # satisfies the build script without pretending the sidecar was tested.
+      # Building the real one here would add Bun plus a full CLI bundle to every
+      # CI run for tests that do not use it.
+      - name: Stage a placeholder sidecar
+        shell: bash
+        run: |
+          mkdir -p packages/desktop/src-tauri/binaries
+          : > packages/desktop/src-tauri/binaries/skillet-x86_64-pc-windows-msvc.exe
+
       - name: Desktop Rust tests
         run: cargo test --manifest-path packages/desktop/src-tauri/Cargo.toml --no-default-features
