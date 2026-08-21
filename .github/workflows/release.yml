@@ -104,6 +104,12 @@ jobs:
       # overlay (tauri.windows-signing.conf.json), so Azure Trusted Signing signs
       # the installer BEFORE the updater minisig is computed over it. Install the
       # signer CLI; it reads the AZURE_* creds from the environment.
+      # The desktop app bundles a Bun-compiled sidecar (build-native.mjs), so
+      # tauri's beforeBuildCommand fails without Bun on PATH. desktop-build.yml
+      # has had this since it was written; the release path never did, because
+      # it had never run.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
       - name: Install Trusted Signing CLI (Windows)
         if: matrix.name == 'windows'
         # Pinned + --locked: this runs in the secrets-bearing job, so don't pull
