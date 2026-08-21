@@ -7,13 +7,16 @@ name: CI
 # `paths-ignore` skips only when EVERY changed file matches, so a commit that
 # touches code and a doc together still runs in full. Note `*.md` is root-level
 # only: a Markdown file inside packages/ can be a test fixture, so those still
-# trigger a run.
+# trigger a run — with an exception for packages/**/README.md, which is package
+# documentation (packages/cli/README.md is the npm landing page) and cannot
+# affect a build.
 on:
   push:
     branches: [main, "feat/**"]
     paths-ignore:
       - "*.md"
       - "docs/**"
+      - "packages/**/README.md"
       - ".github/assets/**"
       - LICENSE
   pull_request:
@@ -23,6 +26,7 @@ on:
     paths-ignore:
       - "*.md"
       - "docs/**"
+      - "packages/**/README.md"
       - ".github/assets/**"
       - LICENSE
 
