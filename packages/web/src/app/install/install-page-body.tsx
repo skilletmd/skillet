@@ -14,7 +14,6 @@ import {
   NPX_SKILLET_COMMAND,
 } from '@/config'
 import { CommandBlock } from '@/components/command-block'
-import { TrustPanel } from '@/components/trust-panel'
 import { SyncDiagram } from '@/components/sync-diagram'
 import { AppleLogo, WindowsLogo, TerminalLogo } from '@/components/os-logos'
 import { Button, buttonClasses } from '@/components/ui/button'
@@ -282,23 +281,6 @@ export function InstallPageBody({
             <SyncDiagram />
           </div>
         </div>
-      </section>
-
-      <section className="mx-auto max-w-[1120px] px-[clamp(16px,4vw,32px)] py-12">
-        <h2 className="mb-8 text-xl font-semibold tracking-tight text-(--ink)">
-          Private, safe, yours.
-        </h2>
-        <TrustPanel />
-        <p className="mt-10 text-sm text-(--ink-2)">
-          Curious how it works?{' '}
-          <Link
-            href="/docs"
-            className="font-medium underline decoration-(--line) underline-offset-2 hover:text-(--ink)"
-          >
-            Read the 2-minute version
-          </Link>
-          .
-        </p>
       </section>
 
       {showDemo && demoVideoUrl ? (
