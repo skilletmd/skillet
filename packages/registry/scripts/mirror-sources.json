@@ -704,6 +704,7 @@
       "license": "Apache-2.0",
       "ownerType": "Organization",
       "maxSkills": 24,
+      "syncMode": "per-skill",
       "logo": "https://github.com/heygen-com.png",
       "sourceUrl": "https://github.com/heygen-com/hyperframes"
     },
@@ -759,6 +760,7 @@
       "license": "MIT",
       "ownerType": "Organization",
       "maxSkills": 12,
+      "syncMode": "per-skill",
       "logo": "https://github.com/prisma.png",
       "sourceUrl": "https://github.com/prisma/skills"
     },
@@ -770,6 +772,7 @@
       "license": "MIT",
       "ownerType": "Organization",
       "maxSkills": 40,
+      "syncMode": "per-skill",
       "logo": "https://github.com/open-mercato.png",
       "sourceUrl": "https://github.com/open-mercato/skills"
     },
