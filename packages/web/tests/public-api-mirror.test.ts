@@ -141,3 +141,96 @@ describe('CORS and method surface', () => {
     expect(lastRequest, 'a refused write must never reach the registry').toBeNull()
   })
 })
+
+describe('rate-limit and deprecation relay', () => {
+  // The mirror is the base URL /openapi.json and /llms.txt hand out. A budget
+  // the registry reports and the mirror drops is a budget an agent has to guess.
+  it('forwards the RateLimit header family to the caller', async () => {
+    upstreamHeaders = {
+      'content-type': 'application/json',
+      'ratelimit-limit': '2000',
+      'ratelimit-remaining': '1993',
+      'ratelimit-reset': '47',
+      'ratelimit-policy': '"ambient"; q=2000; w=60',
+      ratelimit: '"ambient"; r=1993; t=47',
+    }
+    const res = await call(GET, 'skills')
+    expect(res.headers.get('ratelimit-limit')).toBe('2000')
+    expect(res.headers.get('ratelimit-remaining')).toBe('1993')
+    expect(res.headers.get('ratelimit-reset')).toBe('47')
+    expect(res.headers.get('ratelimit-policy')).toBe('"ambient"; q=2000; w=60')
+    expect(res.headers.get('ratelimit')).toBe('"ambient"; r=1993; t=47')
+  })
+
+  it('forwards Retry-After on a 429', async () => {
+    upstreamStatus = 429
+    upstreamHeaders = { 'content-type': 'application/json', 'retry-after': '31' }
+    upstreamBody = '{"error":"rate_limited"}'
+    const res = await call(GET, 'skills')
+    expect(res.status).toBe(429)
+    expect(res.headers.get('retry-after')).toBe('31')
+  })
+
+  it('forwards the deprecation signals so a warning is not lost at the hop', async () => {
+    upstreamHeaders = {
+      'content-type': 'application/json',
+      deprecation: 'true',
+      sunset: 'Wed, 01 Jul 2026 00:00:00 GMT',
+      link: '<https://skillet.md/docs/versioning>; rel="deprecation"',
+    }
+    const res = await call(GET, 'skills')
+    expect(res.headers.get('deprecation')).toBe('true')
+    expect(res.headers.get('sunset')).toBe('Wed, 01 Jul 2026 00:00:00 GMT')
+    expect(res.headers.get('link')).toContain('rel="deprecation"')
+  })
+
+  // A cross-origin agent cannot read a header it was not offered.
+  it('exposes those headers to cross-origin readers', async () => {
+    const res = await call(GET, 'skills')
+    const exposed = res.headers.get('access-control-expose-headers') ?? ''
+    for (const name of [
+      'RateLimit-Limit',
+      'RateLimit-Remaining',
+      'RateLimit-Reset',
+      'Retry-After',
+      'Deprecation',
+      'Sunset',
+    ]) {
+      expect(exposed, name).toContain(name)
+    }
+  })
+})
+
+describe('client identity forwarding', () => {
+  // Without this the registry sees loopback, exempts the request from per-IP
+  // limits by design, and reports no budget at all — so the mirror was both
+  // unmetered and silent about it.
+  it('forwards cf-connecting-ip as X-Forwarded-For when the deployment trusts it', async () => {
+    process.env.TRUST_CF_CONNECTING_IP = '1'
+    await call(GET, 'skills', { headers: { 'cf-connecting-ip': '203.0.113.9' } })
+    expect(lastRequest?.headers.get('x-forwarded-for')).toBe('203.0.113.9')
+    delete process.env.TRUST_CF_CONNECTING_IP
+  })
+
+  it('forwards nothing when the header is not trusted, because it is forgeable', async () => {
+    delete process.env.TRUST_CF_CONNECTING_IP
+    await call(GET, 'skills', { headers: { 'cf-connecting-ip': '203.0.113.9' } })
+    expect(lastRequest?.headers.get('x-forwarded-for')).toBeNull()
+  })
+
+  // Still anonymous: naming the caller's IP must not smuggle their credentials.
+  it('never forwards an Authorization header or a cookie', async () => {
+    process.env.TRUST_CF_CONNECTING_IP = '1'
+    await call(GET, 'skills', {
+      headers: {
+        'cf-connecting-ip': '203.0.113.9',
+        authorization: 'Bearer skillet_s_secret',
+        cookie: 'skillet_session=secret',
+      },
+    })
+    expect(lastRequest?.headers.get('authorization')).toBeNull()
+    expect(lastRequest?.headers.get('cookie')).toBeNull()
+    delete process.env.TRUST_CF_CONNECTING_IP
+  })
+})
+

@@ -8,20 +8,15 @@ import {
   readSessionCookie,
   skilletSessionCookieOptions,
 } from '@/lib/session-cookie'
+import { forwardedClientIp } from '@/lib/forwarded-ip'
 
 function registryOrigin(): string {
   return process.env.REGISTRY_URL ?? process.env.NEXT_PUBLIC_REGISTRY_URL ?? 'http://127.0.0.1:3481'
 }
 
-/**
- * The client IP to forward as X-Forwarded-For, or null to forward nothing.
- * `cf-connecting-ip` is only trustworthy behind Cloudflare's edge; without the
- * explicit trust opt-in it is forgeable and must not key the registry's per-IP
- * rate limit. Exported for tests.
- */
-export function forwardedClientIp(cfConnectingIp: string | null, trust: boolean): string | null {
-  return trust && cfConnectingIp ? cfConnectingIp : null
-}
+/** Shared with the anonymous apex mirror; see lib/forwarded-ip.ts. Re-exported
+ *  because callers (and tests) already import it from this module. */
+export { forwardedClientIp }
 
 // Registry routes the browser must NEVER reach through this proxy. These are the
 // server-to-server trust surfaces (session mint, identity link) gated by the

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { REGISTRY_API } from '@/lib/registry-prefix'
 import { registryFetchOriginOrDefault } from '@/lib/registry-origin'
 import { siteAbsoluteUrl } from '@/lib/site-url'
+import { forwardedClientIp } from '@/lib/forwarded-ip'
 
 /**
  * The public, read-only API mirror on the canonical origin.
@@ -23,6 +24,18 @@ import { siteAbsoluteUrl } from '@/lib/site-url'
  */
 
 const FORWARDED_REQUEST_HEADERS = ['accept', 'accept-language', 'if-none-match', 'user-agent']
+
+/**
+ * Upstream response headers this mirror relays verbatim.
+ *
+ * The RateLimit family (IETF `draft-ietf-httpapi-ratelimit-headers`, both the
+ * legacy triple and the current structured fields) has to survive the hop or
+ * an agent calling the apex mirror — the base URL `/openapi.json` and
+ * `/llms.txt` hand out — sees no budget at all and has to guess. `deprecation`
+ * and `sunset` matter for the same reason: a warning nobody forwards is not a
+ * warning. Header names are lowercased because `Headers.get` is
+ * case-insensitive but the list is also compared against in tests.
+ */
 const FORWARDED_RESPONSE_HEADERS = [
   'content-type',
   'etag',
@@ -30,6 +43,13 @@ const FORWARDED_RESPONSE_HEADERS = [
   'cache-control',
   'retry-after',
   'link',
+  'ratelimit',
+  'ratelimit-limit',
+  'ratelimit-remaining',
+  'ratelimit-reset',
+  'ratelimit-policy',
+  'deprecation',
+  'sunset',
 ]
 
 const CORS_HEADERS: Record<string, string> = {
@@ -37,6 +57,11 @@ const CORS_HEADERS: Record<string, string> = {
   'access-control-allow-methods': 'GET, HEAD, OPTIONS',
   'access-control-allow-headers': 'Accept, If-None-Match',
   'access-control-max-age': '86400',
+  // A cross-origin agent cannot read a header it was not offered. Without this
+  // the RateLimit fields arrive and `fetch` hides them, which is the same as
+  // not sending them.
+  'access-control-expose-headers':
+    'ETag, Link, Retry-After, RateLimit, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset, RateLimit-Policy, Deprecation, Sunset',
 }
 
 function errorResponse(status: number, code: string, message: string): Response {
@@ -65,6 +90,17 @@ async function proxyRead(request: NextRequest, path: string[]): Promise<Response
     const value = request.headers.get(name)
     if (value) headers.set(name, value)
   }
+  // Name the real caller so the registry's per-IP budget applies to them and
+  // not to this server's egress. Without it every mirror request arrives from
+  // loopback, which the registry exempts by design (see isUnkeyedLoopbackClient)
+  // — so the mirror was both unmetered and unable to report a budget. Same
+  // trust gate as the credentialed BFF: `cf-connecting-ip` is forgeable unless
+  // the deployment is actually behind Cloudflare.
+  const clientIp = forwardedClientIp(
+    request.headers.get('cf-connecting-ip'),
+    process.env.TRUST_CF_CONNECTING_IP === '1',
+  )
+  if (clientIp) headers.set('x-forwarded-for', clientIp)
 
   let upstream: Response
   try {
