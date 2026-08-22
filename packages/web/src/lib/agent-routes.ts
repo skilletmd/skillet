@@ -22,6 +22,7 @@
  */
 
 import { RESERVED_SKILL_SLUGS, SKILL_SLUG_RE } from '@skillet/protocol/reserved-skill-slugs'
+import { PROTECTED_RESOURCE_WELL_KNOWN } from '@skillet/protocol/protected-resource'
 import { CATEGORY_BY_KEY } from './categories'
 import { DOC_NAV } from './docs-nav'
 
@@ -132,11 +133,23 @@ function docsPaths(): ReadonlySet<string> {
 /**
  * The `.well-known` suffixes this origin serves. Kept beside the routes that
  * implement them: `app/.well-known/mcp.json`,
- * `app/.well-known/agent-skills/index.json`, and the per-skill artifact route.
+ * `app/.well-known/agent-skills/index.json`, the per-skill artifact route, and
+ * the two RFC 9728 protected-resource documents.
+ *
+ * The protected-resource paths are lowercased already (`PROTECTED_RESOURCE_WELL_KNOWN`
+ * emits them that way), so comparing against the lowercased segments is exact
+ * rather than lenient. Deriving them from the protocol table instead of
+ * spelling them here means a change to the API version prefix moves the route
+ * and this check together.
  */
+const PROTECTED_RESOURCE_PATHS: ReadonlySet<string> = new Set(
+  Object.values(PROTECTED_RESOURCE_WELL_KNOWN),
+)
+
 function pathnameIsWellKnown(segments: string[]): boolean {
   const [, second, third, fourth] = segments
   if (segments.length === 2 && second === 'mcp.json') return true
+  if (PROTECTED_RESOURCE_PATHS.has(`/${segments.join('/')}`)) return true
   if (second !== 'agent-skills') return false
   if (segments.length === 3 && third === 'index.json') return true
   return segments.length === 4 && fourth === 'skill.md'

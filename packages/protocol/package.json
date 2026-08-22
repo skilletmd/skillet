@@ -55,6 +55,10 @@
     "./reserved-skill-slugs": {
       "import": "./dist/reserved-skill-slugs.js",
       "types": "./dist/reserved-skill-slugs.d.ts"
+    },
+    "./protected-resource": {
+      "import": "./dist/protected-resource.js",
+      "types": "./dist/protected-resource.d.ts"
     }
   },
   "scripts": {

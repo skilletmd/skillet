@@ -8,6 +8,7 @@ import {
   KNOWN_TOP_LEVEL_SEGMENTS,
 } from '@/lib/agent-routes'
 import { DOC_NAV } from '@/lib/docs-nav'
+import { PROTECTED_RESOURCE_WELL_KNOWN } from '@skillet/protocol/protected-resource'
 
 const WEB_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const APP_DIR = join(WEB_ROOT, 'src', 'app')
@@ -241,6 +242,26 @@ describe('.well-known suffixes', () => {
     expect(classifyRoute('/.well-known/agent-skills/write-a-skill/SKILL.md')).toEqual({
       kind: 'known',
     })
+  })
+
+  // A 401's WWW-Authenticate header points a client at these. If proxy.ts
+  // classified them `unknown` the challenge would resolve to a 404 and the
+  // whole discovery chain would dead-end.
+  it('serves both RFC 9728 protected-resource documents', () => {
+    for (const path of Object.values(PROTECTED_RESOURCE_WELL_KNOWN)) {
+      expect(classifyRoute(path), path).toEqual({ kind: 'known' })
+    }
+  })
+
+  it('does not treat a protected-resource prefix as a wildcard', () => {
+    for (const path of [
+      '/.well-known/oauth-protected-resource/api',
+      '/.well-known/oauth-protected-resource/api/v1',
+      '/.well-known/oauth-protected-resource/api/v1/mcp/extra',
+      '/.well-known/oauth-authorization-server',
+    ]) {
+      expect(classifyRoute(path), path).toEqual({ kind: 'unknown' })
+    }
   })
 
   it('404s every other well-known probe', () => {

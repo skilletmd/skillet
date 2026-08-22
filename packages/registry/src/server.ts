@@ -46,6 +46,7 @@ import { registerMcpRoutes } from './routes/mcp.js'
 import { registerConnectedRepoRoutes } from './routes/connected-repos.js'
 import { registerHttpSecurity } from './http-security.js'
 import { registerOpenApiRoutes } from './routes/openapi.js'
+import { registerOAuthMetadataRoutes } from './routes/oauth-metadata.js'
 import { registerErrorEnvelope } from './error-envelope.js'
 
 declare module 'fastify' {
@@ -356,6 +357,7 @@ export async function buildServer(opts: ServerOptions = {}): Promise<{
 
   // Machine-readable API description. Root + version-prefixed; see routes/openapi.ts.
   registerOpenApiRoutes(app)
+  registerOAuthMetadataRoutes(app)
 
   // Resolves Bearer tokens to req.principal for every route. Public reads
   // simply ignore it; auth-requiring handlers gate via requireSession.
