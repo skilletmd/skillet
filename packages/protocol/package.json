@@ -20,6 +20,10 @@
       "import": "./dist/untrusted-href.js",
       "types": "./dist/untrusted-href.d.ts"
     },
+    "./humanize": {
+      "import": "./dist/humanize.js",
+      "types": "./dist/humanize.d.ts"
+    },
     "./skill-id": {
       "import": "./dist/skill-id.js",
       "types": "./dist/skill-id.d.ts"

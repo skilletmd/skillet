@@ -15,6 +15,7 @@
 import type { DatabaseSync } from '../db/sqlite-handle.js';
 import type { PrismaClient } from '@prisma/client';
 import { canonicalContentHash, validateBundle, BundleError, MAX_BUNDLE_BYTES, isExcludedDiscoveryPath, isCoupledSkillMarkdown, classifyImport, dedupeMirrorsBy, slugify as canonicalSlugify } from '@skillet/protocol';
+import { humanizeSlug } from '@skillet/protocol/humanize';
 import { blobHash, newId } from '../db/index.js';
 import type { PrismaDb } from '../db/prisma-client.js';
 import { runPrismaTransaction } from '../db/prisma-client.js';
@@ -526,11 +527,15 @@ export async function writeSkillPrisma(prisma: PrismaClient, ctx: SyncContext, d
         }
     });
 }
+/**
+ * Display name for a repo (the generated kit name, and the unified bundle's
+ * title). Delegates to the shared humanizer so a mirrored repo's kit and its
+ * skills title-case identically — this used to be a bare
+ * `\b\w -> uppercase`, which produced the kit "Ui Skills" for a repo whose
+ * skills rendered "UI Skills Root".
+ */
 function humanizeRepo(repo: string): string {
-    return repo
-        .replace(/[-_]+/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase())
-        .trim();
+    return humanizeSlug(repo);
 }
 /** Prisma async counterpart of {@link uniqueKitSlug}. */
 export async function uniqueKitSlugPrisma(prisma: PrismaDb, owner: string, name: string): Promise<string> {
