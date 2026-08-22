@@ -66,6 +66,9 @@ Two supported shapes; pick one.
   `script path` row back before believing a fix landed — that row is the only
   place the stale value shows.
 
+- **Container.** `packages/registry/Dockerfile` binds `0.0.0.0:3481` and
+  entrypoints through `prisma migrate deploy`.
+
 ### Checking that a one-shot job actually ran
 
 `mirror-nightly` is a cron app with `autorestart: false`, and that combination
@@ -78,14 +81,12 @@ pm2 describe mirror-nightly | grep 'out log path'   # then tail that file
 ```
 
 A healthy run opens with `phase 1: seed re-sync (N sources)` and closes with a
-`total: +N ~N =N` line. **An empty stdout log means it never ran**, however
+one-line JSON summary carrying every phase's counters. **An empty stdout log means it never ran**, however
 healthy `pm2 status` looks — the errors are in the *error* log. This is not
 hypothetical: the job crashed on startup at 06:00 every day from 2026-07-16 to
 2026-08-22 without anyone noticing, because its `script` pointed at
 `node_modules/.bin/tsx` (a `#!/bin/sh` shim) under `interpreter: "node"`.
 `scripts/check-pm2-entrypoints.mjs` now fails CI on that class of mistake.
-- **Container.** `packages/registry/Dockerfile` binds `0.0.0.0:3481` and
-  entrypoints through `prisma migrate deploy`.
 
 **First-run checklist:**
 
@@ -112,6 +113,35 @@ hypothetical: the job crashed on startup at 06:00 every day from 2026-07-16 to
 
 ## Ongoing operations
 
+### The layout on the skillet.md box
+
+The checkout is **`~/knox`**, not `~/skillet`. The name predates the rename to
+Skillet and nothing on disk matches the product:
+
+```
+/home/skillet/
+├── Makefile      # two lines: `update:` -> `~/bin/web-deploy`
+├── bin/          # web-deploy and friends
+└── knox/         # the repo checkout, and every PM2 process's cwd
+```
+
+`make update` runs from `$HOME`, which is why the Makefile lives there rather
+than in the repo: you land in `$HOME` on SSH and need no `cd`.
+
+**Do not rename `~/knox` casually.** The path is baked into more than the one
+`REPO=~/knox` line in `web-deploy`:
+
+| Holds an absolute path | Consequence of a bare `mv` |
+| --- | --- |
+| `~/.pm2/dump.pm2` | reboot resurrects processes at the old path |
+| PM2 `pm_cwd` / `pm_exec_path` (5 processes) | `pm2 reload` keeps the old cwd; only delete + start moves it |
+| `node_modules/.pnpm` (~900 entries) | pnpm's store and workspace links are absolute; every one breaks |
+
+A rename is therefore a planned restart, not a tidy-up: `mv`, edit `web-deploy`,
+`pnpm install`, `pm2 delete all`, `pm2 start ecosystem.config.cjs`, `pm2 save`,
+then verify a reboot resurrects correctly. The payoff is a directory name. Leave
+it unless something else already requires a full restart.
+
 ### Every deploy: run migrations
 
 Schema changes ship as Prisma migrations and apply with
@@ -127,9 +157,22 @@ processes must share the same `BLOB_STORE` / `R2_*` values.
 
 ### The nightly mirror job
 
-`mirror-nightly` (PM2 `cron_restart: "0 6 * * *"`, `autorestart: false`) re-syncs
-seeded and approved mirrors, then runs a quality-gated discovery pass into the
-review queue. It needs `SKILLET_MIRROR_GITHUB_TOKEN` and
+`mirror-nightly` (PM2 `cron_restart: "0 6 * * *"`, `autorestart: false`) runs
+four phases:
+
+| Phase | What it does |
+| --- | --- |
+| 1 | Re-sync every `mirror-sources.json` seed |
+| 2 | Re-sync queue-approved (`status='live'`) mirrors |
+| 3 | Quality-gated discovery into the review queue |
+| 4 | Re-publish every active self-serve **connected repo** |
+
+Phase 4 exists because a connected repo otherwise syncs only when its owner
+connects it or presses refresh, while the skill page tells every visitor the
+source syncs daily. It shares `syncConnectedRepoPrisma` with the manual refresh
+route so a scheduled re-publish and a manual one cannot apply different rules —
+`publish_as` is re-checked on every sync, so losing team access stops the
+background job publishing in that team's name. It needs `SKILLET_MIRROR_GITHUB_TOKEN` and
 `SKILLET_DISCOVERY_GITHUB_TOKEN` in `packages/registry/.env` for sane GitHub rate
 limits. Run it by hand any time with
 `pnpm --filter @skillet/registry exec tsx --env-file-if-exists=.env scripts/nightly-mirror-ops.ts`
