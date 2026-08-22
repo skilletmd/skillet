@@ -5,8 +5,7 @@
  * by hand any time (a MySQL advisory lock makes overlapping runs exit early):
  *
  *   cd packages/registry
- *   set -a && . ./.env && set +a
- *   npx tsx scripts/nightly-mirror-ops.ts [--dry-run]
+ *   npx tsx --env-file-if-exists=.env scripts/nightly-mirror-ops.ts [--dry-run]
  *
  * The logic lives in src/mirror-ops/nightly.ts (typechecked, tested):
  * phase 1 seed re-sync, phase 2 discovered-mirror re-sync, phase 3 discovery.

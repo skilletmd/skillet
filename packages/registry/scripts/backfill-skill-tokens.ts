@@ -6,10 +6,9 @@
  * MySQL blobs table locally and R2 in prod. token_bundle is left null (v1.1).
  *
  *   cd packages/registry
- *   set -a && . ./.env && set +a
- *   npx tsx scripts/backfill-skill-tokens.ts             # backfill null rows
- *   npx tsx scripts/backfill-skill-tokens.ts --dry-run   # report only, no writes
- *   npx tsx scripts/backfill-skill-tokens.ts --all       # recompute every row
+ *   npx tsx --env-file-if-exists=.env scripts/backfill-skill-tokens.ts             # backfill null rows
+ *   npx tsx --env-file-if-exists=.env scripts/backfill-skill-tokens.ts --dry-run   # report only, no writes
+ *   npx tsx --env-file-if-exists=.env scripts/backfill-skill-tokens.ts --all       # recompute every row
  */
 import { pathToFileURL } from 'node:url'
 import type { PrismaClient } from '@prisma/client'

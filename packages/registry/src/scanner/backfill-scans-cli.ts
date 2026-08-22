@@ -5,8 +5,7 @@
  * blob store; recomputes through the publish scan path.
  *
  *   cd packages/registry
- *   set -a && . ./.env && set +a
- *   npx tsx src/scanner/backfill-scans-cli.ts [--dry-run]
+ *   npx tsx --env-file-if-exists=.env src/scanner/backfill-scans-cli.ts [--dry-run]
  *   ... --batch=200 --concurrency=8 --sleep-ms=500 --limit=1000
  *   ... --all    # recompute every row regardless of stored version
  *

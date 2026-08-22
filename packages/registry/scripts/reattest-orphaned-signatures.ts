@@ -9,9 +9,8 @@
  * same attestation `sync-repo` applies to freshly mirrored versions.
  *
  *   cd packages/registry
- *   set -a && . ./.env && set +a
- *   npx tsx scripts/reattest-orphaned-signatures.ts             # re-sign
- *   npx tsx scripts/reattest-orphaned-signatures.ts --dry-run   # report only
+ *   npx tsx --env-file-if-exists=.env scripts/reattest-orphaned-signatures.ts             # re-sign
+ *   npx tsx --env-file-if-exists=.env scripts/reattest-orphaned-signatures.ts --dry-run   # report only
  */
 import { pathToFileURL } from 'node:url'
 import { createPrismaClient } from '../src/db/prisma-client.js'

@@ -4,9 +4,8 @@
  * tested). Never publishes — only admin approval promotes a candidate.
  *
  *   cd packages/registry
- *   set -a && . ./.env && set +a
  *   SKILLET_DISCOVERY_GITHUB_TOKEN=ghp_... \
- *   npx tsx scripts/discover-mirror-candidates.ts owner/repo other/repo
+ *   npx tsx --env-file-if-exists=.env scripts/discover-mirror-candidates.ts owner/repo other/repo
  *   ... --query "topic:claude-skills" --from-imports --min-quality 60 --dry-run
  *
  * Credential: a DEDICATED least-privilege token in SKILLET_DISCOVERY_GITHUB_TOKEN

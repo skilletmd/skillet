@@ -106,8 +106,39 @@ seeded and approved mirrors, then runs a quality-gated discovery pass into the
 review queue. It needs `SKILLET_MIRROR_GITHUB_TOKEN` and
 `SKILLET_DISCOVERY_GITHUB_TOKEN` in `packages/registry/.env` for sane GitHub rate
 limits. Run it by hand any time with
-`pnpm --filter @skillet/registry exec tsx scripts/nightly-mirror-ops.ts`
+`pnpm --filter @skillet/registry exec tsx --env-file-if-exists=.env scripts/nightly-mirror-ops.ts`
 (a MySQL advisory lock makes overlapping runs exit early).
+
+### Running a maintenance script on the box
+
+Every `scripts/*.ts` maintenance entrypoint needs the registry's env. Load it
+with tsx's own dotenv parser, **not** by sourcing the file:
+
+```bash
+cd packages/registry
+npx tsx --env-file-if-exists=.env scripts/<name>.ts [--dry-run]
+```
+
+`set -a && . ./.env && set +a` used to be the documented incantation and it is
+not safe here. `.env` is a dotenv file, not a shell script: a value containing a
+backtick, `$(`, or an unbalanced quote is interpreted by the shell rather than
+passed through. A single backtick in a secret is enough to abort with
+`unexpected EOF while looking for matching`, at which point the script runs with
+no `DATABASE_URL` — or, worse, the shell executes what is between the backticks.
+`--env-file-if-exists` parses the file as data.
+
+Two more things that bite on a fresh shell:
+
+- **`pnpm` is often not on the default `PATH`** even in a login shell. It lives
+  under `$PNPM_HOME` (commonly `~/.local/share/pnpm/bin`).
+- **The default `node` may not be the one `.nvmrc` pins.** Check `node -v`
+  against `.nvmrc` before building; a mismatch produces confusing native-module
+  and build-order failures. Prepend the nvm binary directory, or `nvm use`.
+
+```bash
+# note the `v`: .nvmrc holds `24.16.0`, the nvm directory is `v24.16.0`
+export PATH="$HOME/.local/share/pnpm/bin:$HOME/.nvm/versions/node/v$(cat .nvmrc)/bin:$PATH"
+```
 
 ### Scanner maintenance after a corpus-version bump
 

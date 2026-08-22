@@ -5,9 +5,8 @@
  * self-serve connect-your-repo).
  *
  *   cd packages/registry
- *   set -a && . ./.env && set +a
- *   npx tsx scripts/sync-mirror-skills.ts [--dry-run]
- *   npx tsx scripts/sync-mirror-skills.ts --clear <handle>
+ *   npx tsx --env-file-if-exists=.env scripts/sync-mirror-skills.ts [--dry-run]
+ *   npx tsx --env-file-if-exists=.env scripts/sync-mirror-skills.ts --clear <handle>
  *
  * Mirrors publish under a reserved brand handle with the org's logo, scanned
  * and platform-attested. Claiming (mirror_claimed_at set) does not freeze

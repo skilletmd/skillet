@@ -6,8 +6,8 @@
  * landed.
  *
  *   cd packages/registry
- *   npx tsx scripts/backfill-categories-heuristic.ts            # apply
- *   npx tsx scripts/backfill-categories-heuristic.ts --dry-run  # count only
+ *   npx tsx --env-file-if-exists=.env scripts/backfill-categories-heuristic.ts            # apply
+ *   npx tsx --env-file-if-exists=.env scripts/backfill-categories-heuristic.ts --dry-run  # count only
  *
  * Idempotent: only `category IS NULL` rows are selected and each update is
  * guarded on null, so re-runs only touch skills still missing a category.
