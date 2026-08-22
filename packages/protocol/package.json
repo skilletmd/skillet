@@ -44,9 +44,17 @@
       "import": "./dist/inline-images.js",
       "types": "./dist/inline-images.d.ts"
     },
+    "./openapi": {
+      "import": "./dist/openapi.js",
+      "types": "./dist/openapi.d.ts"
+    },
     "./scan-vocabulary": {
       "import": "./dist/scan-vocabulary.js",
       "types": "./dist/scan-vocabulary.d.ts"
+    },
+    "./reserved-skill-slugs": {
+      "import": "./dist/reserved-skill-slugs.js",
+      "types": "./dist/reserved-skill-slugs.d.ts"
     }
   },
   "scripts": {
