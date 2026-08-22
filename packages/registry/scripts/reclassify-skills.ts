@@ -16,6 +16,12 @@
  *                     to the lane you just changed keeps an unrelated scoring
  *                     wobble from rewriting rows you were not thinking about.
  *   --apply           Write. Default is a dry run that prints every move.
+ *   --except a:b,c:d  Skill ids to leave alone. The heuristic has no idea what
+ *                     a skill is *for*: "Create, synthesize, and iteratively
+ *                     improve agent skills" scores as writing on the word
+ *                     "writer" when `agents` is the right answer. Reading the
+ *                     dry run and dropping the cases you disagree with is the
+ *                     intended workflow, not a workaround.
  *   --include-owned   Also consider non-mirrored skills. Off by default: a
  *                     mirrored skill under an unclaimed author was categorized
  *                     by this heuristic and by nobody else, so moving it cannot
@@ -44,6 +50,12 @@ async function main(): Promise<void> {
   const apply = process.argv.includes('--apply');
   const includeOwned = process.argv.includes('--include-owned');
   const to = argValue('--to');
+  const except = new Set(
+    (argValue('--except') ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
 
   if (!isCategoryKey(to)) {
     console.error(
@@ -93,14 +105,26 @@ async function main(): Promise<void> {
     );
 
     const moves: { id: string; from: string; to: string }[] = [];
+    const skipped: string[] = [];
     for (const s of eligible) {
       const body = await readStoredSkillMdPrisma(prisma, s.id).catch(() => '');
       const guessed = guessCategory({ slug: s.slug, description: s.description, body });
       if (guessed !== to) continue;
+      if (except.has(s.id)) {
+        skipped.push(`${s.category} ${s.id}`);
+        continue;
+      }
       moves.push({ id: s.id, from: s.category as string, to });
     }
 
     for (const m of moves) console.log(`  ${m.from.padEnd(14)} -> ${m.to.padEnd(14)} ${m.id}`);
+    if (skipped.length > 0) {
+      console.log(`\nheld by --except (${skipped.length}):`);
+      for (const x of skipped) console.log(`  ${x}`);
+      const unmatched = [...except].filter((id) => !eligible.some((e) => e.id === id));
+      if (unmatched.length > 0)
+        console.log(`  ! --except lists ${unmatched.length} id(s) that did not match: ${unmatched.join(', ')}`);
+    }
 
     if (!apply) {
       console.log(`\nWould move ${moves.length} skill(s) to ${to}. Re-run with --apply to write.`);
