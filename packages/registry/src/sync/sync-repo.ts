@@ -232,10 +232,10 @@ export async function discover(owner: string, repo: string, ctx: SyncContext): P
         .map((b) => (b.path === 'SKILL.md' ? '' : b.path.slice(0, -'/SKILL.md'.length)))
         .sort((a, b) => b.length - a.length);
     const claimed = new Set<string>();
-    const usedSlugs = new Set<string>();
     const raw: Array<{
         skill: DiscoveredGitHubSkill;
         body: string;
+        base: string;
     }> = [];
     for (const dir of skillDirs) {
         const prefix = dir ? dir + '/' : '';
@@ -248,26 +248,41 @@ export async function discover(owner: string, repo: string, ctx: SyncContext): P
         const text = skillMd ? Buffer.from(skillMd).toString('utf8') : '';
         const fm = text ? parseFrontmatter(text) : {};
         const base = dir ? dir.split('/').pop()! : repo;
-        let slug = slugify(fm.name || base);
-        let n = 2;
-        while (usedSlugs.has(slug))
-            slug = `${slugify(fm.name || base)}-${n++}`;
-        usedSlugs.add(slug);
         raw.push({
             skill: {
                 dir,
-                slug,
+                // Provisional: the real slug is assigned after dedupe, below.
+                slug: '',
                 name: fm.name || base,
                 description: fm.description || '',
                 coupled: isCoupledSkillMarkdown(text),
                 files,
             },
             body: text.trim(),
+            base,
         });
     }
     // Drop mirror copies (e.g. plugins/<tool>/skills/x duplicating skills/x), the
     // same content-dedupe the web importer applies.
-    const skills = dedupeMirrorsBy(raw, (r) => r.skill.dir, (r) => r.body || null).map((r) => r.skill);
+    const survivors = dedupeMirrorsBy(raw, (r) => r.skill.dir, (r) => r.body || null);
+    // Slugs are assigned HERE, after dedupe, and never before it. `skillDirs` is
+    // sorted longest-path-first, so a tool-mirror copy (providers/codex/plugin/
+    // skills/stripe-projects) is visited before the canonical one it duplicates
+    // (skills/stripe-projects). Uniquifying during discovery therefore handed the
+    // clean slug to the copy and left the survivor — the canonical dir dedupe
+    // keeps — holding the collision suffix: `redis-search-2` for two copies,
+    // `stripe-projects-6` for six. Deduping first means the suffix only ever
+    // appears for a genuine same-slug collision between distinct skills.
+    const usedSlugs = new Set<string>();
+    const skills = survivors.map((r) => {
+        const wanted = slugify(r.skill.name || r.base);
+        let slug = wanted;
+        let n = 2;
+        while (usedSlugs.has(slug))
+            slug = `${wanted}-${n++}`;
+        usedSlugs.add(slug);
+        return { ...r.skill, slug };
+    });
     return { owner, repo, ref, sha, skills, allFiles: blobs };
 }
 async function buildBundle(owner: string, repo: string, ref: string, skill: DiscoveredGitHubSkill, ctx: SyncContext): Promise<Map<string, Uint8Array> | null> {
