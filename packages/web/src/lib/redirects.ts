@@ -36,10 +36,12 @@ function hostRedirects(): Redirects {
 /** Path moves. Old links (bookmarks, older docs) redirect instead of 404ing. */
 function pathRedirects(): Redirects {
   return [
-    // Internal design/dev tools moved under /internal.
-    { source: '/design-system', destination: '/internal/design', permanent: false },
-    { source: '/og-preview', destination: '/internal/og', permanent: false },
-    { source: '/index2', destination: '/internal/home-v2', permanent: false },
+    // No aliases for the internal tools: `/lab/*` is the only way in. The old
+    // `/design-system`, `/og-preview`, and `/index2` bookmarks pointed at
+    // `/internal/*`, a prefix with no routes at all, and were landing on the app
+    // shell rather than 404ing. Nothing links to them, so they are gone rather
+    // than repointed — a second name for the same page is a thing to keep in
+    // sync forever.
     // The adapter capability table is reference docs, not an uptime page.
     { source: '/status', destination: '/docs/runtimes', permanent: false },
     // The create hub moved from /new to /create.
@@ -52,6 +54,15 @@ function pathRedirects(): Redirects {
     },
     // The safety explainer moved into the docs reference.
     { source: '/safety', destination: '/docs/scanner', permanent: false },
+    // /api is what a developer types first. It is the API NAMESPACE, not a page,
+    // so it had no route and answered the app shell. Send it to the reference
+    // rather than building a second page there: one source of truth, and the
+    // predictable URL still lands. Exact-match only — `/api/*` is untouched.
+    { source: '/api', destination: '/docs/api', permanent: false },
+    // /privacy is the address people and agents check for a privacy policy.
+    // The policy itself lives in the docs (one copy, one place it is edited),
+    // so the conventional URL resolves to it rather than duplicating the text.
+    { source: '/privacy', destination: '/docs/privacy', permanent: false },
     // The Connectors tab folded into the Account page's ChatGPT & Claude.ai section.
     { source: '/settings/connectors', destination: '/settings', permanent: false },
     // The feed URL scheme flattened: Notifications and Updates moved up a level.
