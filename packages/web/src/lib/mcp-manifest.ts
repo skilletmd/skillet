@@ -1,3 +1,4 @@
+import { PROTECTED_RESOURCE_WELL_KNOWN } from '@skillet/protocol/protected-resource'
 import { REGISTRY_API } from './registry-prefix'
 import { registryPublicUrl, siteAbsoluteUrl } from './site-url'
 
@@ -59,12 +60,16 @@ export function mcpManifest(): Record<string, unknown> {
       type: 'bearer',
       required: true,
       description:
-        'A read-only `skillet_m_` link token, sent as `Authorization: Bearer <token>` or embedded in the endpoint URL as `/mcp/{token}` for clients that cannot set headers. An MCP token can never publish, sync-write, or claim.',
+        'A read-only `skillet_m_` link token, sent as `Authorization: Bearer <token>` or embedded in the endpoint URL as `/mcp/{token}` for clients that cannot set headers. An MCP token can never publish, sync-write, or claim. The protocol handshake (`initialize`, `ping`, `tools/list`) needs no token; anything that reads a kit answers 401 with a `WWW-Authenticate` challenge naming `resource_metadata`.',
       instructions_url: siteAbsoluteUrl('/docs/mcp'),
       // MCP is off until the user turns it on; say so rather than let a client
       // assume an open endpoint and report a broken server.
       obtain_url: siteAbsoluteUrl('/settings'),
       scopes: ['read'],
+      // RFC 9728. The same URL the 401's `WWW-Authenticate` header points at,
+      // so a client that read this card and a client that hit the wall land in
+      // the same place.
+      resource_metadata: `${registryPublicUrl()}${PROTECTED_RESOURCE_WELL_KNOWN.mcp}`,
     },
     privacy_policy: siteAbsoluteUrl('/docs/privacy'),
     terms_of_service: siteAbsoluteUrl('/legal/terms'),

@@ -24,6 +24,7 @@ import type { PrismaClient } from '@prisma/client';
 import type { DatabaseSync } from '../db/sqlite-handle.js';
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
 import { handleMessage, parseMessage } from '@skillet/mcp';
+import { bearerChallenge } from '@skillet/protocol/protected-resource';
 import { tryToSkillId, toWireRef } from '@skillet/protocol/skill-id';
 import { mintToken, parseBearer } from '../auth/tokens.js';
 import { requireUser, type Principal } from '../auth/middleware.js';
@@ -119,6 +120,29 @@ async function sendKeyUndecryptable(reply: FastifyReply): Promise<void> {
     });
 }
 // ── Hosted serving endpoint (U3) ─────────────────────────────────────────────
+/**
+ * JSON-RPC methods this endpoint answers WITHOUT a token.
+ *
+ * All four are pure protocol: they describe the server, not the caller's kit.
+ * `initialize` returns capabilities and serverInfo, `ping` returns `{}`,
+ * `tools/list` returns a fixed tool table that is already published verbatim at
+ * `/.well-known/mcp.json`, and `notifications/initialized` has no body at all.
+ * Nothing here reads a user's skills — `tools/call`, `resources/list`, and
+ * `resources/read` all do, and all still require the link token.
+ *
+ * Why open them: the MCP handshake is how a client discovers a server exists.
+ * A `401` on `initialize` reads to every client (and every audit) as "this
+ * server is broken", not "you need a token" — so Skillet's hosted server
+ * looked dead to anything that had not already been handed a link. Answering
+ * the handshake and then challenging on the first real call is both the MCP
+ * authorization spec's flow and the one that tells the truth.
+ */
+const PUBLIC_MCP_METHODS: ReadonlySet<string> = new Set([
+    'initialize',
+    'notifications/initialized',
+    'ping',
+    'tools/list',
+]);
 /**
  * 401 body for the serving endpoint. Mirrors authRequiredBody's tone: say
  * what happened and the one step out. NEVER includes the presented token or
@@ -421,6 +445,32 @@ export function registerMcpRoutes(app: FastifyInstance, db: DatabaseSync, blobSt
     // from registry storage. Auth is the endpoint's own gate (see
     // resolveServeAuth); visibility is the per-user source built per request —
     // `httpAuthorized: true` is scoped to exactly that source.
+    /**
+     * Answer an anonymous request if — and only if — it is one of the four
+     * protocol methods in PUBLIC_MCP_METHODS.
+     *
+     * Returns the JSON-RPC response, `null` for an accepted notification, or
+     * `undefined` to mean "not public, challenge it". No `source` is passed:
+     * these methods never touch one, and handing them an empty source would
+     * make a kit-reading method silently answer "you have no skills" instead of
+     * "you are not authenticated".
+     */
+    const handlePublicMcpMessage = async (req: FastifyRequest): Promise<unknown | null | undefined> => {
+        let msg;
+        try {
+            const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body ?? null);
+            msg = parseMessage(rawBody);
+        }
+        catch {
+            return undefined;
+        }
+        const method = (msg as { method?: string }).method;
+        if (!method || !PUBLIC_MCP_METHODS.has(method)) return undefined;
+        return handleMessage(msg, {
+            deepResearchAliases: true,
+            serverVersion: process.env.SKILLET_REGISTRY_VERSION,
+        });
+    };
     const serveHandler = async (req: FastifyRequest, reply: FastifyReply): Promise<unknown> => {
         if (req.method === 'OPTIONS') {
             return reply.code(204).header('allow', MCP_ALLOW).send();
@@ -440,7 +490,22 @@ export function registerMcpRoutes(app: FastifyInstance, db: DatabaseSync, blobSt
         const rawToken = params.token ?? parseBearer(req.headers.authorization);
         const auth = await resolveServeAuthPrisma(prisma, rawToken);
         if (!auth.ok) {
-            return reply.code(401).send(mcpAuthFailedBody(auth.reason));
+            // Unauthenticated: answer the protocol handshake, challenge on
+            // anything that would read a kit. RFC 6750 §3 + RFC 9728 §5.1 —
+            // `resource_metadata` is how an MCP client discovers where to get a
+            // credential instead of guessing.
+            reply.header('WWW-Authenticate', bearerChallenge('mcp', {
+                siteUrl: (process.env.SKILLET_WEB_URL ?? 'https://skillet.md').replace(/\/+$/, ''),
+                registryUrl: registryBase(req),
+            }, rawToken ? 'invalid_token' : 'invalid_request'));
+            const publicResponse = await handlePublicMcpMessage(req);
+            if (publicResponse === undefined) {
+                return reply.code(401).send(mcpAuthFailedBody(auth.reason));
+            }
+            // The challenge stays on the handshake response too: a client that
+            // reads ahead learns where its token comes from before it needs one.
+            if (publicResponse === null) return reply.code(202).send();
+            return reply.code(200).send(publicResponse);
         }
         // Abuse throttle (U4) — after auth so the PRIMARY bucket keys on the
         // resolved mcp_link id (connector traffic shares egress IPs; see

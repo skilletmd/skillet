@@ -1,6 +1,7 @@
 ---
 title: MCP
-description: "Serve your kit live to MCP clients: per-client setup for Claude Desktop, Cursor, and Claude Code, plus transports, auth, and troubleshooting."
+searchTitle: "Skillet MCP server"
+description: "The Skillet MCP server: serve your kit live over Streamable HTTP, with per-client setup for Claude Desktop, Cursor, and Claude Code, plus transports, auth, and troubleshooting."
 order: 3
 section: Reference
 image: /docs/mcp.png
@@ -132,6 +133,25 @@ The server reuses Skillet's existing tokens; there is no new credential type.
 - **stdio**: authenticates as this machine automatically (`--token` → device token → session). Pass `--token` to override, e.g. a `skillet_k_` kit-key for a headless box that should only see one kit.
 - **HTTP**: every request needs `Authorization: Bearer …` with the loopback token (`skillet_loop_…`) or a registry-validated `skillet_s_` / `skillet_d_` / `skillet_k_` token.
 - **No valid credentials**: empty skill list. Fail-closed: locally imported skills are your most private content, so nothing is served to unauthenticated clients. Private kits stay private.
+
+### The hosted endpoint
+
+`https://registry.skillet.md/api/v1/mcp` answers the protocol handshake without a token. `initialize`, `ping`, `notifications/initialized`, and `tools/list` describe the server, not your kit, so a client can discover what is here before it has a credential:
+
+```bash
+curl -s https://registry.skillet.md/api/v1/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}'
+```
+
+Anything that reads a kit (`tools/call`, `resources/list`, `resources/read`) answers `401` with an RFC 6750 challenge:
+
+```
+WWW-Authenticate: Bearer realm="skillet", error="invalid_request", scope="read",
+  resource_metadata="https://registry.skillet.md/.well-known/oauth-protected-resource/api/v1/mcp"
+```
+
+`resource_metadata` is [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728) and is the discovery path MCP's authorization spec expects. Fetch it to learn that this resource takes exactly one scope, `read`, and where a token comes from. An MCP link can never publish, sync-write, or claim.
 
 ## What it exposes
 
