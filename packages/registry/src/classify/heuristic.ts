@@ -30,7 +30,13 @@ const SIGNALS: Record<CategoryKey, string[]> = {
   agents: ['agent', 'llm', 'rag', 'prompt', 'eval', 'mcp', 'embedding', 'fine-tune', 'inference', 'tool use', 'sub-agent', 'subagent', 'sagemaker', 'training data', 'dpo', 'sft', 'codex'],
   design: ['design', 'figma', 'prototype', 'design token', 'critique', 'image generation', 'wireframe', 'ux', 'mockup', 'illustration', 'pptx', 'powerpoint', 'slide deck', 'excalidraw', 'canvas', 'diagram'],
   product: ['roadmap', 'prd', 'product', 'prioritization', 'launch plan', 'spec', 'requirements', 'brainstorm', 'strategy', 'plan', 'user story', 'backlog', 'cohort', 'retention', 'north star', 'segmentation', 'journey map', 'business model', 'market sizing', 'pestle', 'jtbd'],
-  writing: ['writing', 'essay', 'editing', 'docs', 'documentation', 'document', 'technical writing', 'script', 'proofread', 'draft', 'long-form', 'ghostwrite', 'teaching', 'teach', 'explainer'],
+  // countHits only ever APPENDS s/es/ing/ed, it never strips, so 'writing' does
+  // not catch "writer" or "rewrite". A skill described as "Rewrites text in ...
+  // prose style for the ... book" scored zero and stayed uncategorized. The
+  // additions are the nouns of the craft, not the verbs: bare 'write' and 'edit'
+  // were tried and rejected — they drag in "write or fix @extend_schema
+  // decorators" and "restrict file edits to a directory", which are not writing.
+  writing: ['writing', 'writer', 'rewrite', 'prose', 'essay', 'editing', 'copyedit', 'manuscript', 'chapter', 'narrative', 'storytelling', 'docs', 'documentation', 'document', 'technical writing', 'script', 'proofread', 'draft', 'long-form', 'ghostwrite', 'teaching', 'teach', 'explainer'],
   marketing: ['marketing', 'seo', 'campaign', 'social post', 'blog post', 'copywriting', 'ad', 'email campaign', 'newsletter', 'growth', 'landing page copy', 'content gap'],
   sales: ['sales', 'outbound', 'cold email', 'discovery call', 'crm', 'prospect', 'lead', 'account research', 'pipeline', 'outreach', 'deal'],
   finance: ['finance', 'financial', 'accounting', 'invoice', 'invoicing', 'fintech', 'modeling', 'budget', 'revenue', 'bookkeeping', 'tax', 'valuation', 'trading', 'investment', 'investor', 'portfolio', 'backtest', 'earnings', 'technical analysis', 'chargeback', 'dispute', 'drawdown'],
