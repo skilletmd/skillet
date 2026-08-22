@@ -113,35 +113,6 @@ hypothetical: the job crashed on startup at 06:00 every day from 2026-07-16 to
 
 ## Ongoing operations
 
-### The layout on the skillet.md box
-
-The checkout is **`~/knox`**, not `~/skillet`. The name predates the rename to
-Skillet and nothing on disk matches the product:
-
-```
-/home/skillet/
-├── Makefile      # two lines: `update:` -> `~/bin/web-deploy`
-├── bin/          # web-deploy and friends
-└── knox/         # the repo checkout, and every PM2 process's cwd
-```
-
-`make update` runs from `$HOME`, which is why the Makefile lives there rather
-than in the repo: you land in `$HOME` on SSH and need no `cd`.
-
-**Do not rename `~/knox` casually.** The path is baked into more than the one
-`REPO=~/knox` line in `web-deploy`:
-
-| Holds an absolute path | Consequence of a bare `mv` |
-| --- | --- |
-| `~/.pm2/dump.pm2` | reboot resurrects processes at the old path |
-| PM2 `pm_cwd` / `pm_exec_path` (5 processes) | `pm2 reload` keeps the old cwd; only delete + start moves it |
-| `node_modules/.pnpm` (~900 entries) | pnpm's store and workspace links are absolute; every one breaks |
-
-A rename is therefore a planned restart, not a tidy-up: `mv`, edit `web-deploy`,
-`pnpm install`, `pm2 delete all`, `pm2 start ecosystem.config.cjs`, `pm2 save`,
-then verify a reboot resurrects correctly. The payoff is a directory name. Leave
-it unless something else already requires a full restart.
-
 ### Every deploy: run migrations
 
 Schema changes ship as Prisma migrations and apply with
