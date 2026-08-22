@@ -313,6 +313,10 @@ describe('/openapi.json machine-readable declarations', () => {
       remaining: 'RateLimit-Remaining',
       reset: 'RateLimit-Reset',
       retry_after: 'Retry-After',
+      // Which fields survive a shared cache. The counters do not: a CDN would
+      // serve one caller's remaining count to the next.
+      always_present: ['RateLimit-Limit', 'RateLimit-Policy'],
+      uncached_only: ['RateLimit-Remaining', 'RateLimit-Reset', 'RateLimit'],
     })
   })
 

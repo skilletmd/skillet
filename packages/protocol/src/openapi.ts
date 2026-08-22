@@ -158,10 +158,12 @@ function baseOpenApiDocument(opts: OpenApiOptions): OpenApiDocument {
         '',
         '**Rate limits**',
         '',
-        'Every response carries the RateLimit header fields (`RateLimit-Limit`, `RateLimit-Remaining`,',
-        '`RateLimit-Reset`, plus the structured `RateLimit` and `RateLimit-Policy` fields). A `429`',
-        'additionally carries `Retry-After` in seconds. Read the headers rather than guessing: the',
-        'budgets differ per cost class and are tuned in production.',
+'Metered responses carry the RateLimit header fields. `RateLimit-Limit` and `RateLimit-Policy`',
+        'describe the policy and are always present. `RateLimit-Remaining`, `RateLimit-Reset`, and the',
+        'combined `RateLimit` field describe YOUR bucket, so they are sent only when the response is',
+        'not shared-cacheable: catalog reads sit in a CDN edge cache, where one caller\'s count would',
+        'be served to the next. Pace against `RateLimit-Policy`; read the live counter from any',
+        'uncached response or from the `429`, which is always `no-store` and adds `Retry-After`.',
         '',
         '**Versioning and deprecation**',
         '',
@@ -204,6 +206,11 @@ function baseOpenApiDocument(opts: OpenApiOptions): OpenApiDocument {
         policy: 'RateLimit-Policy',
         combined: 'RateLimit',
         retry_after: 'Retry-After',
+        // Which of the above survive a shared cache. The policy fields are the
+        // same for every caller; the counters are not, and are withheld rather
+        // than served stale from a CDN edge.
+        always_present: ['RateLimit-Limit', 'RateLimit-Policy'],
+        uncached_only: ['RateLimit-Remaining', 'RateLimit-Reset', 'RateLimit'],
         documentation: `${site}/docs/api#rate-limits`,
       },
       'x-versioning': {

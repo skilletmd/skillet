@@ -156,16 +156,20 @@ A deprecated skill answers `410` with its sunset notice rather than disappearing
 
 Three per-IP buckets, each a 60-second window. Roughly 2,000 ambient reads, 300 writes, and 60 heavy reads (bundle downloads, version diffs, MCP tool calls) per minute.
 
-Read the budget off the response instead of hardcoding those numbers. Every metered response carries the IETF RateLimit header fields, in both the spelling the current draft defines and the one older clients parse:
+Read the budget off the response instead of hardcoding those numbers. Metered responses carry the IETF RateLimit header fields, in both the spelling the current draft defines and the one older clients parse:
 
-| Header | Example | Means |
-| --- | --- | --- |
-| `RateLimit-Limit` | `2000` | Requests permitted in the window |
-| `RateLimit-Remaining` | `1993` | Requests left in this window |
-| `RateLimit-Reset` | `47` | Seconds until the window resets |
-| `RateLimit-Policy` | `"ambient"; q=2000; w=60` | The bucket this request was charged to, and its quota |
-| `RateLimit` | `"ambient"; r=1993; t=47` | The same state as a structured field |
-| `Retry-After` | `47` | On `429` only. Seconds to wait. |
+| Header | Example | Means | Always sent |
+| --- | --- | --- | --- |
+| `RateLimit-Limit` | `2000` | Requests permitted in the window | Yes |
+| `RateLimit-Policy` | `"ambient"; q=2000; w=60` | The bucket this request was charged to, and its quota | Yes |
+| `RateLimit-Remaining` | `1993` | Requests left in this window | Uncached only |
+| `RateLimit-Reset` | `47` | Seconds until the window resets | Uncached only |
+| `RateLimit` | `"ambient"; r=1993; t=47` | The same live state as a structured field | Uncached only |
+| `Retry-After` | `47` | Seconds to wait | On `429` |
+
+The last three describe *your* bucket, so they are sent only when the response is not shared-cacheable. Catalog and search answer `public, s-maxage=60` and sit in a CDN edge cache, where one caller's remaining count would be served to every other caller for the next minute. A wrong number is worse than none, so it is withheld rather than guessed.
+
+What that means in practice: pace against `RateLimit-Policy`, which is the same for everyone and always present. When you need your exact position in the window, read `RateLimit-Remaining` from any uncached response, or from the `429` itself, which is always sent `no-store`.
 
 ```bash
 curl -sI "https://skillet.md/api/v1/skills?limit=1" | grep -i ratelimit

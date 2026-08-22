@@ -222,6 +222,22 @@ function takeToken(
 }
 
 /**
+ * True when a SHARED cache may store this response, which decides whether the
+ * per-caller half of the budget can safely ride on it.
+ *
+ * `public` or any `s-maxage` puts the body in a CDN edge cache that serves it
+ * to everyone. `no-store`, `private`, and `s-maxage=0` all take it back out.
+ */
+export function isSharedCacheable(cacheControl: string | undefined | null): boolean {
+  if (!cacheControl) return false;
+  const value = cacheControl.toLowerCase();
+  if (/\bno-store\b/.test(value) || /\bprivate\b/.test(value)) return false;
+  const sMaxAge = /\bs-maxage=(\d+)/.exec(value);
+  if (sMaxAge) return Number(sMaxAge[1]) > 0;
+  return /\bpublic\b/.test(value);
+}
+
+/**
  * Advertise the budget on the response, per the IETF RateLimit header fields
  * draft (draft-ietf-httpapi-ratelimit-headers).
  *
@@ -232,16 +248,50 @@ function takeToken(
  * parses. They describe the same bucket, so emitting both costs ~80 bytes and
  * removes the guesswork that made agents either hammer us or self-throttle to
  * a crawl. `Retry-After` (RFC 9110 §10.2.3) rides along on a 429.
+ *
+ * The split is not cosmetic. Catalog and search answer
+ * `public, max-age=60, s-maxage=60` and Cloudflare really does cache them, so a
+ * per-caller counter on one of those bodies is served to every later caller for
+ * the next minute. A wrong `RateLimit-Remaining` is worse than none: the header
+ * exists to be acted on, and an agent that believes it has 1,995 requests left
+ * when it has 3 self-throttles against another caller's state.
+ *
+ * So the two halves travel differently:
+ *   - `RateLimit-Limit` and `RateLimit-Policy` describe the POLICY. Identical
+ *     for every caller, correct in a shared cache, always sent.
+ *   - `RateLimit-Remaining`, `-Reset`, and the combined `RateLimit` describe
+ *     THIS caller's bucket, and go out only when the response is not
+ *     shared-cacheable. A 429 always qualifies: it is sent `no-store`.
  */
 function setRateLimitHeaders(reply: FastifyReply, scope: RateScope, state: RateState): void {
   reply.header('RateLimit-Limit', String(state.limit));
-  reply.header('RateLimit-Remaining', String(state.remaining));
-  reply.header('RateLimit-Reset', String(state.resetSeconds));
   reply.header(
     'RateLimit-Policy',
     `"${scope}"; q=${state.limit}; w=${Math.round(RATE_WINDOW_MS / 1000)}`,
   );
+  if (isSharedCacheable(reply.getHeader('cache-control') as string | undefined)) return;
+  reply.header('RateLimit-Remaining', String(state.remaining));
+  reply.header('RateLimit-Reset', String(state.resetSeconds));
   reply.header('RateLimit', `"${scope}"; r=${state.remaining}; t=${state.resetSeconds}`);
+}
+
+/**
+ * The bucket a request was charged to, held until `onSend`.
+ *
+ * The charge happens in `onRequest`, before any handler runs, but the response's
+ * own `Cache-Control` is not known until the handler has set it — and that is
+ * what decides which half of the budget may go out. A WeakMap keeps this out of
+ * the request type without a decorator nobody else reads.
+ */
+const chargedBucket = new WeakMap<FastifyRequest, { scope: RateScope; state: RateState }>();
+
+/** Emit the budget once, after the handler has decided how the body is cached. */
+function registerRateLimitHeaders(app: FastifyInstance): void {
+  app.addHook('onSend', async (req: FastifyRequest, reply: FastifyReply, payload) => {
+    const charged = chargedBucket.get(req);
+    if (charged) setRateLimitHeaders(reply, charged.scope, charged.state);
+    return payload;
+  });
 }
 
 function sendRateLimited(
@@ -250,6 +300,9 @@ function sendRateLimited(
   retryAfter: number,
 ) {
   reply.header('Retry-After', String(retryAfter));
+  // Never shared-cacheable: a 429 is about THIS caller, and an edge-cached one
+  // would lock everyone else out for the rest of the window.
+  reply.header('Cache-Control', 'no-store');
   return reply.code(429).send({
     error: 'rate_limited',
     scope,
@@ -265,7 +318,7 @@ function registerAmbientRateLimit(app: FastifyInstance): void {
     const now = Date.now();
     lastAmbientSweepAt = sweepExpired(ambientBuckets, lastAmbientSweepAt, now);
     const result = takeToken(ambientBuckets, req.ip, max, now);
-    setRateLimitHeaders(reply, 'ambient', result);
+    chargedBucket.set(req, { scope: 'ambient', state: result });
     if (result.limited) return sendRateLimited(reply, 'ambient', result.resetSeconds);
   });
 }
@@ -278,7 +331,7 @@ function registerWriteRateLimit(app: FastifyInstance): void {
     const now = Date.now();
     lastWriteSweepAt = sweepExpired(writeBuckets, lastWriteSweepAt, now);
     const result = takeToken(writeBuckets, req.ip, max, now);
-    setRateLimitHeaders(reply, 'write', result);
+    chargedBucket.set(req, { scope: 'write', state: result });
     if (result.limited) return sendRateLimited(reply, 'write', result.resetSeconds);
   });
 }
@@ -297,7 +350,7 @@ function registerHeavyReadRateLimit(app: FastifyInstance): void {
     lastHeavySweepAt = sweepExpired(heavyBuckets, lastHeavySweepAt, now);
     const key = isMcp ? `mcp:${req.ip}` : req.ip;
     const result = takeToken(heavyBuckets, key, max, now);
-    setRateLimitHeaders(reply, 'heavy_read', result);
+    chargedBucket.set(req, { scope: 'heavy_read', state: result });
     if (result.limited) return sendRateLimited(reply, 'heavy_read', result.resetSeconds);
   });
 }
@@ -352,6 +405,9 @@ export async function registerHttpSecurity(app: FastifyInstance): Promise<void> 
   registerAmbientRateLimit(app);
   registerWriteRateLimit(app);
   registerHeavyReadRateLimit(app);
+  // After the three charge hooks: it reads what they stashed, once, on the way
+  // out, when the handler's Cache-Control is finally visible.
+  registerRateLimitHeaders(app);
 }
 
 /**
