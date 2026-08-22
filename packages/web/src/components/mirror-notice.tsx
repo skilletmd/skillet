@@ -21,9 +21,10 @@ export function GitHubMark({ className }: { className?: string }) {
 }
 
 /**
- * One quiet provenance line: a green dot while the sync is running, "Auto-synced
- * from", a GitHub mark, and the source repo. A plain statement of where the skill
- * came from — the claim link is separate ({@link ClaimMirrorCta}).
+ * One quiet provenance block: a GitHub mark, the source repo with its license,
+ * and a caption naming the sync cadence. A plain statement of where the skill
+ * came from and how fresh it is — the claim link is separate
+ * ({@link ClaimMirrorCta}).
  */
 export function MirrorNotice({
   sourceUrl,
@@ -52,85 +53,93 @@ export function MirrorNotice({
       <span className="inline-flex h-5 w-5 items-center justify-center">
         <GitHubMark className="h-4 w-4 text-(--ink-2)" />
       </span>
-      <span className="flex min-w-0 items-center gap-x-1.5">
-      {repo && sourceUrl ? (
-        // Same size/weight/colour as the rest of the meta line — the GitHub
-        // mark already says "source link", so no mono, no underline.
-        <AppLink
-          href={sourceUrl}
-          className="truncate transition-colors hover:text-(--ink)"
-        >
-          {repo}
-        </AppLink>
-      ) : (
-        <span className="shrink-0">a public repo</span>
-      )}
-      {/* The source license: mirrored under its permissive terms, which require
-          keeping the license notice with the copy. Naming it is that notice.
-          A pill sets it apart on its own, so no separator dot. */}
-      {license && (
-        <Badge
-          className="shrink-0 rounded bg-transparent px-1.5 py-px leading-4"
-          title={`Mirrored under the source's ${license} license`}
-        >
-          {license}
-        </Badge>
-      )}
+      {/* Repo and license sit together: the license qualifies the source, so it
+          belongs beside the source. This row WRAPS rather than truncating — the
+          badge is shrink-0, so with `truncate` it always won the width fight and
+          ate the identity fact ("fetcher-sh/fetcher-ski…  MIT"). Wrapping costs
+          a second line on a long repo path and keeps the whole name. */}
+      <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+        {repo && sourceUrl ? (
+          // Same size/weight/colour as the rest of the meta line — the GitHub
+          // mark already says "source link", so no mono, no underline.
+          <AppLink
+            href={sourceUrl}
+            className="min-w-0 break-words transition-colors hover:text-(--ink)"
+          >
+            {repo}
+          </AppLink>
+        ) : (
+          <span>a public repo</span>
+        )}
+        {/* The source license: mirrored under its permissive terms, which require
+            keeping the license notice with the copy. Naming it is that notice.
+            A pill sets it apart on its own, so no separator dot. */}
+        {license && (
+          // Smaller than the default pill on purpose: it annotates the repo, it
+          // does not rank with it. 10px in the muted ink keeps it legible while
+          // the repo name stays the thing your eye lands on.
+          <Badge
+            className="shrink-0 rounded bg-transparent px-1 py-0 text-2xs leading-[15px] tracking-[0.03em] text-(--ink-3)"
+            title={`Mirrored under the source's ${license} license`}
+          >
+            {license}
+          </Badge>
+        )}
       </span>
       {/* Say the sync mode in words — the octocat alone reads as "a link", not
-          "this content comes from there". */}
+          "this content comes from there". Not "from GitHub": the mark and the
+          owner/repo link directly above already say GitHub twice, so a third
+          mention spends the line on nothing. Spend it on cadence instead, which
+          is the fact a reader actually wants — how stale can this be? The
+          mirror job is a daily cron (`0 6 * * *`); nothing syncs on push, so
+          "auto-synced" was promising more freshness than we deliver.
+          The disconnected case has to say it will NOT update, which "Imported
+          from GitHub" never did. */}
       <span className="col-start-2 text-xs text-(--ink-3)">
-        {live ? 'Auto-synced from GitHub' : 'Imported from GitHub'}
+        {live ? 'Syncs daily' : 'Copied once, not synced'}
       </span>
     </span>
   )
 }
 
 /**
- * Bordered rail callout for a MIRRORED PROFILE — explains the special situation
- * in one breath: this handle is not a Skillet account, its skills sync from a
- * named repo, and the owner can claim it. The claim trigger rides in as
- * children so this stays a server-renderable shell.
+ * Provenance for a MIRRORED PROFILE. Deliberately the SAME block the skill page
+ * draws ({@link MirrorNotice}), not a second telling of it — a mirror's source
+ * and license should read identically wherever they appear, and one component
+ * is the only way to guarantee that.
+ *
+ * This used to be a bordered callout carrying a "Mirrored from GitHub" heading,
+ * a sentence beginning "@handle isn't a Skillet account", the claim link, and a
+ * "Mirrored since <month>" footer — eight lines on every mirrored profile, and
+ * nearly every profile on the site is a mirror. Three of those four parts were
+ * already said elsewhere or not worth the room:
+ *
+ *  - the heading duplicated the `Mirror` badge sitting beside the display name;
+ *  - "isn't a Skillet account" is what that badge MEANS, and phrasing an
+ *    author's presence as an absence reads as an apology for carrying them;
+ *  - "Mirrored since" is a fact nobody acts on.
+ *
+ * What survives is what a reader (or a license) actually needs: the source repo,
+ * its license, the sync cadence, and the claim path. The claim trigger stays a
+ * separate child so it keeps its own line and its own weight.
  */
 export function MirrorProfileCard({
-  handle,
   sourceUrl,
   license,
-  since,
   children,
 }: {
-  handle: string
+  /** Accepted for caller compatibility; the copy no longer names the handle. */
+  handle?: string
   sourceUrl: string | null | undefined
   license?: string | null | undefined
-  /** ISO date the mirror was created — rendered as "Mirrored since <month year>". */
+  /** Accepted for caller compatibility; no longer rendered. */
   since?: string | null
   children?: React.ReactNode
 }) {
-  const repo = sourceUrl ? hostPath(sourceUrl) : null
-  const sinceLabel = since
-    ? new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
-        new Date(since),
-      )
-    : null
   return (
-    <div className="rounded-xl border border-(--line) bg-(--card-pop) p-4 text-sm">
-      <p className="flex items-center gap-2 font-medium text-(--ink)">
-        <GitHubMark className="h-4 w-4" />
-        Mirrored from GitHub
-      </p>
-      <p className="mt-1.5 leading-[1.55] text-(--ink-2)">
-        @{handle} isn&apos;t a Skillet account. These skills sync automatically from{' '}
-        {repo && sourceUrl ? (
-          <AppLink href={sourceUrl} className="whitespace-nowrap text-(--ink) hover:underline">
-            {repo}
-          </AppLink>
-        ) : (
-          'a public repo'
-        )}
-        {license ? ` (${license})` : ''}.
-      </p>
-      {children && <div className="mt-2.5">{children}</div>}
-      {sinceLabel && <p className="mt-2.5 text-xs text-(--ink-3)">Mirrored since {sinceLabel}</p>}
+    <div className="space-y-3 text-sm">
+      <MirrorNotice sourceUrl={sourceUrl} license={license} live />
+      {children}
     </div>
   )
 }
