@@ -234,6 +234,19 @@ async function decideWithPrisma(prisma: PrismaClient, req: FastifyRequest, reply
         owner: parsed.owner,
         repo: parsed.repo,
     });
+    // A throttled re-screen must not turn an admin's approve into a permanent
+    // rejection. Put the row back in the queue and let them try again.
+    if (screen.transient) {
+        await prisma.mirror_review_queue.update({
+            where: { id },
+            data: { status: 'pending_review', decided_by: null, decided_at: null, screen_notes: screen.notes },
+        });
+        return reply.code(503).send({
+            error: 'screen_unavailable',
+            message: 'GitHub could not be reached to re-screen this candidate; it is still pending. Try again shortly.',
+            id,
+        });
+    }
     const ownerIdDiverged = row.source_owner_id != null && screen.ownerId != null && screen.ownerId !== row.source_owner_id;
     if (!screen.pass || ownerIdDiverged) {
         const notes = ownerIdDiverged

@@ -255,6 +255,18 @@ export async function discoverMirrorCandidates(opts: DiscoverOptions): Promise<D
             repo: parsed.repo,
             ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
         });
+        // A screen that could not reach a verdict is not a verdict. Recording a
+        // GitHub throttle as `rejected_screen` is permanent and unretryable, and
+        // it silently discarded 240 real repos before this guard existed. Skip
+        // the candidate instead — the next sweep re-proposes it.
+        if (screen.transient) {
+            result.skipped.push({
+                repo: `${parsed.owner}/${parsed.repo}`,
+                reason: 'screen unavailable (GitHub throttled or down); will be re-proposed',
+            });
+            console.warn(`  ~ deferred ${parsed.owner}/${parsed.repo}: ${screen.notes}`);
+            continue;
+        }
         let status = screen.pass ? 'pending_review' : 'rejected_screen';
         let notes = screen.notes;
         const repoFull = `${parsed.owner}/${parsed.repo}`;

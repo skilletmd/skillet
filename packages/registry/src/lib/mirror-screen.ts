@@ -36,6 +36,12 @@ export interface ScreenOwnerType {
 
 export interface ScreenResult {
   pass: boolean
+  /**
+   * True when the screen could not REACH a verdict (rate limit, 5xx, network
+   * error) as opposed to reaching a negative one. A caller must not record a
+   * transient failure as a decision: the repo is unjudged, not rejected.
+   */
+  transient?: boolean
   /** Human-readable rejection reason when `pass` is false; null when it passes. */
   notes: string | null
   /** GitHub owner login as returned live (canonical case). */
@@ -115,17 +121,37 @@ export function normalizeRepoKey(source: string): string | null {
   return `${parsed.owner.toLowerCase()}/${parsed.repo.toLowerCase()}`
 }
 
+/**
+ * Token the screen authenticates with. Unauthenticated GitHub allows 60 requests
+ * per hour; screening one candidate costs several. Discovery therefore burned
+ * through the anonymous budget within a handful of repos and every candidate
+ * after that failed with 429/403 — recorded, until this was fixed, as a
+ * PERMANENT `rejected_screen`. 240 real repos were thrown away that way while
+ * SKILLET_DISCOVERY_GITHUB_TOKEN sat unused at 5000/5000, because nothing in
+ * this module ever read it.
+ */
+function screenToken(): string | undefined {
+  return (
+    process.env.SKILLET_DISCOVERY_GITHUB_TOKEN ||
+    process.env.SKILLET_MIRROR_GITHUB_TOKEN ||
+    process.env.GITHUB_TOKEN ||
+    undefined
+  )
+}
+
 async function ghGet(
   url: string,
   fetchImpl: typeof fetch | undefined,
 ): Promise<Response | null> {
   const f = fetchImpl ?? globalThis.fetch
+  const token = screenToken()
   try {
     return await f(url, {
       headers: {
         accept: 'application/vnd.github+json',
         'user-agent': 'skillet-mirror-screen',
         'x-github-api-version': '2022-11-28',
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
       },
       // A slow GitHub response must not hang a Fastify worker (submit + approve
       // call this synchronously). A timeout throws, caught below as a null
@@ -267,9 +293,22 @@ export async function screenCandidate(input: ScreenInput): Promise<ScreenResult>
 
   const repoRes = await ghGet(`${GH_API}/repos/${owner}/${repo}`, fetchImpl)
   if (!repoRes || !repoRes.ok) {
+    // 429 and a 403 carrying a rate-limit signal are GitHub throttling us; 5xx
+    // and a null Response (timeout / network) are equally inconclusive. None of
+    // them say anything about the repo, so they must not become a verdict.
+    const status = repoRes?.status ?? null
+    const rateLimited =
+      status === 429 ||
+      (status === 403 &&
+        (repoRes?.headers.get('x-ratelimit-remaining') === '0' ||
+          (repoRes?.headers.get('retry-after') ?? null) !== null))
+    const transient = status === null || rateLimited || status >= 500
     return {
       ...empty,
-      notes: `could not fetch ${owner}/${repo} from GitHub (HTTP ${repoRes?.status ?? 'error'}) — repo may be private, deleted, or rate-limited`,
+      transient,
+      notes: transient
+        ? `could not reach a verdict for ${owner}/${repo} (HTTP ${status ?? 'network error'}) — GitHub throttled or unavailable, not a judgement on the repo`
+        : `could not fetch ${owner}/${repo} from GitHub (HTTP ${status}) — repo is private or deleted`,
     }
   }
   const meta = (await repoRes.json().catch(() => null)) as RepoMeta | null
