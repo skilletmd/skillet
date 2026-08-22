@@ -233,8 +233,9 @@ async function ContentGrid({
     offset: include === 'kits' ? offset : 0,
   }
   // Soft each leg so Promise.all can't fail-closed on one registry outage.
-  // We skip the always-on people catalog fan-out for maker avatars — cards fall
-  // back to identicons; PeopleStrip owns the people peek on the All view.
+  // Byline avatars ride along on the catalog rows themselves (author_avatar_url
+  // / owner_avatar_url), so there is still no people-catalog fan-out here.
+  // PeopleStrip owns the people peek on the All view.
   browseSsrLog('grid_enter', { include, offset, has_q: Boolean(q.trim()) })
   const [kitRes, skillRes] = await Promise.all([
     wantKits
@@ -298,7 +299,7 @@ async function ContentGrid({
               description={row.skill.description}
               category={row.skill.category}
               installCount={row.skill.install_count}
-              makerAvatarUrl={null}
+              makerAvatarUrl={row.skill.author_avatar_url ?? null}
               usedByFaces={usedByFacesFromWire(row.skill.used_by)}
             />
           ) : (
@@ -315,7 +316,7 @@ async function ContentGrid({
               subscriberCount={row.kit.subscriberCount}
               skillRefs={row.kit.skillRefs ?? []}
               skillCategories={row.kit.skillCategories ?? []}
-              makerAvatarUrl={null}
+              makerAvatarUrl={row.kit.ownerAvatarUrl}
               usedByFaces={row.kit.usedBy ?? []}
               action={
                 viewerHandle === row.kit.owner ? (

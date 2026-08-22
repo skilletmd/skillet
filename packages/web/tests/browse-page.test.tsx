@@ -50,6 +50,28 @@ describe('browse page', () => {
   })
 })
 
+describe('browse byline avatars', () => {
+  // Browse cards used to hardcode makerAvatarUrl={null} and fall back to an
+  // identicon for everyone, because resolving a face meant a people-catalog
+  // fan-out per card. The avatar now rides along on the catalog row itself
+  // (author_avatar_url / owner_avatar_url), so the null must not come back.
+  it('passes real avatars through to skill and kit cards', () => {
+    const surface = readFileSync(
+      resolve(process.cwd(), 'src/app/(consumer)/skills/explore-surface.tsx'),
+      'utf8',
+    )
+    expect(surface).not.toContain('makerAvatarUrl={null}')
+    expect(surface).toContain('makerAvatarUrl={row.skill.author_avatar_url ?? null}')
+    expect(surface).toContain('makerAvatarUrl={row.kit.ownerAvatarUrl}')
+  })
+
+  it('maps the wire fields the cards depend on', () => {
+    const catalog = readFileSync(resolve(process.cwd(), 'src/lib/registry-catalog.ts'), 'utf8')
+    expect(catalog).toContain('ownerAvatarUrl')
+    expect(catalog).toContain('owner_avatar_url')
+  })
+})
+
 describe('feed page', () => {
   it('opts into per-request rendering via markDynamicRoute', () => {
     const page = readFileSync(

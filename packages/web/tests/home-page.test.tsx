@@ -31,7 +31,7 @@ describe('home shelves', () => {
     const { getKitCatalog, getSkillCatalog, getPeopleCatalog, getDiscoverFeed } =
       await import('@/lib/registry')
     vi.mocked(getKitCatalog).mockResolvedValue({
-      items: [{ id: 'k1', owner: 'taylor', slug: 'starter', name: 'Starter', description: null, skillCount: 2, subscriberCount: 1, category: null }],
+      items: [{ id: 'k1', owner: 'taylor', ownerAvatarUrl: null, slug: 'starter', name: 'Starter', description: null, skillCount: 2, subscriberCount: 1, category: null }],
       total: 1,
       limit: 10,
       offset: 0,

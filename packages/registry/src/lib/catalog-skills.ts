@@ -144,10 +144,17 @@ export async function listPublicCatalogSkillSummariesPrisma(
     .filter((s): s is PublicCatalogSkillRow & { latest_hash: string } => Boolean(s.latest_hash))
     .map((s) => ({ skill_id: s.id, hash: s.latest_hash }))
 
-  const [users, versions, versionCounts, scans] = await Promise.all([
+  const [users, authors, versions, versionCounts, scans] = await Promise.all([
     prisma.users.findMany({
       where: { handle: { in: authorIds } },
       select: { handle: true, author_key_id: true },
+    }),
+    // One batched lookup per page (not per row) so every catalog card can draw
+    // its byline avatar without the web app fanning out to the people catalog.
+    // `authors.id` is the handle, so this covers mirror brands as well as users.
+    prisma.authors.findMany({
+      where: { id: { in: authorIds } },
+      select: { id: true, avatar_url: true },
     }),
     versionPairs.length === 0
       ? Promise.resolve([])
@@ -186,6 +193,7 @@ export async function listPublicCatalogSkillSummariesPrisma(
       .filter((u): u is typeof u & { handle: string } => typeof u.handle === 'string')
       .map((u) => [u.handle, u.author_key_id]),
   )
+  const avatarByHandle = new Map(authors.map((a) => [a.id, a.avatar_url ?? null]))
   const versionByKey = new Map(versions.map((v) => [`${v.skill_id}\0${v.hash}`, v]))
   const countBySkill = new Map(versionCounts.map((c) => [c.skill_id, c._count._all]))
   const scanByKey = new Map(
@@ -199,6 +207,7 @@ export async function listPublicCatalogSkillSummariesPrisma(
     const visibility = s.visibility === 'public' ? 'public' : 'private'
     return {
       author_id: s.author_id,
+      author_avatar_url: avatarByHandle.get(s.author_id) ?? null,
       slug: s.slug,
       skill_id: s.id,
       description: s.description,

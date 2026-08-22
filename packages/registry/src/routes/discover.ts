@@ -71,16 +71,26 @@ export function registerDiscoverRoutes(
             sort,
           }),
         ]);
-        const usedByByKit = await discoverKitSubscriberFacesPrisma(
-          db,
-          rows.map((r) => r.id),
-        );
+        const [usedByByKit, owners] = await Promise.all([
+          discoverKitSubscriberFacesPrisma(
+            db,
+            rows.map((r) => r.id),
+          ),
+          // Batched once per page so a kit card can draw its owner's face
+          // without a per-card profile lookup. `authors.id` is the handle.
+          db.authors.findMany({
+            where: { id: { in: [...new Set(rows.map((r) => r.owner_id))] } },
+            select: { id: true, avatar_url: true },
+          }),
+        ]);
+        const ownerAvatarByHandle = new Map(owners.map((a) => [a.id, a.avatar_url ?? null]));
         return {
           kits: rows.map((r) => {
             const faces = (usedByByKit.get(r.id) ?? []).filter((f) => f.handle !== r.owner_id);
             return {
               id: r.id,
               owner: r.owner_id,
+              owner_avatar_url: ownerAvatarByHandle.get(r.owner_id) ?? null,
               name: r.name,
               slug: r.slug,
               description: r.description,

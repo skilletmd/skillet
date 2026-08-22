@@ -33,6 +33,9 @@ export interface SkillCatalogParams {
 export interface KitCatalogEntry {
   id: string
   owner: string
+  /** The kit owner's avatar photo, shown beside @owner in the card byline.
+   *  Null when the owner has none; the card then falls back to an identicon. */
+  ownerAvatarUrl: string | null
   name: string
   slug: string
   description: string | null
@@ -298,6 +301,7 @@ export async function getKitCatalog(
       items: rows.map((r) => ({
         id: String(r.id),
         owner: String(r.owner),
+        ownerAvatarUrl: (r.owner_avatar_url as string | null) ?? null,
         name: String(r.name),
         slug: String(r.slug ?? ''),
         description: (r.description as string | null) ?? null,
@@ -424,6 +428,7 @@ export async function getKitsForSkill(author: string, slug: string): Promise<Kit
   return rows.map((r) => ({
     id: String(r.id),
     owner: String(r.owner),
+    ownerAvatarUrl: (r.owner_avatar_url as string | null) ?? null,
     name: String(r.name),
     slug: String(r.slug ?? ''),
     description: null,

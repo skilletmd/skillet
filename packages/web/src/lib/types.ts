@@ -307,6 +307,9 @@ export interface Skill {
  */
 export interface SkillSummary {
   author: string
+  /** The author's avatar photo, shown beside @author in the card byline.
+   *  Absent on legacy/mock responses; the card then falls back to an identicon. */
+  author_avatar_url?: string | null
   slug: string
   skill_id: string
   /** Human display title (SKILL.md frontmatter name). Falls back to a humanized slug. */

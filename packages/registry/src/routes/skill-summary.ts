@@ -43,6 +43,12 @@ export type ModerationStatus = 'none' | 'unlisted' | 'quarantined';
 /** Public, web-facing summary of a single skill. */
 export interface SkillSummary {
   author: string;
+  /**
+   * The author's avatar, carried on every catalog row so a browse grid can
+   * render the byline face without a per-card profile lookup. Null when the
+   * author has no avatar (the client falls back to an identicon).
+   */
+  author_avatar_url: string | null;
   slug: string;
   skill_id: string;
   description: string | null;
@@ -78,6 +84,8 @@ export interface SkillSummary {
 /** Joined row shape produced by {@link SKILL_SUMMARY_SELECT}. */
 export interface SkillSummaryRow {
   author_id: string;
+  /** `authors.avatar_url` for `author_id`; null when the author has none. */
+  author_avatar_url?: string | null;
   slug: string;
   skill_id: string;
   description: string | null;
@@ -111,6 +119,7 @@ export interface SkillSummaryRow {
  */
 export const SKILL_SUMMARY_SELECT = `
   SELECT s.author_id            AS author_id,
+         a.avatar_url           AS author_avatar_url,
          s.slug                 AS slug,
          s.id                   AS skill_id,
          s.description          AS description,
@@ -131,6 +140,7 @@ export const SKILL_SUMMARY_SELECT = `
   FROM skills s
   LEFT JOIN skill_versions sv ON sv.skill_id = s.id AND sv.hash = s.latest_hash
   LEFT JOIN users u ON u.handle = s.author_id
+  LEFT JOIN authors a ON a.id = s.author_id
   LEFT JOIN skill_version_scans svs ON svs.skill_version_id = s.latest_hash
 `;
 
@@ -175,6 +185,7 @@ export function moderationOf(row: SkillSummaryRow): ModerationStatus {
 export function toSkillSummary(row: SkillSummaryRow): SkillSummary {
   return {
     author: row.author_id,
+    author_avatar_url: row.author_avatar_url ?? null,
     slug: row.slug,
     skill_id: row.skill_id,
     description: row.description,
