@@ -40,6 +40,12 @@ jobs:
       - name: No internal tracker IDs
         run: node scripts/check-no-tracker-ids.mjs
 
+      # A PM2 app whose `script` its declared interpreter cannot parse dies in
+      # milliseconds and still reports `online`. mirror-nightly did exactly that
+      # at 06:00 every day for over a month before anyone noticed.
+      - name: PM2 entrypoints match their interpreter
+        run: node scripts/check-pm2-entrypoints.mjs
+
       # The registry HTTP API doc is generated from source — fail if it drifted.
       - name: Registry API doc is current
         run: node scripts/gen-registry-api.mjs --check

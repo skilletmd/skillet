@@ -160,6 +160,19 @@ if (webWorkers === 1) {
   });
 }
 
+/**
+ * Absolute path to tsx's executable JS entry, resolved from the registry
+ * package. Deliberately NOT `node_modules/.bin/tsx`: that shim is `#!/bin/sh`,
+ * and PM2 runs this app with `interpreter: "node"`.
+ */
+function tsxCli() {
+  const pkgPath = require.resolve("tsx/package.json", { paths: [registryRoot] });
+  const { bin } = require(pkgPath);
+  const rel = typeof bin === "string" ? bin : bin.tsx;
+  return path.join(path.dirname(pkgPath), rel);
+}
+
+
 apps.push({
   // Nightly mirror ops: re-sync seeded + approved mirrors, then run the
   // quality-gated discovery pass into the review queue. One-shot process
@@ -170,7 +183,17 @@ apps.push({
   // and PM2 runs a cron app once immediately on first start.
   name: "mirror-nightly",
   cwd: registryRoot,
-  script: path.join(registryRoot, "node_modules/.bin/tsx"),
+  // tsx's REAL entry, not `node_modules/.bin/tsx`. The .bin path is a `#!/bin/sh`
+  // shim, so pairing it with `interpreter: "node"` handed a shell script to
+  // Node, which parsed `basedir=$(dirname ...)` as JavaScript and died with
+  // `SyntaxError: missing ) after argument list` — instantly, on every single
+  // 06:00 firing, since at least 2026-07-16. Nothing ever reached the sync
+  // engine and every stdout log stayed 0 bytes.
+  // Resolved through tsx's own package.json `bin` rather than a hardcoded path,
+  // so a missing or moved tsx throws when PM2 LOADS this config instead of
+  // failing silently once a day at 6am. (`tsx/dist/cli.mjs` is not an exported
+  // subpath, so require.resolve cannot address it directly.)
+  script: tsxCli(),
   args: "scripts/nightly-mirror-ops.ts",
   instances: 1,
   exec_mode: "fork",

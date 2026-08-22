@@ -20,6 +20,7 @@
     "check:tracker-ids": "node scripts/check-no-tracker-ids.mjs",
     "check:action-pins": "node scripts/check-action-pins.mjs",
     "check:line-endings": "node scripts/check-line-endings.mjs",
+    "check:pm2": "node scripts/check-pm2-entrypoints.mjs",
     "check:registry-api": "node scripts/gen-registry-api.mjs --check",
     "gen:registry-api": "node scripts/gen-registry-api.mjs",
     "pm2:start": "pnpm exec pm2 start ecosystem.config.cjs",
