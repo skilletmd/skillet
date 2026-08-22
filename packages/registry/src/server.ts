@@ -45,6 +45,8 @@ import { registerConnectPairRoutes } from './routes/connect-pair.js'
 import { registerMcpRoutes } from './routes/mcp.js'
 import { registerConnectedRepoRoutes } from './routes/connected-repos.js'
 import { registerHttpSecurity } from './http-security.js'
+import { registerOpenApiRoutes } from './routes/openapi.js'
+import { registerErrorEnvelope } from './error-envelope.js'
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -343,9 +345,17 @@ export async function buildServer(opts: ServerOptions = {}): Promise<{
     })
   })
 
+  // Every JSON error leaves with a stable `code` and a `docs` URL, whatever
+  // shape the handler chose, and an unrouted path answers in that same shape.
+  // Additive only — see error-envelope.ts.
+  registerErrorEnvelope(app)
+
   await registerHttpSecurity(app)
 
   app.get('/api/hc', async () => ({ ok: true, ts: Date.now() }))
+
+  // Machine-readable API description. Root + version-prefixed; see routes/openapi.ts.
+  registerOpenApiRoutes(app)
 
   // Resolves Bearer tokens to req.principal for every route. Public reads
   // simply ignore it; auth-requiring handlers gate via requireSession.

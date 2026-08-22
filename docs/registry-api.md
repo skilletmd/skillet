@@ -10,6 +10,9 @@ main [README](../README.md) and [packages/registry/README.md](../packages/regist
 ## Conventions
 
 - **Base path.** Every route is under `/api/v1`. Health check: `GET /api/hc`.
+- **Machine-readable description.** `GET /openapi.json` (also under the version
+  prefix) serves the OpenAPI 3.1 document for the public surface, built from
+  `@skillet/protocol/openapi` so the web app can serve the same bytes.
 - **Auth.** Bearer tokens in `Authorization` — `skillet_s_` session, `skillet_d_`
   device, `skillet_m_` MCP-link. Public reads work unauthenticated; write and
   account routes require the right token class.
@@ -17,12 +20,15 @@ main [README](../README.md) and [packages/registry/README.md](../packages/regist
   account. They require the web-internal HMAC signature, must never be internet-routable,
   and can be origin-locked with `SKILLET_INTERNAL_ORIGIN_ALLOWLIST` (they 404 for any
   other peer). See the README Operations section.
-- **Errors.** 4xx carry `{ error }` (and sometimes `code`/`message`); 5xx are reduced to
-  `{ error: "internal", request_id }` with the detail logged server-side.
+- **Errors.** Every failure is JSON carrying `{ error, code, message, statusCode, docs }`.
+  `code` is the stable machine-readable field; the envelope is filled in on the way out
+  by `src/error-envelope.ts`, which only ADDS fields, so a handler's own body survives.
+  5xx are reduced to `{ error: "internal", request_id }` with the detail logged
+  server-side.
 - **Rate limits.** Per-client-IP classes (ambient / write / heavy); see
   `packages/registry/README.md`.
 
-_176 routes across 34 areas._
+_177 routes across 35 areas._
 
 ## Account
 
@@ -265,6 +271,12 @@ _176 routes across 34 areas._
 | GET | `/api/v1/me/notifications` |
 | POST | `/api/v1/me/notifications/seen` |
 | GET | `/api/v1/me/notifications/unread-count` |
+
+## Openapi
+
+| Method | Path |
+| --- | --- |
+| GET | `/api/v1/openapi.json` |
 
 ## Orgs
 

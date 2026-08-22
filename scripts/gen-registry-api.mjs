@@ -107,6 +107,13 @@ lines.push('## Conventions');
 lines.push('');
 lines.push(`- **Base path.** Every route is under \`${PREFIX}\`. Health check: \`GET /api/hc\`.`);
 lines.push(
+  '- **Machine-readable description.** `GET /openapi.json` (also under the version',
+);
+lines.push(
+  '  prefix) serves the OpenAPI 3.1 document for the public surface, built from',
+);
+lines.push('  `@skillet/protocol/openapi` so the web app can serve the same bytes.');
+lines.push(
   '- **Auth.** Bearer tokens in `Authorization` — `skillet_s_` session, `skillet_d_`',
 );
 lines.push(
@@ -124,9 +131,16 @@ lines.push(
 );
 lines.push('  other peer). See the README Operations section.');
 lines.push(
-  '- **Errors.** 4xx carry `{ error }` (and sometimes `code`/`message`); 5xx are reduced to',
+  '- **Errors.** Every failure is JSON carrying `{ error, code, message, statusCode, docs }`.',
 );
-lines.push('  `{ error: "internal", request_id }` with the detail logged server-side.');
+lines.push(
+  '  `code` is the stable machine-readable field; the envelope is filled in on the way out',
+);
+lines.push(
+  '  by `src/error-envelope.ts`, which only ADDS fields, so a handler\'s own body survives.',
+);
+lines.push('  5xx are reduced to `{ error: "internal", request_id }` with the detail logged');
+lines.push('  server-side.');
 lines.push(
   '- **Rate limits.** Per-client-IP classes (ambient / write / heavy); see',
 );
