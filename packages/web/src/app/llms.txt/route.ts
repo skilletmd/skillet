@@ -1,3 +1,4 @@
+import { PROTECTED_RESOURCE_WELL_KNOWN } from '@skillet/protocol/protected-resource'
 import { DOC_NAV } from '@/lib/docs-nav'
 import { REGISTRY_API } from '@/lib/registry-prefix'
 import { siteUrl } from '@/lib/site-url'
@@ -58,6 +59,8 @@ Every page listed here serves clean Markdown at the same URL when you send \`Acc
 
 Do not use Skillet to store secrets, private data, or anything you would not publish: public skills are world-readable and world-runnable by design.
 
+Getting in costs nothing and needs no human: every read above is anonymous, there is no key to apply for, and the tokens that do exist (device, kit, MCP link) are minted self-serve from the site or the CLI in one step. Rate limits are reported per response in the \`RateLimit-Limit\` / \`RateLimit-Remaining\` / \`RateLimit-Reset\` headers, so throttle from those rather than guessing.
+
 ## Start here
 
 - [What is Skillet?](${abs('/docs')}): the model, covering skills, kits, sync, and consent
@@ -66,10 +69,22 @@ Do not use Skillet to store secrets, private data, or anything you would not pub
 - [OpenAPI description](${abs('/openapi.json')}): machine-readable description of every public endpoint
 - [Browse the catalog](${abs('/browse')}): the most recently published public skills
 
+## Developer resources
+
+- [Skillet API reference](${abs('/docs/api')}): endpoints, token scopes, errors, caching, and the RateLimit headers
+- [Skillet API base URL](${template(REGISTRY_API)}): anonymous reads, no key and no signup; \`GET\`, \`HEAD\`, \`OPTIONS\`
+- [Skillet OpenAPI description](${abs('/openapi.json')}): OpenAPI 3.1, typed, with operation IDs for function calling
+- [Skillet MCP server](${abs('/docs/mcp')}): Streamable HTTP, hosted; per-client setup and auth
+- [Skillet CLI (skilletmd)](${abs('/docs/cli')}): \`npx skilletmd\`, published on npm at https://www.npmjs.com/package/skilletmd
+- [Skillet API auth and scopes](${abs('/docs/api')}#auth): the four scopes, which token class carries each, and how to mint one yourself
+- [Skillet API versioning and deprecation policy](${abs('/docs/versioning')}): what breaks, and the \`Deprecation\`/\`Sunset\` headers that warn first
+
 ## Machine-readable files
 
 - [OpenAPI 3.1 description](${abs('/openapi.json')}): every public endpoint, typed, with operation IDs for function calling
 - [MCP server manifest](${abs('/.well-known/mcp.json')}): Streamable HTTP endpoint, transport, and auth for the hosted MCP server
+- [OAuth protected-resource metadata](${abs(PROTECTED_RESOURCE_WELL_KNOWN.api)}): RFC 9728. The scopes this API accepts and where a token comes from
+- [OAuth protected-resource metadata for MCP](${abs(PROTECTED_RESOURCE_WELL_KNOWN.mcp)}): RFC 9728 for the MCP endpoint alone, which takes \`read\` and nothing else
 - [Agent Skills discovery index](${abs('/.well-known/agent-skills/index.json')}): the skills Skillet itself publishes, per the agent-skills well-known convention
 - [Sitemap](${abs('/sitemap.xml')}): every indexable URL
 - [Blog feed](${abs('/blog/rss.xml')}): release notes and changes

@@ -28,6 +28,18 @@ export interface DocFrontmatter {
   section: string
   /** Optional header illustration, e.g. "/docs/concepts.png". */
   image?: string
+  /**
+   * Optional `<title>` override, for pages whose sidebar label is too generic
+   * to survive a name-based search.
+   *
+   * "API", "CLI reference", and "MCP" are the right labels *inside* the docs,
+   * where the product name is already established by every other pixel on the
+   * page. They are the wrong strings in a search result: an agent asked to find
+   * "the Skillet API docs" is matching against a title that never says Skillet
+   * except as a trailing suffix. This lets the two jobs disagree without
+   * renaming the nav.
+   */
+  searchTitle?: string
 }
 
 export interface Doc extends DocFrontmatter {
@@ -69,6 +81,7 @@ export function getDoc(slug: string[]): Doc | null {
     order: fm.order ?? 0,
     section: fm.section ?? '',
     image: fm.image,
+    searchTitle: fm.searchTitle,
     slug,
     content,
     editPath: 'content/docs/' + rel + '.md',

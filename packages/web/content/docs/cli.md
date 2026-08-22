@@ -1,12 +1,15 @@
 ---
 title: CLI reference
-description: "The device CLI: sync your skills to every agent and inspect your kit. Management lives on skillet.md."
+searchTitle: "Skillet CLI (skilletmd) reference"
+description: "The Skillet CLI, published on npm as skilletmd: sync your skills to every agent and inspect your kit. Management lives on skillet.md."
 order: 1
 section: Reference
 image: /docs/cli.png
 ---
 
-The `skillet` CLI syncs your skills onto a machine and lets you inspect your kit. Publishing, kits, and teams are web-first; do those on [skillet.md](https://skillet.md). Install it:
+The `skillet` CLI syncs your skills onto a machine and lets you inspect your kit. Publishing, kits, and teams are web-first; do those on [skillet.md](https://skillet.md).
+
+It is published on npm as [`skilletmd`](https://www.npmjs.com/package/skilletmd), with prebuilt binaries for macOS, Linux, and Windows. Install it:
 
 ```bash
 npx skilletmd

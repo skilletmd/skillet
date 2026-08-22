@@ -1,6 +1,7 @@
 ---
 title: API
-description: "The public HTTP API: anonymous reads, token scopes, the error contract, caching, and what /api/v1 promises."
+searchTitle: "Skillet API reference"
+description: "The Skillet HTTP API: anonymous reads, token scopes, the error contract, caching, rate-limit headers, and what /api/v1 promises."
 order: 0
 section: Reference
 ---
@@ -63,6 +64,16 @@ A token's prefix determines what it may do. Scopes are fixed at mint; a token ca
 | `claim` | Handle claim and author key binding |
 
 Request the narrowest class that does the job. An integration that reads one kit should hold a kit key, not a session token.
+
+Every token is self-serve. Sign in, and the class you need is one page away: a device token from `skillet connect <code>`, a kit key from Settings → Kits, an MCP link from Settings → Account. There is no application to fill in and no sales step.
+
+The same scope list is published machine-readably as [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728) protected-resource metadata, which is what a `401` points at in its `WWW-Authenticate` header:
+
+```
+https://skillet.md/.well-known/oauth-protected-resource
+```
+
+Skillet is an OAuth 2.0 *resource server*: it accepts RFC 6750 bearer tokens and publishes its scopes at the well-known path above. It does not run an authorization server, so there is no `/authorize` or `/token` endpoint and no `/.well-known/oauth-authorization-server` document. Tokens come from the site and the CLI.
 
 ```bash
 curl -s https://registry.skillet.md/api/v1/whoami \
@@ -143,9 +154,24 @@ A deprecated skill answers `410` with its sunset notice rather than disappearing
 
 ## Rate limits
 
-Per IP, per minute: roughly 2,000 ambient reads, 300 writes, and 60 heavy reads (bundle downloads, version diffs, MCP tool calls).
+Three per-IP buckets, each a 60-second window. Roughly 2,000 ambient reads, 300 writes, and 60 heavy reads (bundle downloads, version diffs, MCP tool calls) per minute.
 
-Exceeding a bucket returns `429` with `Retry-After` in seconds. **There are no `X-RateLimit-*` headers** — don't build a quota display against them. There is no key to apply for; if a legitimate integration needs more, [open an issue](https://github.com/skilletmd/skillet/issues).
+Read the budget off the response instead of hardcoding those numbers. Every metered response carries the IETF RateLimit header fields, in both the spelling the current draft defines and the one older clients parse:
+
+| Header | Example | Means |
+| --- | --- | --- |
+| `RateLimit-Limit` | `2000` | Requests permitted in the window |
+| `RateLimit-Remaining` | `1993` | Requests left in this window |
+| `RateLimit-Reset` | `47` | Seconds until the window resets |
+| `RateLimit-Policy` | `"ambient"; q=2000; w=60` | The bucket this request was charged to, and its quota |
+| `RateLimit` | `"ambient"; r=1993; t=47` | The same state as a structured field |
+| `Retry-After` | `47` | On `429` only. Seconds to wait. |
+
+```bash
+curl -sI "https://skillet.md/api/v1/skills?limit=1" | grep -i ratelimit
+```
+
+Exceeding a bucket returns `429` with `Retry-After`. There is no key to apply for and no per-key quota; if a legitimate integration needs more, [open an issue](https://github.com/skilletmd/skillet/issues).
 
 ## What `/api/v1` promises
 
@@ -155,6 +181,7 @@ Exceeding a bucket returns `429` with `Retry-After` in seconds. **There are no `
 | **`code` values are stable** | Once an error code is published it keeps its meaning. |
 | **Enums can gain members** | Treat an unknown `scanStatus` or `category` as unrecognized, not as an error. |
 | **Breaking changes get a new prefix** | `/api/v2`. `/api/v1` is not rewritten under you. |
+| **Removal is announced in headers first** | `Deprecation`, then `Sunset` at least 90 days out. See [Versioning](/docs/versioning). |
 | **Undocumented routes are not API** | The registry serves ~175 routes; the ones in `/openapi.json` are the supported surface. The rest are internal and may change or vanish. |
 
 ## Markdown instead of JSON
@@ -186,6 +213,8 @@ MCP is off until the user enables it in Settings → Account, which mints a read
 | [`/llms.txt`](https://skillet.md/llms.txt) | Orientation for agents: what this site is for and when to call it |
 | [`/.well-known/mcp.json`](https://skillet.md/.well-known/mcp.json) | MCP server card: endpoint, transport, auth |
 | [`/.well-known/agent-skills/index.json`](https://skillet.md/.well-known/agent-skills/index.json) | The skills Skillet itself publishes, with SHA-256 digests |
+| [`/.well-known/oauth-protected-resource`](https://skillet.md/.well-known/oauth-protected-resource) | RFC 9728: the scopes this API accepts, and where to get a token |
+| [`/.well-known/oauth-protected-resource/api/v1/mcp`](https://skillet.md/.well-known/oauth-protected-resource/api/v1/mcp) | RFC 9728 for the MCP endpoint alone: `read` and nothing else |
 | [`/sitemap.xml`](https://skillet.md/sitemap.xml) | Every indexable URL |
 
 ## Limitations
@@ -193,5 +222,6 @@ MCP is off until the user enables it in Settings → Account, which mints a read
 - Writes are not available on the apex mirror. Use the registry origin.
 - No webhooks. Poll `GET /discover/feed`.
 - Private skills are invisible to anonymous callers, including their existence.
-- No `X-RateLimit-*` headers, and no per-key quotas.
+- No per-key quotas. Limits are per IP, and reported in the `RateLimit-*` headers above.
+- No OAuth authorization server. Bearer tokens are accepted and their scopes published (RFC 6750 + RFC 9728), but there is no authorization-code flow to integrate against.
 - The OpenAPI document describes the public surface, not every internal route. Device sync internals, moderation queues, and account routes are deliberately absent.
