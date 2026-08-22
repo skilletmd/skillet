@@ -121,12 +121,21 @@ function browseSegments(): ReadonlySet<string> {
  * navigation source of truth and `tests/docs-nav-coverage.test.ts` holds it to
  * every file in `content/docs`, so it doubles as the docs route table.
  */
+/**
+ * Docs routes rendered by a React page rather than a Markdown file.
+ *
+ * They resolve as HTML, so `classifyRoute` must call them `known`. They have no
+ * source document, so `renderMarkdown` cannot produce a twin for them and
+ * `hasMarkdownVariant` must say so — claiming one sent an agent that asked for
+ * `text/markdown` to a 404 while a browser got the page, and pointed the
+ * `rel="alternate"` link at a dead URL.
+ */
+const DOCS_WITHOUT_MARKDOWN: ReadonlySet<string> = new Set(['/docs/scanner', '/docs/runtimes'])
+
 function docsPaths(): ReadonlySet<string> {
   const out = new Set<string>(['/docs'])
   for (const section of DOC_NAV) for (const item of section.items) out.add(item.href)
-  // React pages that live outside `content/docs` and so never appear as files.
-  out.add('/docs/scanner')
-  out.add('/docs/runtimes')
+  for (const path of DOCS_WITHOUT_MARKDOWN) out.add(path)
   return out
 }
 
@@ -263,7 +272,9 @@ export function hasMarkdownVariant(pathname: string): boolean {
   if (pathname === '/') return true
   const verdict = classifyRoute(pathname)
   if (verdict.kind === 'unknown') return false
-  if (pathname === '/docs' || pathname.startsWith('/docs/')) return true
+  if (pathname === '/docs' || pathname.startsWith('/docs/')) {
+    return !DOCS_WITHOUT_MARKDOWN.has(pathname)
+  }
   if (pathname === '/blog' || pathname.startsWith('/blog/')) return true
   if (pathname === '/browse') return true
   if (verdict.kind !== 'registry') return false

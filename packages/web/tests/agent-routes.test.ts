@@ -230,6 +230,20 @@ describe('hasMarkdownVariant', () => {
 
   // The Agent Skills artifacts end in `.md` but are served verbatim by their own
   // route; negotiating them would break the published SHA-256 digests.
+  // /docs/scanner and /docs/runtimes are React pages with no source document.
+  // Claiming a twin sent an agent asking for text/markdown to a 404 while a
+  // browser got the page.
+  it('does not claim a twin for docs pages that have no Markdown source', () => {
+    expect(hasMarkdownVariant('/docs/scanner')).toBe(false)
+    expect(hasMarkdownVariant('/docs/runtimes')).toBe(false)
+    // Both still resolve as HTML, and their content-backed siblings still do.
+    expect(classifyRoute('/docs/scanner')).toEqual({ kind: 'known' })
+    expect(classifyRoute('/docs/runtimes')).toEqual({ kind: 'known' })
+    expect(hasMarkdownVariant('/docs/runtimes/claude')).toBe(true)
+    expect(hasMarkdownVariant('/docs/api')).toBe(true)
+    expect(hasMarkdownVariant('/docs')).toBe(true)
+  })
+
   it('never claims a .well-known artifact', () => {
     expect(hasMarkdownVariant('/.well-known/agent-skills/write-a-skill/SKILL')).toBe(false)
   })
