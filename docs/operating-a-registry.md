@@ -58,6 +58,32 @@ Two supported shapes; pick one.
   defines every process. Bring it up with `pnpm pm2:start` (`pm2:stop`,
   `pm2:restart`, `pm2:logs` are siblings). Use `pm2 startOrReload` when adding a
   new app (e.g. the nightly job) — a plain `pm2 reload` won't pick it up.
+
+  **Changing an existing app's `script`, `interpreter`, `cwd` or `args` needs
+  `pm2 delete <app>` then `pm2 start`.** `startOrReload` refreshes env and code
+  but keeps the entrypoint PM2 already has, so a corrected `script` silently
+  goes on running the old one. Confirm with `pm2 describe <app>` and read the
+  `script path` row back before believing a fix landed — that row is the only
+  place the stale value shows.
+
+### Checking that a one-shot job actually ran
+
+`mirror-nightly` is a cron app with `autorestart: false`, and that combination
+hides failure well: a process that dies in 40ms looks exactly like one that
+finished. PM2 keeps reporting `online`, the exit is silent, and `restarts` climbs
+for ordinary reasons. **Status is not evidence.** The job's stdout is:
+
+```bash
+pm2 describe mirror-nightly | grep 'out log path'   # then tail that file
+```
+
+A healthy run opens with `phase 1: seed re-sync (N sources)` and closes with a
+`total: +N ~N =N` line. **An empty stdout log means it never ran**, however
+healthy `pm2 status` looks — the errors are in the *error* log. This is not
+hypothetical: the job crashed on startup at 06:00 every day from 2026-07-16 to
+2026-08-22 without anyone noticing, because its `script` pointed at
+`node_modules/.bin/tsx` (a `#!/bin/sh` shim) under `interpreter: "node"`.
+`scripts/check-pm2-entrypoints.mjs` now fails CI on that class of mistake.
 - **Container.** `packages/registry/Dockerfile` binds `0.0.0.0:3481` and
   entrypoints through `prisma migrate deploy`.
 
