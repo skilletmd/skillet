@@ -10,6 +10,7 @@ const {
   createOriginProxyServer,
   DEFAULT_UPSTREAM_TIMEOUT_MS,
   isBrowseProxyPath,
+  withVaryAccept,
 } = require("./web-origin-proxy.js");
 
 function listen(server, host = "127.0.0.1") {
@@ -299,5 +300,66 @@ describe("web-origin-proxy browse admission", () => {
       workerCount: 2,
     });
     assert.equal(fresh.browseMaxInflight, 8);
+  });
+});
+
+// Every page has a Markdown twin at the same URL, so an HTML document leaving
+// this origin must tell caches it varies on Accept. Next overwrites `Vary` when
+// it serves a prerendered app-router page, so `proxy.ts` cannot be the last
+// word — this hop is.
+describe("Vary: Accept on HTML documents", () => {
+  it("appends Accept to whatever Vary Next produced", () => {
+    const out = withVaryAccept({
+      "content-type": "text/html; charset=utf-8",
+      vary: "rsc, next-router-state-tree, Accept-Encoding",
+    });
+    assert.equal(out.vary, "rsc, next-router-state-tree, Accept-Encoding, Accept");
+  });
+
+  it("sets Vary when the upstream had none", () => {
+    assert.equal(withVaryAccept({ "content-type": "text/html" }).vary, "Accept");
+  });
+
+  it("is idempotent, case-insensitively", () => {
+    for (const vary of ["Accept", "accept, Accept-Encoding"]) {
+      const headers = { "content-type": "text/html", vary };
+      assert.equal(withVaryAccept(headers).vary, vary);
+    }
+  });
+
+  it("leaves Vary: * alone", () => {
+    assert.equal(withVaryAccept({ "content-type": "text/html", vary: "*" }).vary, "*");
+  });
+
+  it("touches nothing that is not an HTML document", () => {
+    for (const type of ["application/json", "text/markdown; charset=utf-8", "image/png", undefined]) {
+      const headers = { "content-type": type, vary: "Accept-Encoding" };
+      assert.equal(withVaryAccept(headers).vary, "Accept-Encoding", String(type));
+    }
+  });
+
+  it("normalizes an array-valued Vary from the upstream", () => {
+    const out = withVaryAccept({
+      "content-type": "text/html",
+      vary: ["rsc", "Accept-Encoding"],
+    });
+    assert.equal(out.vary, "rsc, Accept-Encoding, Accept");
+  });
+
+  it("reaches the wire", async () => {
+    const upstream = http.createServer((_req, res) => {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8", vary: "rsc" });
+      res.end("<html></html>");
+    });
+    const upstreamPort = await listen(upstream);
+    const { server } = createOriginProxyServer({ listenPort: 0, workerBase: upstreamPort, workerCount: 1 });
+    const proxyPort = await listen(server);
+    try {
+      const res = await get(proxyPort, "/docs", { expectComplete: true });
+      assert.equal(res.headers.vary, "rsc, Accept");
+    } finally {
+      await close(server);
+      await close(upstream);
+    }
   });
 });

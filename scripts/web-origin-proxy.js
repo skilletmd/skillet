@@ -38,6 +38,40 @@ function isBrowseProxyPath(urlPath) {
 }
 
 /**
+ * Merge `Accept` into an upstream response's `Vary`, for HTML documents only.
+ *
+ * Every page on this site has a Markdown twin at the same URL (see
+ * packages/web/src/lib/agent-surface.ts), so a shared cache MUST key on
+ * `Accept` or it can hand the HTML variant to an agent that asked for Markdown.
+ * `proxy.ts` sets the header, but Next overwrites `Vary` wholesale when it
+ * serves a prerendered app-router page, so the last hop before the CDN is the
+ * only place the value reliably survives. Restricted to `text/html` because
+ * only documents negotiate; static assets and JSON keep the Vary they arrived
+ * with.
+ *
+ * Exported for the test; mutates nothing (returns a new headers object only
+ * when it changes something).
+ *
+ * @param {import('node:http').IncomingHttpHeaders} headers
+ */
+function withVaryAccept(headers) {
+  const contentType = headers["content-type"];
+  const type = Array.isArray(contentType) ? contentType.join(",") : String(contentType ?? "");
+  if (!type.toLowerCase().includes("text/html")) return headers;
+
+  const raw = headers.vary;
+  const current = Array.isArray(raw) ? raw.join(", ") : String(raw ?? "");
+  const tokens = current
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+  // `Vary: *` already defeats caching; adding to it would be noise.
+  if (tokens.some((t) => t === "*" || t.toLowerCase() === "accept")) return headers;
+
+  return { ...headers, vary: [...tokens, "Accept"].join(", ") };
+}
+
+/**
  * @param {{
  *   listenPort?: number,
  *   workerBase?: number,
@@ -124,7 +158,7 @@ function createOriginProxyServer(config = {}) {
         releaseBrowse();
         return;
       }
-      res.writeHead(incoming.statusCode || 502, incoming.headers);
+      res.writeHead(incoming.statusCode || 502, withVaryAccept(incoming.headers));
       incoming.pipe(res);
       incoming.on("error", () => {
         if (!res.writableEnded) res.destroy();
@@ -200,6 +234,7 @@ module.exports = {
   DEFAULT_UPSTREAM_TIMEOUT_MS,
   DEFAULT_BROWSE_MAX_PER_WORKER,
   isBrowseProxyPath,
+  withVaryAccept,
 };
 
 if (require.main === module) {

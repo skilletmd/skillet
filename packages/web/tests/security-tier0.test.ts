@@ -337,23 +337,27 @@ describe('/admin gated via proxy.ts (2a)', () => {
     vi.doMock('@/auth', () => ({ auth: authMock }))
     vi.resetModules()
     await import('@/proxy')
+    // The proxy handler is async (it may need a registry lookup before deciding
+    // a 404 — see lib/agent-surface.ts), so every call here is awaited.
     const handler = authMock.mock.calls[0][0] as (req: {
       auth: { handle: string } | null
       nextUrl: URL
-    }) => Response | undefined
-    const blocked = handler({
-      auth: { handle: 'mallory' },
+      headers: Headers
+      method: string
+    }) => Promise<Response | undefined>
+    const adminRequest = (handle: string) => ({
+      auth: { handle },
       nextUrl: new URL('https://skillet.test/admin/tools'),
+      headers: new Headers({ accept: 'text/html' }),
+      method: 'GET',
     })
+    const blocked = await handler(adminRequest('mallory'))
     expect(blocked).toBeInstanceOf(Response)
     expect((blocked as Response).status).toBe(404)
     // An allowed admin is NOT blocked: the proxy now returns a pass-through
     // response (x-middleware-next) that also carries the security headers, rather
     // than undefined — that's how the CSP reaches allowed pages.
-    const allowed = handler({
-      auth: { handle: 'taylor' },
-      nextUrl: new URL('https://skillet.test/admin/tools'),
-    }) as Response
+    const allowed = (await handler(adminRequest('taylor'))) as Response
     expect(allowed).toBeInstanceOf(Response)
     expect(allowed.status).toBe(200)
     expect(allowed.headers.get('x-middleware-next')).toBe('1')

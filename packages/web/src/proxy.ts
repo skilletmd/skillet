@@ -9,6 +9,9 @@ import {
   newBrowseSsrRequestId,
 } from '@/lib/browse-ssr-probe'
 import { handleAliasTarget } from '@/lib/handle-alias'
+import { agentSurfaceResponse } from '@/lib/agent-surface'
+import { isLabPath } from '@/lib/lab-gate'
+import { appendVaryAccept } from '@/lib/content-negotiation'
 import { buildSecurityHeaders, resolveCspMode } from '@/lib/security-headers'
 
 let warnedNonEnforcing = false
@@ -57,14 +60,27 @@ function nextWithPathname(req: {
     }
   }
 
-  return withSecurityHeaders(
+  const res = withSecurityHeaders(
     NextResponse.next({
       request: { headers: requestHeaders },
     }),
   )
+  // This URL has (or may have) a Markdown twin at the same address, so a shared
+  // cache must key on Accept. Appended, never assigned: Next's own RSC routing
+  // tokens already live on Vary and clobbering them breaks client navigation.
+  appendVaryAccept(res.headers)
+
+  // /lab is internal tooling: reachable on purpose, but nothing should send
+  // anyone there. It is absent from the sitemap and llms.txt, disallowed in
+  // robots.txt, and its pages carry a noindex meta. The header is the belt to
+  // that braces — it reaches a crawler that ignores robots.txt, and it covers
+  // any response under /lab that is not an HTML document.
+  if (isLabPath(pathname)) res.headers.set('x-robots-tag', 'noindex, nofollow')
+
+  return res
 }
 
-export default auth((req) => {
+export default auth(async (req) => {
   const { pathname, searchParams } = req.nextUrl
 
   // Every branch wraps its response with the static security headers. A static
@@ -133,6 +149,17 @@ export default auth((req) => {
   if (activityTarget) {
     return withSecurityHeaders(NextResponse.redirect(new URL(activityTarget, req.nextUrl.origin)))
   }
+
+  // Machine-facing surface, decided before any render: a real 404 for a path
+  // nothing serves, Markdown for a client that asked for it, and 406 when the
+  // client accepts neither representation. See lib/agent-surface.ts — none of
+  // it can be decided during render, because the PPR shell (and its 200) is
+  // already on the wire by then.
+  //
+  // Placed after the redirect rules so an alias still redirects rather than
+  // 404ing, and before the admin gate so an admin path keeps its own handling.
+  const agentResponse = await agentSurfaceResponse(req)
+  if (agentResponse) return withSecurityHeaders(agentResponse)
 
   // Auth-gate /admin and /internal: signed in AND allowlisted admin principal
   // (SKILLET_ADMIN_HANDLES and/or SKILLET_ADMIN_USER_IDS). Server actions under

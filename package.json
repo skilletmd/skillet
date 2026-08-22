@@ -9,7 +9,7 @@
     "dev:web": "pnpm --filter @skillet/web dev",
     "dev:registry": "pnpm --filter @skillet/registry dev",
     "build": "pnpm -r build",
-    "test": "pnpm -r test",
+    "test": "pnpm -r test && pnpm run test:scripts",
     "verify:setup": "node scripts/verify-setup.mjs",
     "lint": "eslint \"packages/*/src/**/*.{ts,tsx}\" \"packages/adapters/*/src/**/*.ts\"",
     "format": "prettier --write \"packages/web/src/**/*.{ts,tsx}\"",
@@ -32,7 +32,10 @@
     "pm2:status": "pnpm exec pm2 status",
     "evals": "pnpm --filter @skillet/protocol exec node --import tsx/esm --test test/eval.test.ts",
     "clean": "pnpm -r clean",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:scripts": "node --test scripts/*.test.cjs",
+    "gen:api-docs": "node scripts/gen-api-docs.mjs",
+    "check:api-docs": "node scripts/gen-api-docs.mjs --check"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",
