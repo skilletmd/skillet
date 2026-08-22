@@ -82,6 +82,57 @@ describe('openapi route', () => {
     const doc = buildOpenApiDocument({ siteUrl: 'https://x.test', registryUrl: 'https://y.test' });
     assert.equal(doc.servers.length, 2);
   });
+
+  // "OpenAPI declares security schemes but no named OAuth scopes — agents get
+  // all-or-nothing access." Every operation now names what it needs, including
+  // the anonymous ones: `[{}, {bearerAuth: ['read']}]` says both "no credential
+  // required" and "`read` is enough if you have one".
+  it('names the scopes on every operation', () => {
+    const doc = buildOpenApiDocument({ siteUrl: 'https://x.test', registryUrl: 'https://y.test' });
+    const methods = ['get', 'put', 'post', 'delete', 'patch'] as const;
+    let counted = 0;
+    for (const [path, item] of Object.entries(doc.paths)) {
+      for (const method of methods) {
+        const op = item[method] as { security?: unknown } | undefined;
+        if (!op) continue;
+        counted += 1;
+        assert.ok(op.security, `${method} ${path} declares no security`);
+      }
+    }
+    assert.ok(counted > 15, `only found ${counted} operations`);
+    assert.deepEqual((doc.paths['/skills']!.get as { security: unknown }).security, [
+      {},
+      { bearerAuth: ['read'] },
+    ]);
+    assert.deepEqual((doc.paths['/sync/manifest']!.get as { security: unknown }).security, [
+      { bearerAuth: ['sync'] },
+    ]);
+  });
+
+  it('carries the scope catalog on the bearer scheme', () => {
+    const doc = buildOpenApiDocument({ siteUrl: 'https://x.test', registryUrl: 'https://y.test' });
+    const schemes = doc.components.securitySchemes as Record<string, Record<string, unknown>>;
+    assert.deepEqual(schemes.bearerAuth!['x-scopes'], OPENAPI_SCOPES);
+    assert.equal(
+      schemes.bearerAuth!['x-protected-resource-metadata'],
+      'https://y.test/.well-known/oauth-protected-resource',
+    );
+  });
+
+  it('declares versioning, rate-limit headers, and onboarding as values', () => {
+    const doc = buildOpenApiDocument({ siteUrl: 'https://x.test', registryUrl: 'https://y.test' });
+    const info = doc.info as Record<string, Record<string, unknown>>;
+    assert.equal(info['x-versioning']!.strategy, 'url-path');
+    assert.equal(info['x-versioning']!.current, '/api/v1');
+    assert.equal(info['x-versioning']!.sunset_header, 'Sunset');
+    assert.equal(info['x-rate-limit-headers']!.remaining, 'RateLimit-Remaining');
+    assert.equal(info['x-onboarding']!.contact_sales_required, false);
+    assert.equal(info['x-onboarding']!.self_serve_credentials, true);
+    assert.equal(
+      info['x-protected-resource-metadata'],
+      'https://y.test/.well-known/oauth-protected-resource',
+    );
+  });
 });
 
 describe('error envelope', () => {

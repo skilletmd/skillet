@@ -22,7 +22,7 @@ Auth, errors, caching, pagination, and rate limits are in the [API overview](/do
 
 Public profiles that have published at least one skill, with the categories they publish in. Use it to answer "who is worth following for X".
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `listPeople`
 
@@ -73,7 +73,7 @@ Returns a page of public profiles.
 
 A profile's public record: display name, bio, avatar, follower counts, public adopter count, and every public skill they publish.
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `getProfile`
 
@@ -133,7 +133,7 @@ Returns the profile record.
 
 Public handles that follow this profile.
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `listFollowers`
 
@@ -172,7 +172,7 @@ Returns a page of follower handles.
 
 Public handles this profile follows.
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `listFollowing`
 

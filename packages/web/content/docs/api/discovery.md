@@ -20,7 +20,7 @@ Auth, errors, caching, pagination, and rate limits are in the [API overview](/do
 
 One query across every public object type. This is the right first call for "is there already a skill for X" — it ranks skills, kits, authors, and teams together.
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `search`
 
@@ -93,7 +93,7 @@ Returns ranked results grouped by type.
 
 Registry-wide public activity — publishes, new kits, new profiles — newest first. Poll it to track what changed since a previous read.
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `listActivity`
 

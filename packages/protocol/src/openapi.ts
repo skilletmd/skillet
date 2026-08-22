@@ -18,6 +18,7 @@
 // app, so it must never reach for `node:*` (see the barrel note in skill-id.ts).
 
 import { REGISTRY_VERSION_PREFIX } from './constants.js';
+import { OPENAPI_SCOPES, PROTECTED_RESOURCE_WELL_KNOWN } from './protected-resource.js';
 
 /** Minimal structural type for the document. Kept local so the package takes
  *  no dependency on an OpenAPI types library for a document we author by hand. */
@@ -39,15 +40,11 @@ export interface OpenApiOptions {
   registryUrl: string;
 }
 
-/** The three token classes an integrator can hold, and what each may do.
- *  Mirrors `SCOPES` in `packages/registry/src/auth/tokens.ts` — the parity test
- *  in the registry fails if these drift. */
-export const OPENAPI_SCOPES: Readonly<Record<string, string>> = {
-  read: 'Read public and self-owned skills, kits, and profiles.',
-  sync: 'Read the sync manifest and pull approved skill content for a paired device.',
-  publish: 'Publish new skill versions and change skill visibility.',
-  claim: 'Claim a handle and bind an author signing key.',
-};
+/** The scope catalog, re-exported so `@skillet/protocol/openapi` stays the
+ *  import path every existing caller already uses. It is defined in
+ *  `protected-resource.ts`, which is also what publishes it as RFC 9728
+ *  `scopes_supported`. */
+export { OPENAPI_SCOPES };
 
 const trim = (raw: string): string => raw.trim().replace(/\/+$/, '');
 
@@ -120,14 +117,11 @@ const HASH_PARAM = {
 };
 
 /**
- * Build the OpenAPI document for a deployment.
- *
- * `siteUrl` is listed first in `servers` because the apex mirror is the URL an
- * agent finds from `/llms.txt` and `/openapi.json`; the registry origin is
- * listed second for callers that need the write surface (the apex mirror is
- * read-only by design).
+ * The hand-authored document, before `buildOpenApiDocument` stamps the default
+ * per-operation grant onto it. Kept separate so the stamping pass has exactly
+ * one place to look and no operation can quietly opt out by omission.
  */
-export function buildOpenApiDocument(opts: OpenApiOptions): OpenApiDocument {
+function baseOpenApiDocument(opts: OpenApiOptions): OpenApiDocument {
   const site = trim(opts.siteUrl);
   const registry = trim(opts.registryUrl);
   const prefix = REGISTRY_VERSION_PREFIX;
@@ -154,10 +148,28 @@ export function buildOpenApiDocument(opts: OpenApiOptions): OpenApiDocument {
         '',
         '**Auth**',
         '',
-        'Every read operation listed here is anonymous. Publishing and device sync use a bearer',
-        'token whose class fixes its scopes (see `securitySchemes`); a token can never widen its',
-        'own scope. Get a session token by signing in at the site and pairing a device with the',
-        '`skilletmd` CLI (`npx skilletmd`).',
+        'Every read operation listed here is anonymous: no key, no signup, no sales call. Publishing',
+        'and device sync use a bearer token whose class fixes its scopes (see `securitySchemes`); a',
+        'token can never widen its own scope. Mint one yourself in seconds — sign in at the site and',
+        'pair a machine with the `skilletmd` CLI (`npx skilletmd`), or enable a read-only MCP link at',
+        'Settings → Account. Scopes are also published machine-readably as RFC 9728 protected-resource',
+        `metadata at ${registry}${PROTECTED_RESOURCE_WELL_KNOWN.api}, which is where the`,
+        '`WWW-Authenticate` header on a `401` points.',
+        '',
+        '**Rate limits**',
+        '',
+        'Every response carries the RateLimit header fields (`RateLimit-Limit`, `RateLimit-Remaining`,',
+        '`RateLimit-Reset`, plus the structured `RateLimit` and `RateLimit-Policy` fields). A `429`',
+        'additionally carries `Retry-After` in seconds. Read the headers rather than guessing: the',
+        'budgets differ per cost class and are tuned in production.',
+        '',
+        '**Versioning and deprecation**',
+        '',
+        `The version lives in the URL path (\`${prefix}\`). A path under that prefix never changes`,
+        'meaning: breaking changes ship as a new prefix, and the old one keeps answering. When an',
+        'endpoint is on its way out it answers with `Deprecation` (RFC 9745) and a',
+        '`Link: <...>; rel="deprecation"` pointing at the policy page, and a `Sunset` (RFC 8594) date',
+        'once one is set. Nothing is removed without that header appearing first.',
         '',
         '**Errors**',
         '',
@@ -174,6 +186,34 @@ export function buildOpenApiDocument(opts: OpenApiOptions): OpenApiDocument {
       },
       license: { name: 'Apache-2.0', identifier: 'Apache-2.0' },
       termsOfService: `${site}/legal/terms`,
+      // Extension members. The prose above says the same things, but an agent
+      // deciding whether it can integrate unattended needs to branch on values,
+      // not parse English.
+      'x-onboarding': {
+        anonymous_reads: true,
+        free_tier: true,
+        self_serve_credentials: true,
+        credential_url: `${site}/docs/api#auth`,
+        cli: 'npx skilletmd',
+        contact_sales_required: false,
+      },
+      'x-rate-limit-headers': {
+        limit: 'RateLimit-Limit',
+        remaining: 'RateLimit-Remaining',
+        reset: 'RateLimit-Reset',
+        policy: 'RateLimit-Policy',
+        combined: 'RateLimit',
+        retry_after: 'Retry-After',
+        documentation: `${site}/docs/api#rate-limits`,
+      },
+      'x-versioning': {
+        strategy: 'url-path',
+        current: prefix,
+        deprecation_header: 'Deprecation',
+        sunset_header: 'Sunset',
+        policy_url: `${site}/docs/versioning`,
+      },
+      'x-protected-resource-metadata': `${registry}${PROTECTED_RESOURCE_WELL_KNOWN.api}`,
     },
     servers: [
       {
@@ -644,7 +684,7 @@ export function buildOpenApiDocument(opts: OpenApiOptions): OpenApiDocument {
           summary: 'Identify the calling token',
           description:
             'Resolves the bearer token to its principal and the scopes it carries. Anonymous callers get `{"authenticated": false}` rather than a 401, so it doubles as a cheap credential check.',
-          security: [{}, { bearerAuth: [] }],
+          security: [{}, { bearerAuth: ['read'] }],
           responses: {
             '200': {
               description: 'The caller identity and granted scopes.',
@@ -731,6 +771,13 @@ export function buildOpenApiDocument(opts: OpenApiOptions): OpenApiDocument {
             '',
             'Request the narrowest class that does the job: an integration that only reads a kit should hold a kit key, not a session token.',
           ].join('\n'),
+          // The named grants, in the field a machine reads. OpenAPI only models
+          // `scopes` under an `oauth2` flow, and Skillet runs no authorization
+          // server to put there, so the catalog is published as an extension
+          // here and — canonically — as `scopes_supported` in the RFC 9728
+          // document at `x-protected-resource-metadata`.
+          'x-scopes': { ...OPENAPI_SCOPES },
+          'x-protected-resource-metadata': `${registry}${PROTECTED_RESOURCE_WELL_KNOWN.api}`,
         },
         mcpLinkToken: {
           type: 'apiKey',
@@ -1230,4 +1277,44 @@ export function buildOpenApiDocument(opts: OpenApiOptions): OpenApiDocument {
       },
     },
   };
+}
+
+/** HTTP methods an OpenAPI path item can carry an operation under. */
+const OPERATION_KEYS = [
+  'get',
+  'put',
+  'post',
+  'delete',
+  'options',
+  'head',
+  'patch',
+  'trace',
+] as const;
+
+/**
+ * Build the OpenAPI document for a deployment.
+ *
+ * `siteUrl` is listed first in `servers` because the apex mirror is the URL an
+ * agent finds from `/llms.txt` and `/openapi.json`; the registry origin is
+ * listed second for callers that need the write surface (the apex mirror is
+ * read-only by design).
+ *
+ * Every operation leaves here with an explicit `security` list that NAMES its
+ * scopes. The document-level `security: [{}]` already said "anonymous works",
+ * but an agent holding a token learned nothing from it about how little it
+ * could get away with presenting — `[{}, { bearerAuth: ['read'] }]` says both:
+ * no credential is needed, and `read` is enough if you have one. Operations
+ * that declare their own grant (`sync`, `publish`) are left alone.
+ */
+export function buildOpenApiDocument(opts: OpenApiOptions): OpenApiDocument {
+  const doc = baseOpenApiDocument(opts);
+  for (const pathItem of Object.values(doc.paths)) {
+    for (const key of OPERATION_KEYS) {
+      const op = pathItem[key] as Record<string, unknown> | undefined;
+      if (!op || typeof op !== 'object') continue;
+      if (op['security'] !== undefined) continue;
+      op['security'] = [{}, { bearerAuth: ['read'] }];
+    }
+  }
+  return doc;
 }

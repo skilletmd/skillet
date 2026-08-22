@@ -25,7 +25,7 @@ Auth, errors, caching, pagination, and rate limits are in the [API overview](/do
 
 The public skill catalog, newest first by default. Use `q` for a substring match over name and description, or `category` to narrow to one domain. Returns only public skills for an anonymous caller.
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `listSkills`
 
@@ -84,7 +84,7 @@ Returns a page of catalog entries.
 
 A skill's full public record: description, category, latest version hash, the version list, scan and signature status, provenance, and token cost. Fetch this before reading skill content so you know which `hash` to request.
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `getSkill`
 
@@ -152,7 +152,7 @@ Returns the skill detail record.
 
 The per-file manifest of the latest published version: every bundle path with its size and content hash. Use it to verify a download or to decide which files are worth fetching.
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `getSkillManifest`
 
@@ -193,7 +193,7 @@ Returns the manifest for the latest published version.
 
 Every file in one published version, with size and kind. `SKILL.md` is always present; supporting `scripts/`, `references/`, and `assets/` files appear when the author bundled them.
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `listSkillVersionFiles`
 
@@ -235,7 +235,7 @@ Returns the file listing for that version.
 
 The decoded text of a single bundle file. Request `path=SKILL.md` to read the instructions an agent loads. Responses carry a strong ETag; send `If-None-Match` to get a 304 instead of a re-download.
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `getSkillVersionFile`
 
@@ -275,7 +275,7 @@ Returns the file, decoded as text.
 
 The registry's static scan of a version: an overall verdict plus the findings behind it. Read this before running a third-party skill; `quarantined` means the registry refuses to serve the content at all.
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `getSkillVersionScan`
 
@@ -318,7 +318,7 @@ Returns the scan record for that version.
 
 Public kits that include this skill. Useful for finding curated collections around a capability you already trust.
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `listKitsForSkill`
 

@@ -20,7 +20,7 @@ Auth, errors, caching, pagination, and rate limits are in the [API overview](/do
 
 The public kit catalog. A kit is a named, versioned collection of skills that a person or team maintains; subscribing to one keeps every member skill current.
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `listKits`
 
@@ -68,7 +68,7 @@ Returns a page of public kits.
 
 One public kit and its member skills, addressed the same way its web page is (`/{owner}/kit/{slug}`).
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `getKitByHandle`
 

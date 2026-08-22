@@ -23,7 +23,7 @@ Auth, errors, caching, pagination, and rate limits are in the [API overview](/do
 
 Public aggregates: skill, kit, author, and device counts, plus recent publish volume. No identity is exposed.
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `getRegistryStats`
 
@@ -52,7 +52,7 @@ Returns registry totals.
 
 Currently-active enforcement against skills and accounts. Published so a downstream consumer can independently check whether something it cached has since been removed.
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `listModerationActions`
 
@@ -85,7 +85,7 @@ Returns active enforcement records.
 
 Resolves the bearer token to its principal and the scopes it carries. Anonymous callers get `{"authenticated": false}` rather than a 401, so it doubles as a cheap credential check.
 
-**Auth** — none. This endpoint is anonymous.
+**Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
 **Operation ID** — `whoami`
 

@@ -130,22 +130,37 @@ function curlFor(method, path, params) {
     })
     .join('&');
   const url = `${BASE}${examplePath(path, params)}${query ? `?${query}` : ''}`;
-  const auth = requiredScopes(method, path);
+  const auth = authRequirement(method, path);
   const lines = [`curl -s "${url}"`];
-  if (auth.length) lines.push(`  -H "Authorization: Bearer $SKILLET_TOKEN"`);
+  // Only show the header when the call cannot be made without it. A copyable
+  // example that demands a token for an anonymous endpoint is a worse example.
+  if (!auth.anonymous && auth.scopes.length) {
+    lines.push(`  -H "Authorization: Bearer $SKILLET_TOKEN"`);
+  }
   if (method !== 'get') lines.unshift(`# ${method.toUpperCase()}`);
   return lines.join(' \\\n');
 }
 
-/** Scopes an operation demands, or [] when it is anonymous. */
-function requiredScopes(method, path) {
+/**
+ * What an operation demands: whether a credential is required at all, and the
+ * scopes that satisfy it.
+ *
+ * An EMPTY requirement object in the `security` array (`{}`) is OpenAPI for
+ * "no credential needed", and it is an ALTERNATIVE to the others, not an
+ * addition. The document now names a scope on every operation — including the
+ * anonymous reads, as `[{}, { bearerAuth: ['read'] }]`, so an agent holding a
+ * token learns that `read` is enough — which means collapsing the array to a
+ * flat scope list would relabel the entire public catalog as authenticated.
+ */
+function authRequirement(method, path) {
   const op = doc.paths[path][method];
   const security = op.security ?? doc.security ?? [];
+  const anonymous = security.some((requirement) => Object.keys(requirement).length === 0);
   const scopes = new Set();
   for (const requirement of security) {
     for (const list of Object.values(requirement)) for (const s of list) scopes.add(s);
   }
-  return [...scopes];
+  return { anonymous, scopes: [...scopes] };
 }
 
 function renderOperation(path, method, op) {
@@ -156,11 +171,13 @@ function renderOperation(path, method, op) {
   out.push(op.description);
   out.push('');
 
-  const scopes = requiredScopes(method, path);
+  const { anonymous, scopes } = authRequirement(method, path);
   out.push(
-    scopes.length
-      ? `**Auth** — bearer token with the \`${scopes.join('`, `')}\` scope.`
-      : '**Auth** — none. This endpoint is anonymous.',
+    anonymous
+      ? scopes.length
+        ? `**Auth** — none. This endpoint is anonymous. A bearer token with the \`${scopes.join('`, `')}\` scope also works.`
+        : '**Auth** — none. This endpoint is anonymous.'
+      : `**Auth** — bearer token with the \`${scopes.join('`, `')}\` scope.`,
   );
   out.push('');
   out.push(`**Operation ID** — \`${op.operationId}\``);

@@ -5,6 +5,12 @@ import { GET as openApi } from '@/app/openapi.json/route'
 import { GET as mcpJson } from '@/app/.well-known/mcp.json/route'
 import { GET as agentSkillsIndexRoute } from '@/app/.well-known/agent-skills/index.json/route'
 import { GET as agentSkillArtifact } from '@/app/.well-known/agent-skills/[name]/SKILL.md/route'
+import { GET as protectedResourceApi } from '@/app/.well-known/oauth-protected-resource/route'
+import { GET as protectedResourceMcp } from '@/app/.well-known/oauth-protected-resource/api/v1/mcp/route'
+import {
+  OPENAPI_SCOPES,
+  PROTECTED_RESOURCE_WELL_KNOWN,
+} from '@skillet/protocol/protected-resource'
 import { AGENT_SKILLS_SCHEMA, listPublishedSkills } from '@/lib/agent-skills-index'
 import { DOC_NAV } from '@/lib/docs-nav'
 
@@ -63,6 +69,8 @@ describe('/llms.txt', () => {
       '/openapi.json',
       '/.well-known/mcp.json',
       '/.well-known/agent-skills/index.json',
+      PROTECTED_RESOURCE_WELL_KNOWN.api,
+      PROTECTED_RESOURCE_WELL_KNOWN.mcp,
       '/sitemap.xml',
     ]) {
       expect(body, path).toContain(`${SITE}${path}`)
@@ -195,5 +203,135 @@ describe('/.well-known/agent-skills/', () => {
     for (const skill of listPublishedSkills()) {
       expect(skill.content).toContain(`name: ${skill.name}`)
     }
+  })
+})
+
+describe('/llms.txt developer resources', () => {
+  // The audit this answers: an agent searching for "skillet" developer
+  // resources found nothing relevant. Every one of them is now named, by
+  // product name, in the file agents read first.
+  it('names each developer resource with the product name in the label', async () => {
+    const body = await llmsTxt().text()
+    const section = body.split('## Developer resources')[1]?.split('\n## ')[0] ?? ''
+    expect(section).toBeTruthy()
+    for (const label of [
+      'Skillet API reference',
+      'Skillet OpenAPI description',
+      'Skillet MCP server',
+      'Skillet CLI (skilletmd)',
+      'Skillet API versioning and deprecation policy',
+    ]) {
+      expect(section, label).toContain(label)
+    }
+    // The CLI is discoverable as a package, not just as prose.
+    expect(section).toContain('https://www.npmjs.com/package/skilletmd')
+  })
+
+  // "Agents can't fill out contact-sales forms." Say the three facts that
+  // decide whether one can integrate unattended.
+  it('states that reads are anonymous, credentials are self-serve, and limits are in headers', async () => {
+    const body = await llmsTxt().text()
+    expect(body).toMatch(/every read above is anonymous/i)
+    expect(body).toMatch(/no key to apply for/i)
+    expect(body).toContain('RateLimit-Remaining')
+  })
+})
+
+describe('/.well-known/oauth-protected-resource', () => {
+  // RFC 9728. Before this, the scopes existed and were enforced but were
+  // published only as prose, so an agent could not request least privilege.
+  it('publishes every scope the API accepts', async () => {
+    const doc = JSON.parse(await protectedResourceApi().text())
+    expect(doc.scopes_supported).toEqual(Object.keys(OPENAPI_SCOPES))
+    expect(doc.bearer_methods_supported).toEqual(['header'])
+    expect(doc.resource).toMatch(/\/api\/v1$/)
+    expect(doc.resource_documentation).toBe(`${SITE}/docs/api`)
+  })
+
+  it('scopes the MCP document to `read` and names the MCP endpoint as the resource', async () => {
+    const doc = JSON.parse(await protectedResourceMcp().text())
+    expect(doc.scopes_supported).toEqual(['read'])
+    expect(doc.resource).toMatch(/\/api\/v1\/mcp$/)
+    expect(doc.resource_documentation).toBe(`${SITE}/docs/mcp`)
+  })
+
+  it('is readable cross-origin and cached', () => {
+    for (const res of [protectedResourceApi(), protectedResourceMcp()]) {
+      expect(res.headers.get('content-type')).toContain('application/json')
+      expect(res.headers.get('access-control-allow-origin')).toBe('*')
+      expect(res.headers.get('cache-control')).toContain('max-age')
+    }
+  })
+
+  // The route directory is a hand-built mirror of a path the protocol derives.
+  // If REGISTRY_VERSION_PREFIX ever moves, this fails rather than leaving the
+  // 401 challenge pointing at a 404.
+  it('lives at the path RFC 9728 derives from the resource', () => {
+    expect(PROTECTED_RESOURCE_WELL_KNOWN.api).toBe('/.well-known/oauth-protected-resource')
+    expect(PROTECTED_RESOURCE_WELL_KNOWN.mcp).toBe(
+      '/.well-known/oauth-protected-resource/api/v1/mcp',
+    )
+  })
+})
+
+describe('/openapi.json machine-readable declarations', () => {
+  // "OpenAPI declares security schemes but no named OAuth scopes — agents get
+  // all-or-nothing access." Every operation now names what it needs.
+  it('names the scopes on every operation, not just the authenticated ones', async () => {
+    const doc = JSON.parse(await openApi().text())
+    const paths = doc.paths as Record<string, Record<string, { security?: unknown }>>
+    const ops = Object.entries(paths).flatMap(([path, item]) =>
+      Object.entries(item).map(([method, op]) => ({ path, method, op })),
+    )
+    expect(ops.length).toBeGreaterThan(15)
+    for (const { path, method, op } of ops) {
+      expect(op.security, `${method} ${path}`).toBeDefined()
+    }
+    // A public read says both things: no credential needed, `read` suffices.
+    expect(doc.paths['/skills'].get.security).toEqual([{}, { bearerAuth: ['read'] }])
+    // An authenticated operation keeps its own, narrower grant.
+    expect(doc.paths['/sync/manifest'].get.security).toEqual([{ bearerAuth: ['sync'] }])
+    // And the catalog itself is on the scheme.
+    expect(doc.components.securitySchemes.bearerAuth['x-scopes']).toEqual(OPENAPI_SCOPES)
+  })
+
+  it('declares the versioning and deprecation policy', async () => {
+    const doc = JSON.parse(await openApi().text())
+    expect(doc.info['x-versioning']).toMatchObject({
+      strategy: 'url-path',
+      current: '/api/v1',
+      deprecation_header: 'Deprecation',
+      sunset_header: 'Sunset',
+      policy_url: `${SITE}/docs/versioning`,
+    })
+  })
+
+  it('declares the rate-limit headers by name', async () => {
+    const doc = JSON.parse(await openApi().text())
+    expect(doc.info['x-rate-limit-headers']).toMatchObject({
+      limit: 'RateLimit-Limit',
+      remaining: 'RateLimit-Remaining',
+      reset: 'RateLimit-Reset',
+      retry_after: 'Retry-After',
+    })
+  })
+
+  // Onboarding friction, as a value rather than a paragraph.
+  it('declares that onboarding is free, anonymous, and self-serve', async () => {
+    const doc = JSON.parse(await openApi().text())
+    expect(doc.info['x-onboarding']).toMatchObject({
+      anonymous_reads: true,
+      free_tier: true,
+      self_serve_credentials: true,
+      contact_sales_required: false,
+      cli: 'npx skilletmd',
+    })
+  })
+
+  it('points at its own protected-resource metadata', async () => {
+    const doc = JSON.parse(await openApi().text())
+    expect(doc.info['x-protected-resource-metadata']).toContain(
+      PROTECTED_RESOURCE_WELL_KNOWN.api,
+    )
   })
 })
