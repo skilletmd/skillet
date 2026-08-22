@@ -1,5 +1,5 @@
 {
-  "_comment": "Sources mirrored into the registry by scripts/sync-mirror-skills.ts. Only permissive-licensed public repos (SKILL.md format). Each handle is a reserved, claimable brand namespace. A handle may list multiple repos (tombstoning is scoped per source repo); list the brand's PRIMARY repo LAST so its sourceUrl wins on the author profile. Every license below was verified against the repo (API SPDX, per-skill LICENSE.txt, or README declaration) on 2026-07-07. Excluded on purpose: anthropics/skills (proprietary per-skill license), openai/skills (all skills under dot-dirs, invisible to discovery), trailofbits (CC-BY-SA), hashicorp (MPL), WordPress/figma/better-auth/remotion/angular (no license), microsoft/skills (skills under .github/, invisible to discovery).",
+  "_comment": "Sources mirrored into the registry by scripts/sync-mirror-skills.ts. Only permissive-licensed public repos (SKILL.md format). Each handle is a reserved, claimable brand namespace. A handle may list multiple repos (tombstoning is scoped per source repo); list the brand's PRIMARY repo LAST so its sourceUrl wins on the author profile. Every license below was verified against the repo (API SPDX, per-skill LICENSE.txt, or README declaration) on 2026-07-07. Excluded on purpose: anthropics/skills (proprietary per-skill license), openai/skills (all skills under dot-dirs, invisible to discovery), trailofbits (CC-BY-SA), hashicorp (MPL), WordPress/figma/better-auth/remotion/angular (no license), microsoft/skills (skills under .github/, invisible to discovery), cursor/plugins + black-forest-labs + bencium/bencium-marketplace + sentimony + kotot/byted-web-search + jalaalrd/anti-ai-slop-writing + ericzakariasson/scandinavian-design (no license), skills-101/superpowers (fork of obra/superpowers, no license), elithrar/dotfiles (skills under .agents/, invisible to discovery), juliusbrussee/caveman engine dirs (BSL-1.1; skills/ is MIT and is all we mirror). Held pending a manual quality read, not a license problem: genmedia-labs/skills and flowkit-labs/skills (MIT, but both orgs are days old with ~1 star while topping the skills.sh install leaderboard). The 15 sources appended 2026-08-21 had their licenses verified the same day. Two of them read NOASSERTION from the GitHub API and are deliberate hand-verified overrides: aashaexo/soundshuman is verbatim MIT behind an upstream-attribution preamble, and juliusbrussee/caveman is MIT with a BSL-1.1 carve-out that does not cover skills/. Neither is a mistake to correct back to no-license.",
   "sources": [
     {
       "handle": "cloudflare",
@@ -640,6 +640,171 @@
       "syncMode": "per-skill",
       "logo": "https://github.com/shadcn-ui.png",
       "sourceUrl": "https://github.com/shadcn-ui/ui"
+    },
+    {
+      "handle": "blader",
+      "displayName": "Siqi Chen",
+      "bio": "Rewrites AI-sounding prose so it reads naturally, based on Wikipedia's signs of AI writing.",
+      "repo": "blader/humanizer",
+      "license": "MIT",
+      "ownerType": "User",
+      "maxSkills": 2,
+      "logo": "https://github.com/blader.png",
+      "sourceUrl": "https://github.com/blader/humanizer"
+    },
+    {
+      "handle": "hardikpandya",
+      "displayName": "Hardik Pandya",
+      "bio": "Strips predictable AI tells out of prose while drafting, editing, or reviewing.",
+      "repo": "hardikpandya/stop-slop",
+      "license": "MIT",
+      "ownerType": "User",
+      "maxSkills": 2,
+      "logo": "https://github.com/hardikpandya.png",
+      "sourceUrl": "https://github.com/hardikpandya/stop-slop"
+    },
+    {
+      "handle": "petergyang",
+      "displayName": "Peter Yang",
+      "bio": "Edits drafts sharper and more human without flattening the writer's voice.",
+      "repo": "petergyang/no-ai-slop",
+      "license": "MIT",
+      "ownerType": "User",
+      "maxSkills": 4,
+      "logo": "https://github.com/petergyang.png",
+      "sourceUrl": "https://github.com/petergyang/no-ai-slop"
+    },
+    {
+      "handle": "aashaexo",
+      "displayName": "aasha",
+      "bio": "Detects 41 AI writing patterns and keeps them out of a repo's docs.",
+      "repo": "aashaexo/soundshuman",
+      "license": "MIT",
+      "ownerType": "User",
+      "maxSkills": 2,
+      "logo": "https://github.com/aashaexo.png",
+      "sourceUrl": "https://github.com/aashaexo/soundshuman"
+    },
+    {
+      "handle": "humanlayer",
+      "displayName": "HumanLayer",
+      "bio": "Control loops, agentic iteration, and CLAUDE.md hygiene for agent-built software.",
+      "repo": "humanlayer/skills",
+      "license": "MIT",
+      "ownerType": "Organization",
+      "maxSkills": 8,
+      "logo": "https://github.com/humanlayer.png",
+      "sourceUrl": "https://github.com/humanlayer/skills"
+    },
+    {
+      "handle": "heygen",
+      "displayName": "HeyGen",
+      "bio": "Hyperframes: write HTML, render video. Agent-native motion, audio, and creative direction.",
+      "repo": "heygen-com/hyperframes",
+      "license": "Apache-2.0",
+      "ownerType": "Organization",
+      "maxSkills": 24,
+      "logo": "https://github.com/heygen-com.png",
+      "sourceUrl": "https://github.com/heygen-com/hyperframes"
+    },
+    {
+      "handle": "leonxlnx",
+      "displayName": "Leon Lin",
+      "bio": "Taste for frontend work, so an agent stops shipping generic interfaces.",
+      "repo": "leonxlnx/taste-skill",
+      "license": "MIT",
+      "ownerType": "User",
+      "maxSkills": 16,
+      "logo": "https://github.com/leonxlnx.png",
+      "sourceUrl": "https://github.com/leonxlnx/taste-skill"
+    },
+    {
+      "handle": "caveman",
+      "displayName": "Caveman",
+      "bio": "Evidence-first engineering loops: investigate, patch surgically, verify, then stop.",
+      "repo": "juliusbrussee/caveman",
+      "license": "MIT",
+      "ownerType": "User",
+      "maxSkills": 24,
+      "logo": "https://github.com/juliusbrussee.png",
+      "sourceUrl": "https://github.com/juliusbrussee/caveman"
+    },
+    {
+      "handle": "orca",
+      "displayName": "Orca",
+      "bio": "Run a fleet of parallel coding agents from one workspace.",
+      "repo": "stablyai/orca",
+      "license": "MIT",
+      "ownerType": "Organization",
+      "maxSkills": 12,
+      "logo": "https://github.com/stablyai.png",
+      "sourceUrl": "https://github.com/stablyai/orca"
+    },
+    {
+      "handle": "rigorpilot",
+      "displayName": "RigorPilot",
+      "bio": "Reproduce a paper end to end: resolve context, intake the repo, bootstrap, run, audit.",
+      "repo": "lllllllama/rigorpilot-skills",
+      "license": "MIT",
+      "ownerType": "User",
+      "maxSkills": 12,
+      "logo": "https://github.com/lllllllama.png",
+      "sourceUrl": "https://github.com/lllllllama/rigorpilot-skills"
+    },
+    {
+      "handle": "prisma",
+      "displayName": "Prisma",
+      "bio": "Official Prisma skills: client API, schema setup, Postgres, and version upgrades.",
+      "repo": "prisma/skills",
+      "license": "MIT",
+      "ownerType": "Organization",
+      "maxSkills": 12,
+      "logo": "https://github.com/prisma.png",
+      "sourceUrl": "https://github.com/prisma/skills"
+    },
+    {
+      "handle": "openmercato",
+      "displayName": "Open Mercato",
+      "bio": "CRM and ERP framework skills: review PRs, shape UX, and merge with guardrails.",
+      "repo": "open-mercato/skills",
+      "license": "MIT",
+      "ownerType": "Organization",
+      "maxSkills": 40,
+      "logo": "https://github.com/open-mercato.png",
+      "sourceUrl": "https://github.com/open-mercato/skills"
+    },
+    {
+      "handle": "fetcher",
+      "displayName": "Fetcher",
+      "bio": "Pull structured data out of social and web APIs without writing a scraper.",
+      "repo": "fetcher-sh/fetcher-skills",
+      "license": "MIT",
+      "ownerType": "User",
+      "maxSkills": 16,
+      "logo": "https://github.com/fetcher-sh.png",
+      "sourceUrl": "https://github.com/fetcher-sh/fetcher-skills"
+    },
+    {
+      "handle": "asmartbear",
+      "displayName": "Jason Cohen",
+      "bio": "Founder-grade strategy, pricing, and positioning judgment from A Smart Bear.",
+      "repo": "asmartbear/asb-skills",
+      "license": "CC-BY-4.0",
+      "ownerType": "User",
+      "maxSkills": 8,
+      "logo": "https://github.com/asmartbear.png",
+      "sourceUrl": "https://github.com/asmartbear/asb-skills"
+    },
+    {
+      "handle": "loops",
+      "displayName": "Loops",
+      "bio": "Official Loops skills for transactional and marketing email that actually lands.",
+      "repo": "loops-so/skills",
+      "license": "MIT",
+      "ownerType": "Organization",
+      "maxSkills": 8,
+      "logo": "https://github.com/loops-so.png",
+      "sourceUrl": "https://github.com/loops-so/skills"
     }
   ]
 }
