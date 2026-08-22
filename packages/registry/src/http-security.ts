@@ -187,30 +187,66 @@ export function resetGlobalRateDeprecationWarn(): void {
   warnedGlobalDeprecated = false;
 }
 
+/** Cost class a request was charged to. Doubles as the RateLimit policy name. */
+export type RateScope = 'ambient' | 'write' | 'heavy_read';
+
+/** What a bucket looked like after this request was charged to it. */
+export interface RateState {
+  limited: boolean;
+  /** Requests permitted per window. */
+  limit: number;
+  /** Requests left in the window, never negative. */
+  remaining: number;
+  /** Seconds until the window resets, always >= 1. */
+  resetSeconds: number;
+}
+
 function takeToken(
   map: Map<string, RateBucket>,
   key: string,
   max: number,
   now: number,
-): { limited: true; retryAfter: number } | { limited: false } {
+): RateState {
   let bucket = map.get(key);
   if (!bucket || now >= bucket.resetAt) {
     bucket = { count: 0, resetAt: now + RATE_WINDOW_MS };
     map.set(key, bucket);
   }
   bucket.count += 1;
-  if (bucket.count > max) {
-    return {
-      limited: true,
-      retryAfter: Math.max(1, Math.ceil((bucket.resetAt - now) / 1000)),
-    };
-  }
-  return { limited: false };
+  return {
+    limited: bucket.count > max,
+    limit: max,
+    remaining: Math.max(0, max - bucket.count),
+    resetSeconds: Math.max(1, Math.ceil((bucket.resetAt - now) / 1000)),
+  };
+}
+
+/**
+ * Advertise the budget on the response, per the IETF RateLimit header fields
+ * draft (draft-ietf-httpapi-ratelimit-headers).
+ *
+ * Both spellings go out on purpose. The structured-field pair (`RateLimit` +
+ * `RateLimit-Policy`) is what the current draft defines; the
+ * `RateLimit-Limit` / `-Remaining` / `-Reset` triple is what every client
+ * written against the earlier drafts — which is nearly all of them — actually
+ * parses. They describe the same bucket, so emitting both costs ~80 bytes and
+ * removes the guesswork that made agents either hammer us or self-throttle to
+ * a crawl. `Retry-After` (RFC 9110 §10.2.3) rides along on a 429.
+ */
+function setRateLimitHeaders(reply: FastifyReply, scope: RateScope, state: RateState): void {
+  reply.header('RateLimit-Limit', String(state.limit));
+  reply.header('RateLimit-Remaining', String(state.remaining));
+  reply.header('RateLimit-Reset', String(state.resetSeconds));
+  reply.header(
+    'RateLimit-Policy',
+    `"${scope}"; q=${state.limit}; w=${Math.round(RATE_WINDOW_MS / 1000)}`,
+  );
+  reply.header('RateLimit', `"${scope}"; r=${state.remaining}; t=${state.resetSeconds}`);
 }
 
 function sendRateLimited(
   reply: FastifyReply,
-  scope: 'ambient' | 'write' | 'heavy_read',
+  scope: RateScope,
   retryAfter: number,
 ) {
   reply.header('Retry-After', String(retryAfter));
@@ -229,7 +265,8 @@ function registerAmbientRateLimit(app: FastifyInstance): void {
     const now = Date.now();
     lastAmbientSweepAt = sweepExpired(ambientBuckets, lastAmbientSweepAt, now);
     const result = takeToken(ambientBuckets, req.ip, max, now);
-    if (result.limited) return sendRateLimited(reply, 'ambient', result.retryAfter);
+    setRateLimitHeaders(reply, 'ambient', result);
+    if (result.limited) return sendRateLimited(reply, 'ambient', result.resetSeconds);
   });
 }
 
@@ -241,7 +278,8 @@ function registerWriteRateLimit(app: FastifyInstance): void {
     const now = Date.now();
     lastWriteSweepAt = sweepExpired(writeBuckets, lastWriteSweepAt, now);
     const result = takeToken(writeBuckets, req.ip, max, now);
-    if (result.limited) return sendRateLimited(reply, 'write', result.retryAfter);
+    setRateLimitHeaders(reply, 'write', result);
+    if (result.limited) return sendRateLimited(reply, 'write', result.resetSeconds);
   });
 }
 
@@ -259,7 +297,8 @@ function registerHeavyReadRateLimit(app: FastifyInstance): void {
     lastHeavySweepAt = sweepExpired(heavyBuckets, lastHeavySweepAt, now);
     const key = isMcp ? `mcp:${req.ip}` : req.ip;
     const result = takeToken(heavyBuckets, key, max, now);
-    if (result.limited) return sendRateLimited(reply, 'heavy_read', result.retryAfter);
+    setRateLimitHeaders(reply, 'heavy_read', result);
+    if (result.limited) return sendRateLimited(reply, 'heavy_read', result.resetSeconds);
   });
 }
 
