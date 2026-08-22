@@ -28,23 +28,44 @@ async function main(): Promise<void> {
       orderBy: { created_at: 'asc' },
     });
     console.log(`${pending.length} uncategorized skill(s).`);
-    if (dryRun) return;
 
+    // A dry run scores exactly what a real run would score, including the stored
+    // SKILL.md body, and differs only in not writing. It used to print the count
+    // and return, which told an operator nothing about what was about to change.
     let set = 0;
+    const unmatched: string[] = [];
     for (const s of pending) {
       const body = await readStoredSkillMdPrisma(prisma, s.id).catch(() => '');
       const guessed = guessCategory({ slug: s.slug, description: s.description, body });
-      if (!guessed) continue;
+      if (!guessed) {
+        unmatched.push(s.id);
+        continue;
+      }
+      if (dryRun) {
+        set++;
+        console.log(`  ${s.id} → ${guessed}`);
+        continue;
+      }
       const res = await prisma.skills.updateMany({
         where: { id: s.id, category: null },
         data: { category: guessed },
       });
       if (res.count > 0) {
         set++;
-        console.log(`  ${s.slug} → ${guessed}`);
+        console.log(`  ${s.id} → ${guessed}`);
       }
     }
-    console.log(`Categorized ${set}/${pending.length}.`);
+    if (unmatched.length > 0) {
+      // Naming these is the point: a skill nothing matches is either genuinely
+      // uncategorizable (a fixture, a bundle index) or a gap in SIGNALS, and you
+      // cannot tell which from a count.
+      console.log(`\nno signal matched (${unmatched.length}, left null):`);
+      for (const id of unmatched) console.log(`  ${id}`);
+    }
+    console.log(
+      `\n${dryRun ? 'Would categorize' : 'Categorized'} ${set}/${pending.length}.` +
+        (dryRun ? ' Re-run without --dry-run to write.' : ''),
+    );
   } finally {
     await prisma.$disconnect();
   }
