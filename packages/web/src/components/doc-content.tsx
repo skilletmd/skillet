@@ -10,6 +10,21 @@ import { panelHues } from '@/lib/docs-panel'
 
 type CalloutType = 'tip' | 'note' | 'warning'
 
+/**
+ * Inline code is `whitespace-nowrap` in prose, which is right there — `skillet
+ * sync` should never break across lines. In a table cell that same rule makes
+ * the column as wide as its longest token, and a value like `Cache-Control:
+ * public, max-age=60, s-maxage=60` pushed the API overview's tables off the
+ * page. Cells let code wrap instead.
+ *
+ * Only `whitespace-normal`, deliberately NOT `overflow-wrap: anywhere`: that
+ * changes min-content sizing, so the browser sized the column narrower than
+ * `skillet_s_` and snapped the trailing underscore onto its own line. Normal
+ * wrapping breaks at spaces and leaves a short token whole, which is the
+ * behavior every one of these cells actually wants.
+ */
+const TABLE_CELL_CODE_WRAP = '[&_code]:whitespace-normal'
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -109,7 +124,7 @@ export function DocContent({ content }: { content: string }) {
           h1({ children }) {
             const id = makeId(children)
             return (
-              <h1 id={id} className="mb-4 mt-0 text-3xl font-bold tracking-tight text-(--ink)">
+              <h1 id={id} className="scroll-mt-24 mb-4 mt-0 text-3xl font-bold tracking-tight text-(--ink)">
                 {children}
               </h1>
             )
@@ -117,7 +132,7 @@ export function DocContent({ content }: { content: string }) {
           h2({ children }) {
             const id = makeId(children)
             return (
-              <h2 id={id} className="mb-3 mt-10 text-xl font-semibold text-(--ink)">
+              <h2 id={id} className="scroll-mt-24 mb-3 mt-10 text-xl font-semibold text-(--ink)">
                 {children}
               </h2>
             )
@@ -125,7 +140,7 @@ export function DocContent({ content }: { content: string }) {
           h3({ children }) {
             const id = makeId(children)
             return (
-              <h3 id={id} className="mb-2 mt-6 text-base font-semibold text-(--ink)">
+              <h3 id={id} className="scroll-mt-24 mb-2 mt-6 text-base font-semibold text-(--ink)">
                 {children}
               </h3>
             )
@@ -195,11 +210,15 @@ export function DocContent({ content }: { content: string }) {
             )
           },
           th({ children }) {
-            return <th className="py-2 pr-6">{children}</th>
+            return <th className={`py-2 pr-6 ${TABLE_CELL_CODE_WRAP}`}>{children}</th>
           },
           td({ children }) {
             return (
-              <td className="border-b border-(--line) py-2.5 pr-6 text-(--ink-2)">{children}</td>
+              <td
+                className={`border-b border-(--line) py-2.5 pr-6 align-top text-(--ink-2) ${TABLE_CELL_CODE_WRAP}`}
+              >
+                {children}
+              </td>
             )
           },
           code({ className, children }) {

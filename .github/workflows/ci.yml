@@ -53,6 +53,13 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # The /docs/api/* reference pages are projected from the OpenAPI document
+      # in @skillet/protocol. Lives here rather than in guards.yml because the
+      # generator imports the built dist, and guards.yml is deliberately
+      # install-free so a docs-only push stays cheap.
+      - name: API reference pages are current
+        run: pnpm check:api-docs
+
       - name: Test
         run: pnpm test
 

@@ -6,6 +6,11 @@ export type NavSection = {
   collapsed?: boolean
 }
 
+// The API reference pages are generated from the OpenAPI document
+// (scripts/gen-api-docs.mjs), so a new operation reaches the sidebar without a
+// hand edit here. Everything else in this file is hand-ordered.
+import { API_REFERENCE_ITEMS } from './docs-nav-api.generated'
+
 export const DOC_NAV: NavSection[] = [
   {
     title: 'Get started',
@@ -30,11 +35,17 @@ export const DOC_NAV: NavSection[] = [
   {
     title: 'Reference',
     items: [
+      { title: 'API', href: '/docs/api' },
       { title: 'CLI', href: '/docs/cli' },
       { title: 'MCP', href: '/docs/mcp' },
       { title: 'Scanner', href: '/docs/scanner' },
       { title: 'Skill.md', href: '/docs/skill-md' },
     ],
+  },
+  {
+    title: 'API reference',
+    collapsed: true,
+    items: API_REFERENCE_ITEMS,
   },
   {
     title: 'Runtimes',

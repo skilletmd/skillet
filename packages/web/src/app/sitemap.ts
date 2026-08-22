@@ -6,6 +6,7 @@ import {
 } from '@/lib/registry'
 import { getAllPosts } from '@/lib/blog'
 import { CATEGORY_BY_KEY } from '@/lib/categories'
+import { DOC_NAV } from '@/lib/docs-nav'
 import { skillHref, kitHref, profileHref, browseHref, browseAllHref, blogHref } from '@/lib/urls'
 
 // Public catalog sitemap. Crawlers are always logged-out, so the auth-aware root
@@ -33,7 +34,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     safe(getAllAuthorUsernames(), [] as string[]),
   ])
 
-  const staticRoutes = ['/', browseHref(), browseAllHref(), blogHref()].map((path) => ({
+  // Trust anchors and the docs landing belong here: they are the pages a
+  // person (or an AI answer engine) checks to decide whether this project is
+  // real, and nothing else in the sitemap links to them.
+  //
+  // Docs come from DOC_NAV, which is the site's navigation source of truth and
+  // already includes the generated API reference pages — so a new operation in
+  // the OpenAPI document reaches the sitemap with no edit here. Previously not
+  // one docs page was listed, which left the entire reference discoverable only
+  // by crawling the sidebar.
+  const docRoutes = ['/docs', ...DOC_NAV.flatMap((s) => s.items.map((i) => i.href))]
+  const staticRoutes = [
+    ...new Set([
+      '/',
+      browseHref(),
+      browseAllHref(),
+      blogHref(),
+      '/about',
+      '/contact',
+      ...docRoutes,
+    ]),
+  ].map((path) => ({
     url: abs(path),
   }))
 
