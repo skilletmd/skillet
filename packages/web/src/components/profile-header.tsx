@@ -188,11 +188,19 @@ export function ProfileHeader({
   return (
     <header>
       {hideAvatar ? (
-        // Avatar-in-rail layout (profile page): identity + action only, matching
-        // the skill/kit main column. The avatar leads the left rail instead.
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">{identityInner}</div>
-          {resolvedAction && <div className="shrink-0">{resolvedAction}</div>}
+        // Avatar-in-rail layout (profile page): identity then action, stacked.
+        // This used to be justify-between, which floated Follow to the far right
+        // edge of a wide column and left the name and its own button separated by
+        // most of the viewport. DetailHeader states the rule for skill and kit
+        // pages — "the primary action, grouped IN the block rather than floated
+        // to a far corner" — and the profile is the page that was breaking it.
+        // Same mt-5 / gap-3 action row as DetailHeader, so the three page types
+        // put their buttons in the same place.
+        <div className="min-w-0">
+          {identityInner}
+          {resolvedAction && (
+            <div className="mt-5 flex flex-wrap items-center gap-3">{resolvedAction}</div>
+          )}
         </div>
       ) : (
         // App-header grid, same as DetailHeader: avatar | text stack | action,
