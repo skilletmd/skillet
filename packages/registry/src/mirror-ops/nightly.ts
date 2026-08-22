@@ -27,6 +27,7 @@ import { normalizeRepoKey } from '../lib/mirror-screen.js';
 import { loadSources, syncAllSourcesPrisma, type MirrorSource, type SyncAllResult, type SourceSyncOutcome } from './sync-sources.js';
 import { discoverMirrorCandidates, DISCOVERY_TOKEN_ENV, DEFAULT_MIN_QUALITY_SCORE, type DiscoverResult } from './discovery.js';
 import { loadDenylist } from './denylist.js';
+import { syncAllConnectedReposPrisma, type ConnectedSyncSummary } from '../sync/connected-repo.js';
 import type { BlobStore } from '../blob-store/types.js';
 import { createPrismaBlobStore } from '../blob-store/create-blob-store.js';
 import { assertDurableBlobStoreForProd } from './require-durable-blob-store.js';
@@ -60,6 +61,9 @@ export interface NightlyResult {
     phase1: SyncAllResult | null;
     phase2: Phase2Result | null;
     phase3: DiscoverResult | null;
+    /** Self-serve connected repos, re-published on the same daily cadence the
+     *  UI promises. Null when an earlier phase hit a rate limit. */
+    phase4: ConnectedSyncSummary | null;
     /** null = phase 3 was skipped (rate limit earlier in the run). */
     exitCode: number;
 }
@@ -197,7 +201,7 @@ export async function runNightlyMirrorOps(prisma: PrismaClient, opts: NightlyOpt
             console.log('another nightly run holds the lock; exiting');
             // Distinguishable from a clean zero-work run in the log stream.
             console.log(JSON.stringify({ nightly_mirror_ops: { skipped: 'lock-held', exit_code: 0 } }));
-            return { lockAcquired: false, phase1: null, phase2: null, phase3: null, exitCode: 0 };
+            return { lockAcquired: false, phase1: null, phase2: null, phase3: null, phase4: null, exitCode: 0 };
         }
 
         console.log(`phase 1: seed re-sync (${sources.length} sources)${dryRun ? ' [dry-run]' : ''}`);
@@ -245,7 +249,17 @@ export async function runNightlyMirrorOps(prisma: PrismaClient, opts: NightlyOpt
             });
         }
 
-        const failed = phase1.failed + (phase2?.failed ?? 0);
+        // Phase 4: self-serve connected repos. These used to sync only when a
+        // human connected one or pressed refresh, while every skill page told
+        // visitors the source syncs daily. Runs after discovery and is skipped
+        // on a rate limit like the rest, since it is ordinary GitHub traffic.
+        let phase4: ConnectedSyncSummary | null = null;
+        if (!rateLimited && !dryRun) {
+            console.log('\nphase 4: connected-repo re-sync');
+            phase4 = await syncAllConnectedReposPrisma(prisma, { blobStore });
+        }
+
+        const failed = phase1.failed + (phase2?.failed ?? 0) + (phase4?.failed ?? 0);
         const exitCode = failed > 0 || rateLimited ? 1 : 0;
         // Machine-greppable summary, deliberately the LAST stdout line: with
         // autorestart:false the exit code only lands in PM2 logs, so this line
@@ -266,10 +280,13 @@ export async function runNightlyMirrorOps(prisma: PrismaClient, opts: NightlyOpt
                     enqueued: phase3.enqueued.length, skipped: phase3.skipped.length,
                     search_rate_limited: phase3.rateLimited,
                 } : null,
+                phase4: phase4 ? {
+                    synced: phase4.synced, failed: phase4.failed, skipped: phase4.skipped,
+                } : null,
                 exit_code: exitCode,
             },
         }));
-        return { lockAcquired: true, phase1, phase2, phase3, exitCode };
+        return { lockAcquired: true, phase1, phase2, phase3, phase4, exitCode };
     }
     finally {
         // Disconnecting closes the dedicated session, which releases the lock

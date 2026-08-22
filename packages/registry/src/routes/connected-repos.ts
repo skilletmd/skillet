@@ -16,10 +16,11 @@ import { requireSession } from '../auth/middleware.js';
 import { verifyWebInternalSignature } from '../auth/web-internal-sig.js';
 import { newId } from '../db/index.js';
 import type { PrismaDb } from '../db/prisma-client.js';
-import { encryptToken, decryptToken, verifyRepoOwnership, listOwnedRepos, getGithubUser, } from '../sync/repo-auth.js';
+import { encryptToken, verifyRepoOwnership, listOwnedRepos, getGithubUser, } from '../sync/repo-auth.js';
 import { getUserGithubTokenPrisma, storeUserGithubTokenPrisma, userHasGithubTokenPrisma, } from '../sync/github-token.js';
 import { canAdminOrgAuthorPrisma } from '../lib/org-access.js';
 import { syncRepoSkillsPrisma, type SyncResult } from '../sync/sync-repo.js';
+import { syncConnectedRepoPrisma } from '../sync/connected-repo.js';
 import type { BlobStore } from '../blob-store/types.js';
 // SECURITY: the read-only GitHub OAuth token rides in the connect body, so POST
 // /api/v1/github/repos requires BOTH a user session AND proof the request came
@@ -438,7 +439,9 @@ export function registerConnectedRepoRoutes(app: FastifyInstance, db: DatabaseSy
             return reply.code(409).send({ error: 'no_token' });
         // Re-publish under the stored owner (a team, or the user). Re-verify team
         // admin so a user who lost access can't keep syncing under the team.
-        const authorHandle = row.publish_as ?? handle;
+        // The handle the row publishes under is re-derived inside
+        // syncConnectedRepoPrisma; this check stays only so the route can answer
+        // 403 with a reason rather than a bare refusal.
         if (row.publish_as && row.publish_as !== handle) {
             const allowed = await canAdminOrgAuthorPrisma(prisma, row.publish_as, req.principal.user_id);
             if (!allowed) {
@@ -448,20 +451,24 @@ export function registerConnectedRepoRoutes(app: FastifyInstance, db: DatabaseSy
                 });
             }
         }
-        const selectedDirs = parseSelectedDirs(row.selected_dirs) ?? undefined;
         let result: SyncResult;
         try {
-            const syncOpts = {
-                authorHandle,
-                repoFull: `${row.owner}/${row.repo}`,
-                license: null as string | null,
-                token: decryptToken(row.token_enc),
-                blobStore,
-                bundle: row.as_kit !== 0,
-                ...(selectedDirs ? { selectedDirs } : {}),
-            };
-            result =
-                await syncRepoSkillsPrisma(prisma, row.owner, row.repo, syncOpts);
+            // Same function the nightly calls, so a scheduled re-publish and a
+            // manual one can never apply different rules. It re-derives the
+            // author handle and re-checks publish_as itself; the checks above
+            // stay so the route can answer 403 with the reason.
+            // toRepoRow drops user_id; the findFirst above already constrained
+            // the row to this session's user, so it is the same value.
+            const out = await syncConnectedRepoPrisma(
+                prisma,
+                { ...row, user_id: req.principal.user_id },
+                { blobStore },
+            );
+            if (!out.ok) {
+                const code = out.reason === 'publish_as_forbidden' ? 403 : 409;
+                return reply.code(code).send({ error: out.reason });
+            }
+            result = out.result;
         }
         catch (err) {
             // Explicit send — scrub the upstream/sync error text (it can carry repo
@@ -471,13 +478,7 @@ export function registerConnectedRepoRoutes(app: FastifyInstance, db: DatabaseSy
                 .code(502)
                 .send({ error: 'sync_failed', message: 'Repo sync failed. Try again.', request_id: req.id });
         }
-        await prisma.connected_repos.update({
-            where: { id: row.id },
-            data: {
-                last_synced_sha: result.sha,
-                last_synced_at: Math.floor(Date.now() / 1000),
-            },
-        });
+        // syncConnectedRepoPrisma already stamped last_synced_sha/at.
         return reply.send({ sync: result });
     });
     // Disconnect = STOP syncing, keep what's published. The synced skills and their
