@@ -7,8 +7,12 @@ packages/desktop/dist-installers/
 .deepsec/
 *.tsbuildinfo
 .DS_Store
+# Every env variant, not just these two names. `.env` and `.env.local` were
+# listed literally, so a sibling like `.env.bak` or `.env.prod` was untracked
+# but NOT ignored — one broad `git add` away from committing live secrets.
 .env
-.env.local
+.env.*
+!.env.example
 
 # Security audit — documents account-takeover exploit chains. Kept locally for
 # maintainers; never committed to the public tree.

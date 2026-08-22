@@ -91,6 +91,31 @@ Package `test` scripts build their workspace deps first, so a bare
   or re-tiering any CLI command, check the contract test in
   `packages/cli/tests/` (desktop-contract) and the `run_skillet` call sites.
   Update approval (`pending`/`approve`/`reject`) is device-tier by design.
+- **Real 404s are decided before render:** under `cacheComponents`, every
+  document route flushes a PPR shell (and its `200`) before a page body can call
+  `notFound()`, so the status is already on the wire. `packages/web/src/proxy.ts`
+  decides instead, using the hand-maintained route table in
+  `src/lib/agent-routes.ts`. **Adding a top-level route means adding its segment
+  to `KNOWN_TOP_LEVEL_SEGMENTS`**, and adding a docs page means adding it to
+  `DOC_NAV` — otherwise the new page 404s for logged-out visitors.
+  `tests/agent-routes.test.ts` walks `src/app` and `content/docs` and fails when
+  either drifts. The registry existence check fails OPEN: only an explicit 404
+  from the registry produces a 404, and it runs for anonymous requests only (a
+  signed-in viewer may own private skills an anonymous lookup cannot see).
+  The same flush explains a nastier one: **`notFound()` in a LAYOUT does not
+  stop its children rendering.** `/lab`'s layout called it behind a `SHOW_LAB`
+  flag and a production build still served `/lab/design` at 200 with the whole
+  design system. Never gate a tree with a layout `notFound()` — put it in
+  `proxy.ts`, where the decision happens before the render. `/lab` itself is now
+  deliberately public and kept unlisted instead (no links, no sitemap entry, no
+  `llms.txt` entry, a robots.txt `Disallow`, and `noindex` from both a meta tag
+  and `X-Robots-Tag`); `tests/lab-not-discoverable.test.ts` holds those surfaces.
+- **`Vary: Accept` is set at the origin proxy, not in Next:** every page has a
+  Markdown twin at the same URL (`Accept: text/markdown` → `/api/md/*`). Next
+  overwrites `Vary` wholesale when it serves a prerendered app-router page, so
+  `proxy.ts` cannot be the last word; `scripts/web-origin-proxy.js` merges
+  `Accept` into the outgoing `Vary` for HTML documents. Route handlers keep the
+  value `proxy.ts` sets.
 - **`@skillet/protocol` imports:** client code (web, desktop webview) must
   import node-free subpaths (`@skillet/protocol/covers`, …), never the barrel —
   it pulls `node:crypto` and blank-pages the app. Lint-enforced.
