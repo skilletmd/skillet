@@ -40,6 +40,7 @@ export const DOC_NAV: NavSection[] = [
       { title: 'MCP', href: '/docs/mcp' },
       { title: 'Scanner', href: '/docs/scanner' },
       { title: 'Skill.md', href: '/docs/skill-md' },
+      { title: 'Versioning', href: '/docs/versioning' },
     ],
   },
   {

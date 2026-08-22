@@ -58,6 +58,7 @@ import { parseStoredAgents } from './device-agents.js';
 import { parseStoredKinds } from '../auth/client-identity.js';
 import { isReservedHandle } from '@skillet/protocol';
 import { parseBrandClaimAllowlist } from '../auth/brand-claim.js';
+import { deprecationPolicyUrl, markDeprecated } from '../lib/deprecation.js';
 
 function requirePrisma(prisma: PrismaClient | undefined): PrismaClient {
   if (!prisma) {
@@ -304,6 +305,11 @@ export function registerAuthRoutes(
   // `body.message`, so this tombstone is permanent and the message is their
   // entire signpost. 410, never 404: the route intentionally ceased to exist.
   app.post('/api/v1/signup', async (_req, reply) => {
+    // Retired, and it says so in headers a client can branch on rather than
+    // only in a message a human has to read. `Sunset` is deliberately absent:
+    // the route is already gone, so there is no future date to announce, and
+    // publishing one would imply it still works until then.
+    markDeprecated(reply, { documentation: deprecationPolicyUrl() });
     return reply.code(410).send({
       error: 'anonymous_signup_retired',
       message: pairFlowGuidance(),
