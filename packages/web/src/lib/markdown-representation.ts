@@ -18,9 +18,13 @@ import 'server-only'
 import { getDoc } from './docs'
 import { getAllPosts, getPost } from './blog'
 import { getAuthorProfile, getSkill, getSkillCatalog } from './registry'
-import { getSkillBundleSummary } from './skill-bundle-content'
+import type { Skill } from './types'
+import { fetchSkillBundleFile, getSkillBundleSummary } from './skill-bundle-content'
 import { classifyRoute } from './agent-routes'
 import { siteUrl } from './site-url'
+import { REGISTRY_API } from './registry-prefix'
+import { capabilityLabel } from './scan-taxonomy'
+import { SKILL_ENTRYPOINT } from './skill-bundle'
 
 /** A rendered Markdown representation, or `null` when the resource is gone. */
 export interface MarkdownRepresentation {
@@ -141,13 +145,115 @@ async function profileMarkdown(handle: string): Promise<string | null> {
   ])
 }
 
-async function skillMarkdown(author: string, slug: string): Promise<string | null> {
-  const skill = await getSkill(author, slug, { skipScan: true })
+/**
+ * Bundle size at or under which the twin inlines every file by default.
+ *
+ * Picked from the live catalog, not from taste. Across a 400-skill sample the
+ * median bundle is 14 KB and p90 is 54 KB, while p99 is 1.2 MB and the largest
+ * is 1.8 MB across 200 files — the distribution is not long-tailed, it is
+ * bimodal. 50 KB (roughly 12k tokens) covers 88% of skills.
+ *
+ * Why inline at all: a round trip in an agent loop costs a whole model turn.
+ * Making the 88% spend one to save ~12k tokens is a bad trade, and linking
+ * everything by default made exactly that trade. The tail is what the threshold
+ * is for, and the tail is entirely reference files — the largest SKILL.md in
+ * the sample is 87 KB, because keeping the entrypoint small is the format's own
+ * discipline.
+ */
+const AUTO_INLINE_THRESHOLD_BYTES = 50 * 1024
+
+/**
+ * Hard ceiling on what `?full=1` will inline, even when explicitly asked.
+ *
+ * 512 KB is roughly 128k tokens. Above it a caller is not getting a large
+ * response, they are getting a context bomb: five skills in the sample exceed
+ * this, topping out near 456k tokens. Those stay un-servable in one response,
+ * which is the correct answer rather than a truncation nobody notices.
+ */
+const FULL_INLINE_BUDGET_BYTES = 512 * 1024
+
+/** Byte count as a short human string, for a sentence explaining a decision. */
+function humanBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${Math.round(bytes / 1024)} KB`
+}
+
+/** Public URL that returns one file from a published version, verbatim. */
+function bundleFileUrl(author: string, slug: string, hash: string, path: string): string {
+  const base = `${REGISTRY_API}/skills/${encodeURIComponent(author)}/${encodeURIComponent(slug)}/versions/${encodeURIComponent(hash)}/file`
+  return abs(`${base}?path=${encodeURIComponent(path)}`)
+}
+
+/**
+ * What the skill is allowed to do, from the static scan.
+ *
+ * Four states, and they are NOT interchangeable (see `Skill.capabilities`):
+ * never fetched, never computed, computed-and-empty, and computed-with-results.
+ * Collapsing the first two into "no permissions" would tell an agent a skill is
+ * inert when nobody ever checked.
+ */
+function permissionsSection(skill: Skill): string[] {
+  if (skill.capabilities === undefined) return []
+  if (skill.capabilities === null) {
+    return ['## Permissions', '', 'Not analyzed for this version.', '']
+  }
+  if (skill.capabilities.length === 0) {
+    return [
+      '## Permissions',
+      '',
+      skill.capabilitiesAnalysis === 'partial'
+        ? 'None detected, but some files could not be inspected. Not a proof of inertness.'
+        : 'None detected. Everything executable was inspected.',
+      '',
+    ]
+  }
+  const labels = skill.capabilities.map((c) => capabilityLabel(c.capability))
+  return [
+    '## Permissions',
+    '',
+    ...labels.map((label) => `- ${label}`),
+    ...(skill.capabilitiesAnalysis === 'partial'
+      ? ['', 'Some files could not be inspected, so this list may be incomplete.']
+      : []),
+    '',
+  ]
+}
+
+/**
+ * The Markdown twin of a skill page.
+ *
+ * The published SKILL.md is the artifact itself — serve it rather than a
+ * description of it. But SKILL.md is an INDEX as often as it is the whole
+ * instruction set: the format's progressive-disclosure model has it say "read
+ * `references/cli.md`" and load that only when the task needs it. Serving the
+ * body alone therefore handed an agent instructions whose pointers went
+ * nowhere. The file list below fixes that with a fetchable URL per file, which
+ * keeps the disclosure model intact — the caller still chooses what to load.
+ *
+ * Whether those files are inlined or linked is decided by bundle size, because
+ * the catalog is bimodal: 88% of skills fit in 50 KB, and the rest run to 1.8 MB.
+ * `?full=1` forces inlining up to a hard cap, `?full=0` forces links. Both modes
+ * say which one they are in.
+ */
+async function skillMarkdown(
+  author: string,
+  slug: string,
+  options: { full?: boolean } = {},
+): Promise<string | null> {
+  // No `skipScan` here, unlike the rest of this module: the scan is where
+  // `capabilities` comes from, and "what is this allowed to do" is the question
+  // an agent has to answer before running third-party instructions. One extra
+  // fetch, on a response cached for five minutes.
+  const skill = await getSkill(author, slug)
   if (!skill) return null
-  // The published SKILL.md is the artifact itself — serve it rather than a
-  // description of it. If the bundle is unreachable, fall back to the catalog
-  // record so the URL still answers with something useful.
+  // If the bundle is unreachable, fall back to the catalog record so the URL
+  // still answers with something useful.
   const bundle = await getSkillBundleSummary(author, slug).catch(() => null)
+
+  const source = skill.mirrorSourceUrl
+    ? `- Source: ${skill.mirrorSourceUrl}${skill.mirrorLicense ? ` (${skill.mirrorLicense})` : ''}`
+    : null
+
   const header = joinLines([
     `# ${skill.title || slug} (@${author})`,
     '',
@@ -157,11 +263,111 @@ async function skillMarkdown(author: string, slug: string): Promise<string | nul
     `- Install: \`npx skilletmd add ${author}/${slug}\``,
     skill.category ? `- Category: ${skill.category}` : null,
     `- Latest version: ${skill.latestVersion}`,
+    bundle?.versionHash ? `- Version hash: ${bundle.versionHash}` : null,
+    // Context budget is a real constraint for the caller; say it before they
+    // spend it rather than after.
+    skill.tokenCount ? `- Size: ~${skill.tokenCount} tokens` : null,
+    source,
+    `- Updated: ${skill.updatedAt.slice(0, 10)}`,
     '',
   ])
 
   if (!bundle?.skillMdBody) return `${header}\n${footer()}`
-  return [header, '## SKILL.md', '', bundle.skillMdBody.trim(), footer()].join('\n')
+
+  const extras = bundle.files.filter((f) => f.path !== SKILL_ENTRYPOINT)
+  const totalBytes = bundle.files.reduce((sum, f) => sum + f.size, 0)
+  // Three states, not two: an absent `?full` hands the decision here, where the
+  // size of THIS bundle is known. Only an explicit value overrides it.
+  const inline = options.full ?? totalBytes <= AUTO_INLINE_THRESHOLD_BYTES
+
+  const sections: string[] = [header, ...permissionsSection(skill)]
+
+  if (extras.length > 0) {
+    sections.push(
+      '## Files',
+      '',
+      `- \`${SKILL_ENTRYPOINT}\` (included below)`,
+      ...extras.map((f) =>
+        f.kind === 'binary'
+          ? `- \`${f.path}\` (${f.size} bytes, binary): ${bundleFileUrl(author, slug, bundle.versionHash, f.path)}`
+          : `- \`${f.path}\` (${f.size} bytes): ${bundleFileUrl(author, slug, bundle.versionHash, f.path)}`,
+      ),
+      '',
+      // Say what comes back. The file endpoint answers a JSON envelope, not raw
+      // bytes, and a link inside a Markdown document reads like it will return
+      // Markdown — an agent that assumes so parses a `{"path":…}` object as
+      // prose and gets nonsense.
+      'Each URL returns JSON; the file body is in the `text` field.',
+      '',
+      // Always state which mode this response is in. The shape varies by bundle
+      // size, so a reader that is not told cannot distinguish "this skill has no
+      // more content" from "the rest is behind those links".
+      ...(inline
+        ? ['Every text file is inlined below, so nothing here needs fetching.']
+        : [
+            options.full === false
+              ? `This bundle is ${humanBytes(totalBytes)}. Files are linked, not inlined, because \`?full=0\` was set.`
+              : `This bundle is ${humanBytes(totalBytes)}, over the ${humanBytes(AUTO_INLINE_THRESHOLD_BYTES)} inline threshold, so files are linked instead. Append \`?full=1\` to inline them anyway.`,
+          ]),
+      '',
+    )
+  }
+
+  sections.push('## SKILL.md', '', bundle.skillMdBody.trim(), '')
+
+  if (inline && extras.length > 0) {
+    sections.push(...(await inlinedFiles(author, slug, bundle.versionHash, extras)))
+  }
+
+  return [...sections, footer()].join('\n')
+}
+
+/**
+ * Bodies for `?full=1`, in bundle order, stopping at the byte budget.
+ *
+ * A truncated response that does not say it was truncated is worse than a
+ * short one: the caller cannot tell "this skill has no more files" from "we
+ * stopped sending them". Every omission is named.
+ */
+async function inlinedFiles(
+  author: string,
+  slug: string,
+  hash: string,
+  files: Array<{ path: string; kind: 'text' | 'binary'; size: number }>,
+): Promise<string[]> {
+  const out: string[] = []
+  const skipped: string[] = []
+  let spent = 0
+
+  for (const file of files) {
+    if (file.kind === 'binary') {
+      skipped.push(`\`${file.path}\` (binary)`)
+      continue
+    }
+    if (spent + file.size > FULL_INLINE_BUDGET_BYTES) {
+      skipped.push(`\`${file.path}\` (over the inline budget)`)
+      continue
+    }
+    const fetched = await fetchSkillBundleFile(author, slug, hash, file.path).catch(() => null)
+    if (!fetched?.text) {
+      skipped.push(`\`${file.path}\` (unreadable)`)
+      continue
+    }
+    spent += file.size
+    out.push(`## ${file.path}`, '', fetched.text.trim(), '')
+  }
+
+  if (skipped.length > 0) {
+    out.push(
+      '## Not inlined',
+      '',
+      ...skipped.map((s) => `- ${s}`),
+      '',
+      'Fetch these at the URLs in the file list above.',
+      '',
+    )
+  }
+  return out
 }
 
 /** The Markdown catalog index served at `/browse`. */
@@ -191,7 +397,20 @@ async function browseMarkdown(): Promise<string> {
  * time this runs, `hasMarkdownVariant` has already said the shape is one we
  * serve.
  */
-export async function renderMarkdown(pathname: string): Promise<MarkdownRepresentation | null> {
+/** Per-surface knobs a caller can set from the query string. */
+export interface MarkdownOptions {
+  /**
+   * Force-inline every text file in a skill bundle (`true`), force links
+   * (`false`), or leave it undefined to let bundle size decide. Undefined is
+   * the common case and is NOT the same as `false`.
+   */
+  full?: boolean
+}
+
+export async function renderMarkdown(
+  pathname: string,
+  options: MarkdownOptions = {},
+): Promise<MarkdownRepresentation | null> {
   if (pathname === '/') return { body: homeMarkdown(), maxAge: 3600 }
   if (pathname === '/browse') return { body: await browseMarkdown(), maxAge: 300 }
   if (pathname === '/blog') return { body: blogIndexMarkdown(), maxAge: 600 }
@@ -215,7 +434,9 @@ export async function renderMarkdown(pathname: string): Promise<MarkdownRepresen
       return body ? { body, maxAge: 300 } : null
     }
     if (verdict.check.type === 'skill') {
-      const body = await skillMarkdown(verdict.check.author, verdict.check.slug)
+      const body = await skillMarkdown(verdict.check.author, verdict.check.slug, {
+        full: options.full,
+      })
       return body ? { body, maxAge: 300 } : null
     }
   }

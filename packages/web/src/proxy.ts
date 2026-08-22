@@ -11,7 +11,9 @@ import {
 import { handleAliasTarget } from '@/lib/handle-alias'
 import { agentSurfaceResponse } from '@/lib/agent-surface'
 import { isLabPath } from '@/lib/lab-gate'
-import { appendVaryAccept } from '@/lib/content-negotiation'
+import { appendVaryAccept, markdownAlternateLink } from '@/lib/content-negotiation'
+import { hasMarkdownVariant } from '@/lib/agent-routes'
+import { siteAbsoluteUrl } from '@/lib/site-url'
 import { buildSecurityHeaders, resolveCspMode } from '@/lib/security-headers'
 
 let warnedNonEnforcing = false
@@ -69,6 +71,13 @@ function nextWithPathname(req: {
   // cache must key on Accept. Appended, never assigned: Next's own RSC routing
   // tokens already live on Vary and clobbering them breaks client navigation.
   appendVaryAccept(res.headers)
+
+  // And say so, rather than making an agent guess the convention. Only where a
+  // twin actually exists: advertising one on a page that answers HTML for every
+  // Accept would be a link to nowhere.
+  if (hasMarkdownVariant(pathname)) {
+    res.headers.append('Link', markdownAlternateLink(siteAbsoluteUrl(pathname)))
+  }
 
   // /lab is internal tooling: reachable on purpose, but nothing should send
   // anyone there. It is absent from the sitemap and llms.txt, disallowed in

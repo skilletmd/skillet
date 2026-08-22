@@ -1,6 +1,7 @@
 import { MARKDOWN_CONTENT_TYPE } from '@/lib/content-negotiation'
 import { notFoundMarkdownBody } from '@/lib/agent-surface'
 import { renderMarkdown } from '@/lib/markdown-representation'
+import { fullRequested } from '@/lib/content-negotiation'
 
 /**
  * The Markdown half of content negotiation.
@@ -15,13 +16,18 @@ import { renderMarkdown } from '@/lib/markdown-representation'
  * hand this Markdown to the next browser that asks for the same URL.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ slug?: string[] }> },
 ): Promise<Response> {
   const { slug = [] } = await params
   const pathname = slug.length ? `/${slug.join('/')}` : '/'
 
-  const representation = await renderMarkdown(pathname)
+  // `proxy.ts` rewrites the pathname and leaves the query string alone, so a
+  // caller's `?full=1` survives the hop. Any truthy-but-not-"0" value counts:
+  // an agent that writes `?full=true` meant the same thing as `?full=1`.
+  const full = fullRequested(new URL(request.url).searchParams.get('full'))
+
+  const representation = await renderMarkdown(pathname, { full })
   if (!representation) {
     return new Response(notFoundMarkdownBody(pathname), {
       status: 404,

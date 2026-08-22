@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   appendVaryAccept,
+  fullRequested,
   isNotAcceptable,
+  markdownAlternateLink,
   preferredType,
   wantsMarkdown,
 } from '@/lib/content-negotiation'
+import { hasMarkdownVariant } from '@/lib/agent-routes'
 
 // The four conformance checks acceptmarkdown.com runs against an origin:
 // serves Markdown for `Accept: text/markdown`, sets `Vary: Accept`, returns
@@ -97,3 +100,49 @@ describe('appendVaryAccept', () => {
     expect(h.get('Vary')).toBe('*')
   })
 })
+
+// `Vary: Accept` is a message to caches. This is the message to clients: the
+// twin exists, at this URL, in this media type. Without it an agent had to
+// already know the convention to find the JavaScript-free representation.
+describe('markdownAlternateLink', () => {
+  it('is a well-formed RFC 8288 link to the same URL', () => {
+    expect(markdownAlternateLink('https://skillet.md/docs/api')).toBe(
+      '<https://skillet.md/docs/api>; rel="alternate"; type="text/markdown"',
+    )
+  })
+
+  it('is only ever emitted for a URL that actually has a twin', () => {
+    // proxy.ts gates on this pair; a link advertised on a path with no Markdown
+    // representation would be a link to the HTML page, which is a lie.
+    expect(hasMarkdownVariant('/')).toBe(true)
+    expect(hasMarkdownVariant('/docs/api')).toBe(true)
+    expect(hasMarkdownVariant('/openapi.json')).toBe(false)
+    expect(hasMarkdownVariant('/settings')).toBe(false)
+  })
+})
+
+// Lenient on the value, strict on the default: an agent that writes `?full=true`
+// meant `?full=1`, but the flag stays opt-in so the default response keeps a
+// predictable size.
+describe('fullRequested', () => {
+  // Three states, not two. "Did not ask" hands the decision to the surface,
+  // which sizes the response to the resource; "asked for the small form" does
+  // not. Collapsing them would make every default response a link-only one.
+  it('reports absence as undefined, never as false', () => {
+    expect(fullRequested(null)).toBeUndefined()
+    expect(fullRequested(undefined)).toBeUndefined()
+  })
+
+  it('accepts the spellings an agent is likely to write', () => {
+    for (const value of ['1', '', 'true', 'TRUE', 'yes', 'on']) {
+      expect(fullRequested(value), value).toBe(true)
+    }
+  })
+
+  it('honors an explicit negative', () => {
+    for (const value of ['0', 'false', 'no', ' FALSE ']) {
+      expect(fullRequested(value), value).toBe(false)
+    }
+  })
+})
+

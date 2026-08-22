@@ -132,3 +132,34 @@ export function appendVaryAccept(headers: Headers): void {
 
 /** The body of a spec-correct 406, listing what this origin can produce. */
 export const NOT_ACCEPTABLE_BODY = `Not Acceptable\n\nAvailable representations: ${PRODUCES.join(', ')}\n`
+
+/**
+ * The `Link` header that advertises the Markdown twin (RFC 8288 + RFC 7763).
+ *
+ * `Vary: Accept` tells a cache that the representation depends on `Accept`. It
+ * does not tell a CLIENT that a second representation exists — an agent had to
+ * already know the acceptmarkdown.com convention to try for it, so the clean,
+ * JavaScript-free version of every page on this site was invisible to anything
+ * that did not guess. This says it outright, at the same URL, in a header a
+ * non-HTML-parsing client can read.
+ */
+export function markdownAlternateLink(absoluteUrl: string): string {
+  return `<${absoluteUrl}>; rel="alternate"; type="text/markdown"`
+}
+
+/**
+ * What a caller asked for with `?full=`, as three states rather than two.
+ *
+ * `undefined` means they did not ask, which is NOT the same as asking for the
+ * small form: it hands the decision to the surface, which sizes the response to
+ * the resource. Only an explicit value overrides that.
+ *
+ * Lenient on the value, because an agent that writes `?full=true` or a bare
+ * `?full` meant `?full=1`, and refusing those would make the flag feel broken.
+ */
+export function fullRequested(raw: string | null | undefined): boolean | undefined {
+  if (raw == null) return undefined
+  const value = raw.trim().toLowerCase()
+  if (value === '') return true
+  return value !== '0' && value !== 'false' && value !== 'no'
+}
