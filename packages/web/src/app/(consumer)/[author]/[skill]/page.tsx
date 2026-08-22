@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import { markdownAlternates } from '@/lib/markdown-alternate'
 import { Suspense } from 'react'
 import {
   getSkill,
@@ -50,6 +51,9 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   return {
     title: `${skill.title} by @${author} · Skillet`,
     description: skill.description,
+    // The twin here returns the published SKILL.md, so this is the single most
+    // useful `rel="alternate"` on the site.
+    alternates: markdownAlternates(`/${author}/${slug}`),
     openGraph: {
       title: skill.title,
       description: skill.description,

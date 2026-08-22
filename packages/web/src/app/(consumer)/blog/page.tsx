@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { markdownAlternates } from '@/lib/markdown-alternate'
 import { getAllPosts } from '@/lib/blog'
 import { blogHref } from '@/lib/urls'
 import { BlogIndex } from './blog-index'
@@ -10,10 +11,9 @@ const DESCRIPTION =
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
-  alternates: {
-    canonical: blogHref(),
-    types: { 'application/rss+xml': [{ url: '/blog/rss.xml', title: 'Skillet Blog' }] },
-  },
+  alternates: markdownAlternates(blogHref(), {
+    'application/rss+xml': [{ url: '/blog/rss.xml', title: 'Skillet Blog' }],
+  }),
   openGraph: {
     title: TITLE,
     description: DESCRIPTION,

@@ -5,6 +5,7 @@ import { DynamicPageBoundary } from '@/lib/dynamic-page-boundary'
 import { HomeCatalogShelves } from '@/components/home/home-shelves'
 import { CatalogShelvesSkeleton } from '@/components/home/shelf-skeleton'
 import { ogMeta, OG } from '@/lib/og'
+import { markdownAlternates } from '@/lib/markdown-alternate'
 import {
   BROWSE_SSR_RID_HEADER,
   browseSsrLog,
@@ -17,6 +18,7 @@ export const metadata: Metadata = {
   title: 'Featured AI agent skills · Skillet',
   description:
     'Hand-picked skills and kits for AI agents like Claude, Codex, and Cursor, plus the top skills and creators on Skillet. Browse the full catalog under All Skills.',
+  alternates: markdownAlternates('/browse'),
   ...ogMeta(OG.skills()),
 }
 

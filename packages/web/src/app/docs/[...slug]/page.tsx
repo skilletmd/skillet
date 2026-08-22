@@ -4,6 +4,7 @@ import { getDoc, getDocSlugs } from '@/lib/docs'
 import { OG, ogMeta } from '@/lib/og'
 import { DocArticle } from '@/components/doc-article'
 import { docStructuredData } from '@/lib/docs-structured-data'
+import { markdownAlternates } from '@/lib/markdown-alternate'
 
 export async function generateStaticParams() {
   return getDocSlugs().map((slug) => ({ slug }))
@@ -26,7 +27,7 @@ export async function generateMetadata({
     description: doc.description,
     // Every docs page has a Markdown twin at its own URL. Advertise it rather
     // than leaving an agent to guess the convention.
-    alternates: { canonical: href, types: { 'text/markdown': href } },
+    alternates: markdownAlternates(href),
     // Per-article share card: the article title under a DOCS eyebrow.
     ...ogMeta(OG.docs({ title: doc.title })),
   }

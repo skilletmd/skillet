@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { markdownAlternates } from '@/lib/markdown-alternate'
 import Link from 'next/link'
 import { MarkdownContent } from '@/components/markdown-content'
 import { NotFoundBody } from '@/components/not-found-body'
@@ -66,10 +67,9 @@ export async function generateMetadata({
   return {
     title: `${postTitleTag(post)} · Skillet`,
     description: post.description,
-    alternates: {
-      canonical,
-      types: { 'application/rss+xml': [{ url: '/blog/rss.xml', title: 'Skillet Blog' }] },
-    },
+    alternates: markdownAlternates(canonical, {
+      'application/rss+xml': [{ url: '/blog/rss.xml', title: 'Skillet Blog' }],
+    }),
     openGraph: {
       title: post.title,
       description: post.description,

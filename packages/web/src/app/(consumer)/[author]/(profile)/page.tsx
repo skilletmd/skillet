@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { cookies } from 'next/headers'
 import type { Metadata } from 'next'
+import { markdownAlternates } from '@/lib/markdown-alternate'
 import { auth } from '@/auth'
 import { ClaimResultToast } from '@/components/claim-result-toast'
 import {
@@ -110,6 +111,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   return {
     title: `${profile.displayName} (@${author}) · Skillet`,
     description: profile.bio ?? `Skills published by @${author} on Skillet.`,
+    alternates: markdownAlternates(`/${author}`),
     openGraph: {
       title: `${profile.displayName} on Skillet`,
       description: profile.bio ?? `Skills published by @${author} on Skillet.`,

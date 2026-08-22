@@ -11,6 +11,7 @@ import { CatalogShelvesSkeleton } from '@/components/home/shelf-skeleton'
 import { PAGE_CONTAINER_CLASS } from '@/lib/page-layout'
 import { ogMeta, OG } from '@/lib/og'
 import { GITHUB_REPO_URL } from '@/lib/urls'
+import { markdownAlternates } from '@/lib/markdown-alternate'
 import { HOME_JSON_LD } from '@/lib/home-json-ld'
 
 const HOME_OG = ogMeta(OG.home())
@@ -31,7 +32,7 @@ export const metadata: Metadata = {
   // representation an agent actually wants. `Vary: Accept` told caches that;
   // nothing told the client the twin existed. This does, in the document
   // itself, where it survives Next's header rewriting on a prerendered page.
-  alternates: { canonical: '/', types: { 'text/markdown': '/' } },
+  alternates: markdownAlternates('/'),
   ...HOME_OG,
   openGraph: { ...HOME_OG.openGraph, title: HOME_SHARE_TITLE, description: HOME_SHARE_DESCRIPTION },
   twitter: { ...HOME_OG.twitter, title: HOME_SHARE_TITLE, description: HOME_SHARE_DESCRIPTION },
