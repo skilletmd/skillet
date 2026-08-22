@@ -133,13 +133,18 @@ export function CardLg({
             href={href}
             className="card-main-link block after:absolute after:inset-0 after:content-['']"
           >
-            <span
+            {/* A card title is a subheading of the shelf it sits in, so it is an
+                h3, not a span. Gives the page a real h1 → h2 → h3 outline for
+                screen readers and for the crawlers that read structure to
+                understand a page. Tailwind's preflight resets heading font-size,
+                weight, and margin, so the rendered result is byte-identical. */}
+            <h3
               className={`line-clamp-2 block text-balance font-semibold leading-[1.1] tracking-tight text-(--ink) ${
                 title.length > 22 ? 'text-lg' : 'text-xl'
               }`}
             >
               {title}
-            </span>
+            </h3>
           </Link>
           {description && (
             <p className="mt-1.5 line-clamp-2 text-pretty text-sm leading-[1.5] text-(--ink-2)">
@@ -236,12 +241,12 @@ export function CardMd({
                   href={href}
                   className="card-main-link block min-w-0 after:absolute after:inset-0 after:content-['']"
                 >
-                  <span
+                  <h3
                     className="block truncate text-base font-semibold leading-[1.2] tracking-tight text-(--ink)"
                     title={typeof title === 'string' ? title : undefined}
                   >
                     {title}
-                  </span>
+                  </h3>
                 </Link>
               </div>
               {action && (

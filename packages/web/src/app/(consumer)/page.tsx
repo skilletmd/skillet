@@ -10,6 +10,7 @@ import { GetAppButton } from '@/components/home/get-app-button'
 import { CatalogShelvesSkeleton } from '@/components/home/shelf-skeleton'
 import { PAGE_CONTAINER_CLASS } from '@/lib/page-layout'
 import { ogMeta, OG } from '@/lib/og'
+import { GITHUB_REPO_URL } from '@/lib/urls'
 
 const HOME_OG = ogMeta(OG.home())
 
@@ -33,6 +34,10 @@ export const metadata: Metadata = {
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://skillet.md'
 
+/** Public support address for structured data. Unset by default — see the
+ *  contactPoint note below. */
+const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL?.trim() || null
+
 // Organization + WebSite in one graph. The SearchAction is what makes Google
 // eligible to show a sitelinks search box for the brand query, and the
 // Organization node is what feeds the knowledge panel / AI-answer attribution.
@@ -47,6 +52,27 @@ const HOME_JSON_LD = {
       logo: `${SITE_URL}/brand/skillet-mascot-logo.png`,
       description:
         'A registry for agent skills: publish a skill once, run it in every agent runtime.',
+      sameAs: [GITHUB_REPO_URL],
+      // How to reach a human, in the field AI answer engines read to verify a
+      // business is real. `email` is opt-in via NEXT_PUBLIC_CONTACT_EMAIL: the
+      // rest of the site renders addresses through ObfuscatedEmail on purpose,
+      // so publishing one into structured data has to be a deliberate choice,
+      // not a side effect of adding schema.
+      contactPoint: [
+        {
+          '@type': 'ContactPoint',
+          contactType: 'customer support',
+          url: `${SITE_URL}/contact`,
+          availableLanguage: ['English'],
+          ...(CONTACT_EMAIL ? { email: CONTACT_EMAIL } : {}),
+        },
+        {
+          '@type': 'ContactPoint',
+          contactType: 'technical support',
+          url: `${GITHUB_REPO_URL}/issues`,
+          availableLanguage: ['English'],
+        },
+      ],
     },
     {
       '@type': 'WebSite',
