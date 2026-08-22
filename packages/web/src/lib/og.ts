@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { compactCount } from '@/lib/format-count'
 
 // Single source of truth for OG share cards. Pages call `ogMeta(...)` in their
-// metadata; the /og-preview gallery calls the same builders so the previews are
+// metadata; the /lab/og gallery calls the same builders so the previews are
 // exactly what ships. The image itself renders at /api/og.
 
 export interface OgArgs {

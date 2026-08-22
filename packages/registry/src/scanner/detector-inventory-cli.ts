@@ -8,7 +8,7 @@
 // the live detector sources. `--check` rebuilds in-memory and fails if the
 // committed file is out of date — the same shape as a generated-types check, so
 // a detector change that isn't regenerated breaks the build instead of silently
-// shipping stale cross-reference copy on `/labs/scanner`.
+// shipping stale cross-reference copy on `/lab/scanner`.
 
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';

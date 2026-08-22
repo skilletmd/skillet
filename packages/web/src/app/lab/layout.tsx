@@ -1,20 +1,17 @@
 import type { Metadata } from 'next'
-import { notFound } from 'next/navigation'
 
+// Internal dev tooling (design system, scanner audit, OG/avatar previews).
+// Reachable in production on purpose, but never advertised: no inbound links,
+// no sitemap entry, no llms.txt entry, a robots.txt Disallow, and the noindex
+// below. It previously tried to 404 itself in prod behind a SHOW_LAB flag —
+// that guard was inert (a layout's notFound() does not stop children rendering
+// under cacheComponents), so the flag is gone rather than left lying about what
+// it does. proxy.ts adds a matching X-Robots-Tag. No subnav — the hub is a card
+// grid.
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-/** True when the internal /lab tools should be reachable — dev by default, or a
- *  prod/staging preview that opts in with SHOW_LAB=1. */
-export function labEnabled(): boolean {
-  return process.env.NODE_ENV !== 'production' || process.env.SHOW_LAB === '1'
-}
-
-// Internal dev tooling (design system, scanner audit, OG/avatar previews). Not
-// shipped to production: this guard 404s the whole /lab tree in prod builds
-// unless SHOW_LAB=1 is set. No subnav — the hub is a card grid.
 export default function LabLayout({ children }: { children: React.ReactNode }) {
-  if (!labEnabled()) notFound()
   return <div style={{ minHeight: '100%' }}>{children}</div>
 }

@@ -1,11 +1,11 @@
-// Detector-inventory builder (U1 of the /labs scanner-vocabulary audit).
+// Detector-inventory builder (U1 of the /lab scanner-vocabulary audit).
 //
 // The scanner's user-facing COPY lives in the web package (`scan-taxonomy.ts`);
 // the DETECTORS that produce the categories + `why` tags that copy describes
 // live here in the registry. Web can't import registry internals, so this
 // builder distills the detectors' declared vocabulary into a small, committed
 // JSON manifest (`packages/web/src/lib/scan-detector-inventory.json`) that the
-// web `/labs/scanner` page imports to cross-reference copy ↔ detector.
+// web `/lab/scanner` page imports to cross-reference copy ↔ detector.
 //
 // WHY parse source instead of importing detector metadata: each threat detector
 // declares its `category` + per-pattern `detector:` ids inside a LOCAL

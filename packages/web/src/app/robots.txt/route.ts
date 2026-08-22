@@ -49,8 +49,11 @@ const CONTENT_SIGNALS_PREAMBLE = `# As a condition of accessing this website, yo
 const CONTENT_SIGNAL = 'search=yes, ai-input=yes, ai-train=no'
 
 // Authed-only and write surfaces: nothing for an index to hold, and a crawler
-// that follows them just burns budget on a login redirect.
+// that follows them just burns budget on a login redirect. Plus /lab: internal
+// tooling that is reachable but should never send anyone there (it also carries
+// a noindex meta and an X-Robots-Tag, and appears in no sitemap).
 const DISALLOWED_PATHS = [
+  '/lab',
   '/feed/',
   '/notifications',
   '/updates',
