@@ -1,4 +1,9 @@
 {
-  "_comment": "Repos discovery must never propose, keyed by normalized owner/repo (lowercase). Intentionally empty in the public tree: suppression decisions belong to per-review-queue actions, not a published list. loadDenylist() treats an empty list (or a missing file) as a no-op.",
-  "deny": []
+  "_comment": "Repos discovery must never propose, keyed by normalized owner/repo (lowercase). Authoritative across all three nightly phases. Keep this list short and reasoned: it is the kill switch, not a taste filter \u2014 routine 'not for us' calls belong in the review queue, which records who decided and when.",
+  "deny": [
+    {
+      "repo": "jiweiyeah/Skills-Manager",
+      "reason": "Competing product, not a skill library. A Tauri desktop app that syncs skills to 32 agent runtimes via symlinks \u2014 the same job as our desktop + sync. It also carries zero SKILL.md files, so there is nothing to mirror even setting the overlap aside; discovery only ever reached it because it matched a skills topic."
+    }
+  ]
 }
