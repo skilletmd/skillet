@@ -42,6 +42,13 @@ packages/registry/registry.db-shm
 # PM2 process logs (ecosystem.config.cjs)
 logs/
 
+# Maintainer-local scratch. Previously kept as a tracked private/.gitignore that
+# ignored its own contents, which is the usual trick for making a directory
+# appear on clone — but that also published an empty folder named "private" on a
+# public repo, which invites exactly the wrong kind of curiosity. Nothing in the
+# tree references the path, so it is ignored outright and created on demand.
+private/
+
 # Internal process artifacts — planning, brainstorming, generated reports, and
 # solution write-ups. These belong in the maintainers' private repo, never here.
 # The ignores stay as a guard so a workflow tool cannot drop one into the public
