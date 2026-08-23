@@ -799,6 +799,17 @@
       "sourceUrl": "https://github.com/asmartbear/asb-skills"
     },
     {
+      "handle": "every",
+      "displayName": "Every",
+      "bio": "Compound Engineering: plan, build, review and ship with the loop written down.",
+      "repo": "EveryInc/compound-engineering-plugin",
+      "license": "MIT",
+      "ownerType": "Organization",
+      "maxSkills": 48,
+      "logo": "https://github.com/EveryInc.png",
+      "sourceUrl": "https://github.com/EveryInc/compound-engineering-plugin"
+    },
+    {
       "handle": "jlevy",
       "displayName": "Joshua Levy",
       "bio": "A staged editorial pass for practical writing: de-slop, copy-edit, review, score.",
