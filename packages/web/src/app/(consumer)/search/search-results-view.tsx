@@ -31,6 +31,13 @@ export function SearchResultsView() {
 
   const [groups, setGroups] = useState<SearchGroups>({})
   const [status, setStatus] = useState<Status>('idle')
+  // Controlled so the field follows the URL: clearing navigates to /search, and
+  // an uncontrolled defaultValue would keep the old text in the DOM.
+  const [term, setTerm] = useState(query)
+
+  useEffect(() => {
+    setTerm(query)
+  }, [query])
 
   useEffect(() => {
     if (query === '') {
@@ -85,7 +92,8 @@ export function SearchResultsView() {
               name="q"
               type="search"
               size="lg"
-              defaultValue={query}
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
               placeholder="Search skills, kits, people..."
               className="pr-10 [&::-webkit-search-cancel-button]:appearance-none"
             />
