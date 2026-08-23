@@ -7,8 +7,15 @@ name: Desktop release (signed + auto-update)
 # the newest release's latest.json (so a repo/org rename never breaks installed apps).
 #
 # Cut a release: bump packages/desktop/src-tauri/tauri.conf.json `version`, then
-#   git tag vX.Y.Z && git push origin vX.Y.Z
+#   git tag desktop-vX.Y.Z && git push origin desktop-vX.Y.Z
 # The tag version MUST match the tauri.conf.json version (guarded below).
+#
+# Tags are component-prefixed because this repo publishes several artifacts from
+# one history: `desktop-v*` here, `cli-v*` in cli-publish.yml. A bare `vX.Y.Z`
+# names no particular component and, as a trigger, greedily matches any future
+# tag starting with `v`. desktop-v0.1.0 and the bare v0.1.1 predate this and are
+# left alone — a GitHub Release is bound to its tag, so renaming one would break
+# that version's download URL for nothing.
 #
 # Prerequisites — provide these as repository/organization secrets:
 #   Apple (macOS):   APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD,
@@ -26,11 +33,16 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - "v*"
+      - "desktop-v*"
 
 jobs:
   guard-version:
     runs-on: ubuntu-latest
+    outputs:
+      # The bare semver, prefix stripped. The release job uses it for the
+      # human-facing release name so the display title does not carry the
+      # component prefix the tag needs.
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Release must be triggered from a version tag
@@ -38,18 +50,24 @@ jobs:
           # workflow_dispatch from a branch would otherwise release under the
           # branch name; require a tag ref for both dispatch and push.
           if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
-            echo "::error::Run this workflow from a vX.Y.Z tag, not ${GITHUB_REF_NAME} (a ${GITHUB_REF_TYPE})."
+            echo "::error::Run this workflow from a desktop-vX.Y.Z tag, not ${GITHUB_REF_NAME} (a ${GITHUB_REF_TYPE})."
             exit 1
           fi
       - name: Tag must match tauri.conf.json version
+        id: version
         run: |
-          tag="${GITHUB_REF_NAME#v}"
+          # Strip the component prefix first, then a bare leading v, so the
+          # guard still reads a version from a legacy vX.Y.Z tag if one is ever
+          # replayed via workflow_dispatch.
+          tag="${GITHUB_REF_NAME#desktop-}"
+          tag="${tag#v}"
           conf=$(node -p "require('./packages/desktop/src-tauri/tauri.conf.json').version")
           echo "tag=$tag conf=$conf"
           if [ "$tag" != "$conf" ]; then
-            echo "::error::Tag v$tag does not match tauri.conf.json version $conf"
+            echo "::error::Tag ${GITHUB_REF_NAME} (version $tag) does not match tauri.conf.json version $conf"
             exit 1
           fi
+          echo "version=$tag" >> "$GITHUB_OUTPUT"
       - name: Signing placeholders must be replaced
         run: |
           # The dev updater pubkey and the Windows cert-profile placeholder are
@@ -161,7 +179,10 @@ jobs:
         with:
           projectPath: packages/desktop
           tagName: ${{ github.ref_name }}
-          releaseName: "Skillet ${{ github.ref_name }}"
+          # Display name drops the component prefix: the release page already
+          # sits under this repo, so "Skillet v0.1.2" reads better than
+          # "Skillet desktop-v0.1.2". The tag itself keeps the prefix.
+          releaseName: "Skillet v${{ needs.guard-version.outputs.version }}"
           # Draft, NOT published: both platform legs upload their installers +
           # merge latest.json into this draft. The separate `publish` job flips
           # it public only after EVERY leg succeeds, so the live updater endpoint
