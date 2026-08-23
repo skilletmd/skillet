@@ -49,6 +49,16 @@ export async function lastCleanHashPrisma(
     select: { hash: true },
   })
   if (versions.length === 0) return null
+  // An admin who reviewed the quarantine and judged it a false positive — the
+  // security-tooling case, where a guard and a payload contain the same strings.
+  // The findings stay on the version and stay visible; this only stops the
+  // quarantine from suppressing the servable hash. Without it a skill whose
+  // every version is flagged has no latest_hash at all and cannot be installed.
+  const skill = await prisma.skills.findUnique({
+    where: { id: skillId },
+    select: { scan_override_at: true },
+  })
+  if (skill?.scan_override_at != null) return versions[0]!.hash
   const hashes = versions.map((v) => v.hash)
   const scans = await prisma.skill_version_scans.findMany({
     where: { skill_id: skillId, skill_version_id: { in: hashes } },

@@ -806,6 +806,12 @@ model skills {
   source_repo              String? @db.VarChar(512)
   source_url               String? @db.Text
   moderation_status        String                     @default("none")
+  /// Admin decision that the scanner's quarantine is a false positive (security
+  /// tooling containing the patterns it defends against). Keeps findings visible
+  /// while letting the skill stay servable. Null = no override.
+  scan_override_at         Int?
+  scan_override_by         String?
+  scan_override_reason     String?                    @db.Text
   is_featured              Int                        @default(0)
   kit_skills               kit_skills[]
   publish_log              publish_log[]             

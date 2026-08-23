@@ -9,6 +9,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '@prisma/client';
 import type { DatabaseSync } from '../db/sqlite-handle.js';
 import { requireAdmin } from '../auth/middleware.js';
+import { lastCleanHashPrisma } from '../lib/sync-manifest.js';
 import { BrandGrantError, grantBrandOrgPrisma } from '../lib/brand-grant.js'
 import { userIdByVerifiedEmailPrisma } from '../auth/identities.js'
 import {
@@ -646,5 +647,68 @@ export function registerAdminRoutes(
                 name: k.name,
             })),
         });
+    });
+
+    /**
+     * POST /api/v1/admin/skills/:author/:slug/scan-override
+     *
+     * Record that an admin reviewed this skill's scanner quarantine and judged it
+     * a false positive, so it becomes servable again. The security-tooling case:
+     * a guard and a payload contain the same strings for opposite reasons, and no
+     * path or filename rule can separate them because an attacker controls those
+     * too. A human review is the only signal that is not spoofable.
+     *
+     * Findings are NOT cleared — they stay on the version and stay visible in the
+     * trust panel. This only stops the quarantine from suppressing `latest_hash`.
+     * Body: { reason } to set, or { clear: true } to revoke.
+     */
+    app.post<{
+        Params: { author: string; slug: string };
+        Body: { reason?: string; clear?: boolean };
+    }>('/api/v1/admin/skills/:author/:slug/scan-override', { preHandler: requireAdmin() }, async (req, reply) => {
+        const { author, slug } = req.params;
+        const skill = await prisma.skills.findFirst({
+            where: { author_id: author, slug },
+            select: { id: true, scan_override_at: true },
+        });
+        if (!skill) return reply.code(404).send({ error: 'skill_not_found' });
+
+        const principal = req.principal as { class?: string; user_id?: string } | undefined;
+        const adminId = principal?.user_id ?? null;
+
+        if (req.body?.clear) {
+            await prisma.skills.update({
+                where: { id: skill.id },
+                data: { scan_override_at: null, scan_override_by: null, scan_override_reason: null },
+            });
+            // Recompute: with the override gone the quarantine suppresses the hash again.
+            await prisma.skills.update({
+                where: { id: skill.id },
+                data: { latest_hash: await lastCleanHashPrisma(prisma, skill.id) },
+            });
+            return reply.send({ author, slug, override: null });
+        }
+
+        const reason = (req.body?.reason ?? '').trim();
+        // A reason is required: the point of the record is that someone can read
+        // back WHY a quarantine was waived, months later, without re-deriving it.
+        if (reason.length < 10) {
+            return reply.code(400).send({
+                error: 'reason_required',
+                message: 'Explain why this quarantine is a false positive (10 characters minimum).',
+            });
+        }
+        const at = Math.floor(Date.now() / 1000);
+        await prisma.skills.update({
+            where: { id: skill.id },
+            data: { scan_override_at: at, scan_override_by: adminId, scan_override_reason: reason },
+        });
+        // Resolve the hash now so the skill is installable without waiting for a sync.
+        await prisma.skills.update({
+            where: { id: skill.id },
+            data: { latest_hash: await lastCleanHashPrisma(prisma, skill.id) },
+        });
+        req.log.warn({ author, slug, adminId, reason }, 'admin scan-override set: scanner quarantine waived');
+        return reply.send({ author, slug, override: { at, by: adminId, reason } });
     });
 }
