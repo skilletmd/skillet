@@ -1,5 +1,5 @@
 {
-  "_comment": "Sources mirrored into the registry by scripts/sync-mirror-skills.ts. Only permissive-licensed public repos (SKILL.md format). Each handle is a reserved, claimable brand namespace. A handle may list multiple repos (tombstoning is scoped per source repo); list the brand's PRIMARY repo LAST so its sourceUrl wins on the author profile. Every license below was verified against the repo (API SPDX, per-skill LICENSE.txt, or README declaration) on 2026-07-07. Excluded on purpose: anthropics/skills (proprietary per-skill license), openai/skills (all skills under dot-dirs, invisible to discovery), trailofbits (CC-BY-SA), hashicorp (MPL), WordPress/figma/better-auth/remotion/angular (no license), microsoft/skills (skills under .github/, invisible to discovery), cursor/plugins + black-forest-labs + bencium/bencium-marketplace + sentimony + kotot/byted-web-search + jalaalrd/anti-ai-slop-writing + ericzakariasson/scandinavian-design (no license), skills-101/superpowers (fork of obra/superpowers, no license), elithrar/dotfiles (skills under .agents/, invisible to discovery), juliusbrussee/caveman engine dirs (BSL-1.1; skills/ is MIT and is all we mirror). Held pending a manual quality read, not a license problem: genmedia-labs/skills and flowkit-labs/skills (MIT, but both orgs are days old with ~1 star while topping the skills.sh install leaderboard). The 15 sources appended 2026-08-21 had their licenses verified the same day. Two of them read NOASSERTION from the GitHub API and are deliberate hand-verified overrides: aashaexo/soundshuman is verbatim MIT behind an upstream-attribution preamble, and juliusbrussee/caveman is MIT with a BSL-1.1 carve-out that does not cover skills/. Neither is a mistake to correct back to no-license.",
+  "_comment": "Sources mirrored into the registry by scripts/sync-mirror-skills.ts. Only permissive-licensed public repos (SKILL.md format). Each handle is a reserved, claimable brand namespace. A handle may list multiple repos (tombstoning is scoped per source repo); list the brand's PRIMARY repo LAST so its sourceUrl wins on the author profile. Every license below was verified against the repo (API SPDX, per-skill LICENSE.txt, or README declaration) on 2026-07-07. Excluded on purpose: anthropics/skills (proprietary per-skill license), openai/skills (all skills under dot-dirs, invisible to discovery), trailofbits (CC-BY-SA), hashicorp (MPL), WordPress/figma/better-auth/remotion/angular (no license), microsoft/skills (skills under .github/, invisible to discovery), cursor/plugins + black-forest-labs + bencium/bencium-marketplace + sentimony + kotot/byted-web-search + jalaalrd/anti-ai-slop-writing + ericzakariasson/scandinavian-design (no license), skills-101/superpowers (fork of obra/superpowers, no license), elithrar/dotfiles (skills under .agents/, invisible to discovery), juliusbrussee/caveman engine dirs (BSL-1.1; skills/ is MIT and is all we mirror). Held pending a manual quality read, not a license problem: genmedia-labs/skills and flowkit-labs/skills (MIT, but both orgs are days old with ~1 star while topping the skills.sh install leaderboard). The 15 sources appended 2026-08-21 had their licenses verified the same day. Two of them read NOASSERTION from the GitHub API and are deliberate hand-verified overrides: aashaexo/soundshuman is verbatim MIT behind an upstream-attribution preamble, and juliusbrussee/caveman is MIT with a BSL-1.1 carve-out that does not cover skills/. Neither is a mistake to correct back to no-license. jlevy/practical-prose is a third: its LICENSE dual-licenses code as MIT and prose as CC BY 4.0, which GitHub cannot parse into a single SPDX id, so the API reports NOASSERTION. Both halves are in PERMISSIVE_SPDX; the skills are prose, so CC BY 4.0 is the operative one and MIT is recorded as the repo-level id.",
   "sources": [
     {
       "handle": "cloudflare",
@@ -797,6 +797,17 @@
       "maxSkills": 8,
       "logo": "https://github.com/asmartbear.png",
       "sourceUrl": "https://github.com/asmartbear/asb-skills"
+    },
+    {
+      "handle": "jlevy",
+      "displayName": "Joshua Levy",
+      "bio": "A staged editorial pass for practical writing: de-slop, copy-edit, review, score.",
+      "repo": "jlevy/practical-prose",
+      "license": "MIT",
+      "ownerType": "User",
+      "maxSkills": 10,
+      "logo": "https://github.com/jlevy.png",
+      "sourceUrl": "https://github.com/jlevy/practical-prose"
     },
     {
       "handle": "loops",
