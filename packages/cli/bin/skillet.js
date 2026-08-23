@@ -48,6 +48,18 @@ if (native) {
   execAndExit(native, process.argv.slice(2));
 }
 
+// Say so. A silent fallback is how the Windows packaging bug survived three
+// releases: cli-win32-x64 shipped without its binary, every Windows user ran
+// this JS path instead, and nothing anywhere said a word. stderr so pipes and
+// `--json` consumers are unaffected. Skipped in the monorepo, where src/ is
+// present and falling back to the bundle is the normal way to run from source.
+const isPublishedInstall = !existsSync(join(pkgRoot, 'src'));
+if (isPublishedInstall && PLATFORM_PACKAGES[`${process.platform}-${process.arch}`]) {
+  process.stderr.write(
+    'skillet: no native binary for this platform, running the slower bundled JS.\n',
+  );
+}
+
 const cjs = join(pkgRoot, 'dist', 'cli.cjs');
 if (!existsSync(cjs)) {
   console.error(

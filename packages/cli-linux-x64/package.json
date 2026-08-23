@@ -4,7 +4,7 @@
   "description": "Skillet CLI native binary for linux x64",
   "type": "module",
   "files": [
-    "bin/skillet"
+    "bin"
   ],
   "publishConfig": {
     "access": "public"
@@ -19,6 +19,9 @@
   ],
   "cpu": [
     "x64"
+  ],
+  "libc": [
+    "glibc"
   ],
   "license": "Apache-2.0"
 }

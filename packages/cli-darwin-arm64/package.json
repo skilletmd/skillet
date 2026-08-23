@@ -4,7 +4,7 @@
   "description": "Skillet CLI native binary for macOS arm64",
   "type": "module",
   "files": [
-    "bin/skillet"
+    "bin"
   ],
   "publishConfig": {
     "access": "public"
