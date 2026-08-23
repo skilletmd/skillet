@@ -1,0 +1,11 @@
+-- Drop the unmet-demand keyword log entirely.
+--
+-- The table stored (day, token, count) with no identity attached, and the
+-- router was instructed to send capability keywords rather than the raw task.
+-- But the keywords were still derived from what a person asked their own
+-- agent in private, and any keyword that slipped through was kept forever.
+-- A signal that useful is not worth deriving from someone's task text, so we
+-- stop collecting it rather than trying to sanitize it well enough.
+--
+-- DROP removes the rows with the table; nothing here is retained elsewhere.
+DROP TABLE IF EXISTS `summon_demand_tokens`;

@@ -58,55 +58,6 @@ export async function recordSearchSourcePrisma(
   }
 }
 
-// Unmet-demand log: which capabilities people summon for. Keywords only — no
-// task text, no user/device/IP, ever. Only the router's cross-author fallback
-// feeds it, so the tokens reflect a real "who can do X" ask.
-const DEMAND_SOURCE = 'summon-fallback'
-const MAX_DEMAND_TOKENS = 5
-const MAX_DEMAND_TOKEN_LEN = 32
-
-/** Sanitize a raw query into short, safe demand keyword slugs (deduped, capped). */
-export function demandTokens(rawQuery: unknown): string[] {
-  if (typeof rawQuery !== 'string') return []
-  const seen = new Set<string>()
-  const out: string[] = []
-  for (const raw of rawQuery.toLowerCase().split(/[^a-z0-9-]+/)) {
-    const t = raw.replace(/^-+|-+$/g, '')
-    if (t.length === 0 || t.length > MAX_DEMAND_TOKEN_LEN || seen.has(t)) continue
-    seen.add(t)
-    out.push(t)
-    if (out.length >= MAX_DEMAND_TOKENS) break
-  }
-  return out
-}
-
-/**
- * Record keywords-only unmet-demand tokens for the summon-fallback source.
- * Aggregate (day, token) counts only; drops every other source and never stores
- * the raw query, a user, a device, or an IP.
- */
-export async function recordDemandTokensPrisma(
-  prisma: PrismaDb,
-  rawMarker: unknown,
-  rawQuery: unknown,
-): Promise<void> {
-  if (rawMarker !== DEMAND_SOURCE) return
-  const tokens = demandTokens(rawQuery)
-  if (tokens.length === 0) return
-  const day = new Date().toISOString().slice(0, 10)
-  for (const token of tokens) {
-    try {
-      await prisma.summon_demand_tokens.upsert({
-        where: { day_token: { day, token } },
-        create: { day, token, count: 1 },
-        update: { count: { increment: 1 } },
-      })
-    } catch {
-      // Best-effort demand signal.
-    }
-  }
-}
-
 async function canReadKitPrisma(
   prisma: PrismaDb,
   kitRow: { id: string; owner_id: string; visibility: string },

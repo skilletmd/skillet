@@ -49,6 +49,7 @@ const EMPTY_STATS: RegistryStats = {
   routes: {
     invocations: 0,
     picks: 0,
+    summons: 0,
     topPickedSkills: [],
     invocationsByRuntime: [],
   },
@@ -140,6 +141,14 @@ function routeCards(stats: RegistryStats): Stat[] {
       label: 'Skills picked',
       value: stats.routes.picks,
       hint: 'successful route selections',
+    },
+    {
+      // Summons are the no-install path, so they are counted server-side
+      // rather than from CLI events like the two cards above.
+      id: 'route-summons',
+      label: 'Summons',
+      value: stats.routes.summons,
+      hint: "someone's kit run without installing it",
     },
   ]
 }

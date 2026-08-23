@@ -32,6 +32,12 @@ export interface RegistryStatsPayload {
   routes: {
     invocations: number
     picks: number
+    /**
+     * `/skillet @handle` summons. Counted server-side on the version fetch,
+     * NOT from `events` like invocations and picks: summon deliberately works
+     * with nothing installed, so there is no CLI to emit an event.
+     */
+    summons: number
     topPickedSkills: Array<{ skillRef: string; picks: number }>
     invocationsByRuntime: Array<{ runtime: string; count: number }>
   }
@@ -227,9 +233,10 @@ export async function buildRegistryStatsPrisma(prisma: PrismaDb): Promise<Regist
     }))
     .sort((a, b) => b.skills - a.skills || b.installs - a.installs)
 
-  const [routeInvocations, routePicks, topPicked, byRuntime] = await Promise.all([
+  const [routeInvocations, routePicks, summonAgg, topPicked, byRuntime] = await Promise.all([
     prisma.events.count({ where: { name: 'skill.route.invoke' } }),
     prisma.events.count({ where: { name: 'skill.route' } }),
+    prisma.skill_summon_counts.aggregate({ _sum: { count: true } }),
     prisma.$queryRawUnsafe<Array<{ skill_ref: string; picks: number | bigint }>>(
       `SELECT skill_ref, COUNT(*) AS picks
          FROM (
@@ -271,6 +278,7 @@ export async function buildRegistryStatsPrisma(prisma: PrismaDb): Promise<Regist
     routes: {
       invocations: routeInvocations,
       picks: routePicks,
+      summons: summonAgg._sum.count ?? 0,
       topPickedSkills: topPicked.map((row) => ({
         skillRef: row.skill_ref,
         picks: Number(row.picks),

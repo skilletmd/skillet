@@ -604,13 +604,6 @@ model search_source_counts {
   @@id([day, source])
 }
 
-model summon_demand_tokens {
-  day   String
-  token String
-  count Int    @default(0)
-
-  @@id([day, token])
-}
 
 model sessions {
   id         String @id

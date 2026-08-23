@@ -22,6 +22,11 @@ import {
   hideKitPrisma,
   unhideKitPrisma,
 } from '../lib/enforcement.js'
+import {
+  summonLeaderboardPrisma,
+  topSummonedSkillsPrisma,
+  searchSourceTotalsPrisma,
+} from '../lib/summon-events.js'
 
 const MAX_PUBLIC_REASON_LEN = 500
 
@@ -338,6 +343,38 @@ export function registerAdminRoutes(
     // Private skills are attributed to their author (name + avatar) for abuse
     // monitoring, but the skill's own identity (slug) is stripped here on the
     // server so a non-public skill's contents never leak.
+    // Launch-week read surface over the summon metrics. `?days=N` windows every
+    // section (omit for all-time). The three tables underneath were write-only;
+    // this is the only place they can be read together.
+    app.get<{ Querystring: { days?: string; limit?: string } }>(
+      '/api/v1/admin/summons',
+      { preHandler: requireAdmin() },
+      async (req, reply) => {
+        const parse = (raw: string | undefined, max: number): number | undefined => {
+          if (raw == null) return undefined
+          const n = Number.parseInt(raw, 10)
+          return Number.isFinite(n) && n > 0 ? Math.min(n, max) : undefined
+        }
+        const days = parse(req.query.days, 365)
+        const limit = parse(req.query.limit, 500) ?? 50
+        const [handles, skills, sources] = await Promise.all([
+          summonLeaderboardPrisma(prisma, { days, limit }),
+          topSummonedSkillsPrisma(prisma, { days, limit }),
+          searchSourceTotalsPrisma(prisma, { days }),
+        ])
+        return reply.send({
+          window_days: days ?? null,
+          total_summons: handles.reduce((n, h) => n + h.summons, 0),
+          // Ranked reach per handle: the claim-campaign outreach order.
+          handles,
+          // Which individual skills are actually being run.
+          skills,
+          // How many fallback searches ran, never what they searched for.
+          search_sources: sources,
+        })
+      },
+    );
+
     app.get('/api/v1/admin/activity', { preHandler: requireAdmin() }, async (_req, reply) => {
         // authors.id = users.handle, so a manual join on handle resolves name + avatar.
         const userRows = await prisma.users.findMany({

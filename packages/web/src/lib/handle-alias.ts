@@ -1,6 +1,6 @@
 // `/@handle` and `/@handle/skill` are aliases for the canonical `/handle` and
 // `/handle/skill` pages. Every handle-based product has taught people that an
-// @-prefixed URL is a person, and the summon flow (`/skillet @karpathy`) teaches
+// @-prefixed URL is a person, and the summon flow (`/skillet @mattpocock`) teaches
 // it again, so the @ form is what people type and what agent output can link to.
 //
 // It redirects rather than rewrites: one canonical URL per page, so the alias

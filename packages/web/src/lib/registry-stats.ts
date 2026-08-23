@@ -41,6 +41,7 @@ export interface CategoryStat {
 
 export interface RouteStats {
   invocations: number
+  summons: number
   picks: number
   topPickedSkills: Array<{
     skillRef: string
@@ -94,6 +95,7 @@ const EMPTY: RegistryStats = {
   categories: [],
   routes: {
     invocations: 0,
+    summons: 0,
     picks: 0,
     topPickedSkills: [],
     invocationsByRuntime: [],

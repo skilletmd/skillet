@@ -7,7 +7,6 @@ import type { PrismaClient } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 import {
   recordSearchSourcePrisma,
-  recordDemandTokensPrisma,
   searchAuthorsPrisma,
   searchKitsPrisma,
   searchSkillsPrisma,
@@ -18,6 +17,28 @@ import {
   setPrivateCatalogListCacheHeaders,
   setPublicCatalogListCacheHeaders,
 } from '../lib/catalog-list-cache-headers.js';
+
+/**
+ * Route-level log redaction. The search query is the user's own words: on the
+ * router's cross-author fallback it is derived straight from their task. The
+ * default `req` serializer writes `req.url` on every "incoming request" line,
+ * which would put those words in the log stream even though the database only
+ * ever stores capped, content-free keyword tallies. Swap the `q` value for its
+ * length before anything is logged. Mirrors the capability-token redaction in
+ * routes/mcp.ts.
+ */
+export function redactSearchUrl(url: string): string {
+  return url.replace(/([?&]q=)([^&#]*)/g, (_m, prefix: string, value: string) =>
+    value === '' ? `${prefix}` : `${prefix}[redacted:${value.length}]`,
+  );
+}
+
+function redactedSearchReqSerializer(req: { method?: string; url?: string }): {
+  method: string | undefined;
+  url: string;
+} {
+  return { method: req?.method, url: redactSearchUrl(req?.url ?? '') };
+}
 
 const ALL_TYPES = ['skills', 'kits', 'authors', 'teams'] as const;
 type SearchType = (typeof ALL_TYPES)[number];
@@ -49,6 +70,19 @@ export function registerSearchRoutes(
   // GET /v1/search?q=&types=skills,kits,authors,teams&limit=<perType>
   app.get<{ Querystring: { q?: string; types?: string; limit?: string } }>(
     '/search',
+    {
+      // The query never reaches the log stream (see redactSearchUrl): this
+      // route's child logger swaps in a redacting `req` serializer, so the auto
+      // "incoming request" line and anything else that serializes the request
+      // carries a masked URL. Same mechanism as the token redaction in
+      // routes/mcp.ts.
+      childLoggerFactory(logger, bindings, opts) {
+        return logger.child(bindings, {
+          ...opts,
+          serializers: { ...opts?.serializers, req: redactedSearchReqSerializer },
+        });
+      },
+    },
     async (req, reply) => {
       const db = requirePrisma(prisma);
       const q = (typeof req.query.q === 'string' ? req.query.q : '').trim();
@@ -59,10 +93,10 @@ export function registerSearchRoutes(
       // only for a real (non-empty) query, so a no-op typeahead ping can't
       // inflate the signal. Never stored alongside the query text.
       if (q !== '') {
-        const searchSource = req.headers['x-skillet-search-source'];
-        await recordSearchSourcePrisma(db, searchSource);
-        // Keywords-only demand log: only the summon-fallback source feeds it.
-        await recordDemandTokensPrisma(db, searchSource, q);
+        // Content-free: which known client drove the search, never what was
+        // searched for. The query itself is not recorded anywhere, including
+        // the logs (see redactSearchUrl).
+        await recordSearchSourcePrisma(db, req.headers['x-skillet-search-source']);
       }
 
       // `types` CSV — default all four, unknown tokens ignored. Dedup but
