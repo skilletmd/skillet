@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "import:blog": "node scripts/import-blog-md.mjs",
-    "lint": "next lint",
+    "lint": "eslint src",
     "lint:css": "stylelint \"src/**/*.css\"",
     "test": "pnpm --filter \"@skillet/web^...\" build && vitest run",
     "test:watch": "vitest",
