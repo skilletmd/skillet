@@ -40,12 +40,34 @@ jobs:
       - name: No internal tracker IDs
         run: node scripts/check-no-tracker-ids.mjs
 
+      # The registry HTTP API doc is generated from source — fail if it drifted.
+      - name: Registry API doc is current
+        run: node scripts/gen-registry-api.mjs --check
+
+  # Split out because it is the one guard that needs node_modules, and putting
+  # it in secret-scan broke that whole job the day it landed: ecosystem.config
+  # resolves tsx's real path via require.resolve, which throws MODULE_NOT_FOUND
+  # without an install, so the step exited 1 on every push and took gitleaks'
+  # green with it. The guard meant to catch a silently dead cron job was itself
+  # silently dead for its entire life. Everything in secret-scan above uses
+  # node: builtins only and stays install-free.
+  pm2-entrypoints:
+    name: PM2 entrypoints match their interpreter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4 # version comes from package.json "packageManager"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
       # A PM2 app whose `script` its declared interpreter cannot parse dies in
       # milliseconds and still reports `online`. mirror-nightly did exactly that
       # at 06:00 every day for over a month before anyone noticed.
       - name: PM2 entrypoints match their interpreter
         run: node scripts/check-pm2-entrypoints.mjs
-
-      # The registry HTTP API doc is generated from source — fail if it drifted.
-      - name: Registry API doc is current
-        run: node scripts/gen-registry-api.mjs --check

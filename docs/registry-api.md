@@ -28,7 +28,7 @@ main [README](../README.md) and [packages/registry/README.md](../packages/regist
 - **Rate limits.** Per-client-IP classes (ambient / write / heavy); see
   `packages/registry/README.md`.
 
-_177 routes across 35 areas._
+_178 routes across 35 areas._
 
 ## Account
 
@@ -63,6 +63,7 @@ _177 routes across 35 areas._
 | POST | `/api/v1/admin/skills/:id/feature` |
 | POST | `/api/v1/admin/skills/:id/moderate` |
 | POST | `/api/v1/admin/skills/:id/reverse` |
+| GET | `/api/v1/admin/summons` |
 | POST | `/api/v1/admin/users/:handle/suspend` |
 
 ## Approvals
