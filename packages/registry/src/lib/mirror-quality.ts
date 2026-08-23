@@ -128,12 +128,43 @@ export function looksLikeRouterSkill(body: string): boolean {
   return linkLines / lines.length > 0.6
 }
 
+/**
+ * Scripts that are never English. Detecting the SCRIPT is reliable in a way that
+ * detecting the language is not, and it catches almost everything that matters:
+ * of the 112 non-English skills that reached production, 106 were CJK.
+ */
+const NON_LATIN_SCRIPT =
+  /[\u4e00-\u9fff\u3400-\u4dbf\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af\u1100-\u11ff\u0400-\u04ff\u0600-\u06ff\u0590-\u05ff\u0e00-\u0e7f\u0900-\u097f]/
+
+/**
+ * Latin-script languages that are not English. Deliberately weak: it needs BOTH
+ * an accented character and a function word before it fires, because a false
+ * positive here silently drops a legitimate English skill, and "naïve" or
+ * "café" in an English sentence must not be enough.
+ */
+const NON_ENGLISH_MARKS = /[àâäçéèêëîïôöùûüÿœæáíóúñãõğışİåøßčšž]/i
+const NON_ENGLISH_WORDS =
+  /\b(le|la|les|des|une|pour|avec|dans|votre|qui|sur|est|sont|und|der|die|das|nicht|mit|für|von|ein|eine|el|los|las|para|con|una|que|del|por|como|bir|için|olarak|não|você|um|uma|com|della|per|che)\b/i
+
+/**
+ * True when a skill's own words are not English. Read from the frontmatter
+ * `name` + `description`, which is what a reader and a search see first.
+ */
+export function looksNonEnglish(md: string): boolean {
+  const fm = parseFrontmatter(md)
+  const text = `${fm.name ?? ''} ${fm.description ?? ''}`.trim()
+  if (!text) return false
+  if (NON_LATIN_SCRIPT.test(text)) return true
+  return NON_ENGLISH_MARKS.test(text) && NON_ENGLISH_WORDS.test(text)
+}
+
 /** Score a single SKILL.md against the mechanical rubric (0-1 per component). */
 export function lintSkillMarkdown(md: string): {
   validFrontmatter: boolean
   descriptionOk: boolean
   structured: boolean
   notRouter: boolean
+  english: boolean
 } {
   const fm = parseFrontmatter(md)
   const validFrontmatter = Boolean(fm.name && fm.description)
@@ -144,7 +175,7 @@ export function lintSkillMarkdown(md: string): {
   const bodyLines = body.split(/\r?\n/).filter((l) => l.trim().length > 0)
   const structured = /^##\s+/m.test(body) && bodyLines.length >= 10
   const notRouter = !looksLikeRouterSkill(body)
-  return { validFrontmatter, descriptionOk, structured, notRouter }
+  return { validFrontmatter, descriptionOk, structured, notRouter, english: !looksNonEnglish(md) }
 }
 
 /**
@@ -195,6 +226,20 @@ export async function assessCandidateQuality(input: QualityInput): Promise<Quali
     return {
       score: 0,
       hardFail: 'no sampled SKILL.md has valid frontmatter (name + description)',
+      notes,
+      skillCount: dirs.length,
+    }
+  }
+
+  // English-only catalog. A hard fail, not a scored component: a Chinese or
+  // Japanese skill can be excellent and still be wrong for this catalog, so
+  // points would only let a good one buy its way past the policy. Majority rules
+  // on the sample so one translated example does not sink an English library.
+  const englishRatio = frac((l) => l.english)
+  if (englishRatio < 0.5) {
+    return {
+      score: 0,
+      hardFail: `skills are not in English (${Math.round((1 - englishRatio) * 100)}% of sampled SKILL.md)`,
       notes,
       skillCount: dirs.length,
     }

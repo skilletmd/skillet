@@ -1,9 +1,53 @@
 {
-  "_comment": "Repos discovery must never propose, keyed by normalized owner/repo (lowercase). Authoritative across all three nightly phases. Keep this list short and reasoned: it is the kill switch, not a taste filter \u2014 routine 'not for us' calls belong in the review queue, which records who decided and when.",
+  "_comment": "Repos discovery must never propose, keyed by normalized owner/repo (lowercase). Authoritative across all three nightly phases. Keep this list short and reasoned: it is the kill switch, not a taste filter \u2014 routine 'not for us' calls belong in the review queue, which records who decided and when. The language entries below are belt-and-braces: the quality gate now hard-fails a repo whose sampled SKILL.md files are not in English, so discovery should never re-propose these on its own.",
   "deny": [
     {
       "repo": "jiweiyeah/Skills-Manager",
       "reason": "Competing product, not a skill library. A Tauri desktop app that syncs skills to 32 agent runtimes via symlinks \u2014 the same job as our desktop + sync. It also carries zero SKILL.md files, so there is nothing to mirror even setting the overlap aside; discovery only ever reached it because it matched a skills topic."
+    },
+    {
+      "repo": "nexu-io/html-anything",
+      "reason": "Non-English catalog policy: repo description is English but all 81 skills are Chinese."
+    },
+    {
+      "repo": "nexu-io/open-design",
+      "reason": "Same author, same shape: Chinese skills behind an English description."
+    },
+    {
+      "repo": "KKKKhazix/khazix-skills",
+      "reason": "Non-English catalog policy: Chinese."
+    },
+    {
+      "repo": "KKKKhazix/human-writing",
+      "reason": "Non-English catalog policy: Chinese."
+    },
+    {
+      "repo": "worldwonderer/novel-to-game",
+      "reason": "Non-English catalog policy: Chinese."
+    },
+    {
+      "repo": "worldwonderer/oh-story-claudecode",
+      "reason": "Non-English catalog policy: Chinese."
+    },
+    {
+      "repo": "LB623/no-negative-echo",
+      "reason": "Non-English catalog policy: Chinese."
+    },
+    {
+      "repo": "Songzhi-lab/chinese-font-selector",
+      "reason": "Non-English catalog policy: Chinese."
+    },
+    {
+      "repo": "titanwings/colleague-skill",
+      "reason": "Non-English catalog policy: Chinese."
+    },
+    {
+      "repo": "WenyuChiou/awesome-agentic-ai-zh",
+      "reason": "Non-English catalog policy: Chinese."
+    },
+    {
+      "repo": "romainsimon/paperasse",
+      "reason": "Non-English catalog policy: French."
     }
   ]
 }
