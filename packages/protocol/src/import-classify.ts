@@ -23,6 +23,21 @@ const EXCLUDED_DISCOVERY_SEGMENTS = new Set([
   'vendor',
   'in-progress',
   'deprecated',
+  // A repo's own test fixtures are not skills. EveryInc/compound-engineering-plugin
+  // ships five under tests/fixtures/ ("skill-one", "default-skill", …) to exercise
+  // its loader, and they were published under @every as if real; garrytan/gstack
+  // has the same shape under test/fixtures/. Matching whole SEGMENTS is what keeps
+  // this safe: flutter/agent-plugins' genuine `dart-add-unit-test` lives at
+  // skills/dart-add-unit-test, whose segments are `skills` and the skill name, so
+  // a skill ABOUT testing is untouched. `spec` is deliberately absent — a skill
+  // legitimately named `spec` is plausible in a way `__tests__` is not.
+  'test',
+  'tests',
+  '__tests__',
+  'fixture',
+  'fixtures',
+  '__fixtures__',
+  'e2e',
 ]);
 
 /**

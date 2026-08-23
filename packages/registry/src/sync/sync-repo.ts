@@ -248,6 +248,13 @@ export async function discover(owner: string, repo: string, ctx: SyncContext): P
         const text = skillMd ? Buffer.from(skillMd).toString('utf8') : '';
         const fm = text ? parseFrontmatter(text) : {};
         const base = dir ? dir.split('/').pop()! : repo;
+        // No description, no skill. The description IS the trigger an agent
+        // matches on, so a skill without one can never be selected — it is dead
+        // weight in the catalog and in every installer's context. In practice it
+        // means a scaffold or fixture: EveryInc's `custom-skill` and
+        // `default-skill` carry an empty description and nothing else.
+        if (!fm.description || !fm.description.trim())
+            continue;
         raw.push({
             skill: {
                 dir,
