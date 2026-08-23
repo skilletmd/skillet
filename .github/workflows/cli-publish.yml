@@ -4,7 +4,14 @@ name: CLI publish (npm provenance)
 # Cut a release: bump packages/cli/package.json version (and platform packages), then:
 #   git tag cli-vX.Y.Z && git push origin cli-vX.Y.Z
 #
-# Prerequisites: npm trusted publisher OIDC for this repo (npmjs.com package settings).
+# Publishing is OIDC-only. Every one of the six packages needs its own trusted
+# publisher entry on npmjs.com (Settings > Trusted Publisher) pointing at
+# skilletmd/skillet + this workflow filename, Environment blank. Trusted
+# publishing is configured per package, not per org, so a package missing its
+# entry fails with a misleading ENEEDAUTH: npm requests the ID token, the
+# exchange is rejected, and it falls back to token auth that is not there.
+# There is deliberately no NPM_TOKEN fallback — npm is retiring 2FA-bypass
+# tokens for account changes (Aug 2026) and for publishing entirely (Jan 2027).
 
 permissions:
   contents: read
@@ -81,8 +88,6 @@ jobs:
 
       - name: Publish platform package with provenance
         shell: bash
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           VERSION="${GITHUB_REF_NAME#cli-v}"
           PKG="packages/cli-${{ matrix.target }}"
@@ -95,13 +100,8 @@ jobs:
             echo "$NAME@$VERSION already published — skipping"
             exit 0
           fi
-          if [ -n "${NPM_TOKEN:-}" ]; then
-            echo "Publishing with NPM_TOKEN"
-            export NODE_AUTH_TOKEN="$NPM_TOKEN"
-          else
-            unset NODE_AUTH_TOKEN
-            node packages/cli/scripts/prepare-npm-oidc-publish.mjs
-          fi
+          unset NODE_AUTH_TOKEN
+          node packages/cli/scripts/prepare-npm-oidc-publish.mjs
           cd "$PKG" && npm publish --provenance --access public
 
   publish-main:
@@ -154,17 +154,9 @@ jobs:
 
       - name: Publish skilletmd with provenance
         shell: bash
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          VERSION="${GITHUB_REF_NAME#cli-v}"
-          if [ -n "${NPM_TOKEN:-}" ]; then
-            echo "Publishing with NPM_TOKEN"
-            export NODE_AUTH_TOKEN="$NPM_TOKEN"
-          else
-            unset NODE_AUTH_TOKEN
-            node packages/cli/scripts/prepare-npm-oidc-publish.mjs
-          fi
+          unset NODE_AUTH_TOKEN
+          node packages/cli/scripts/prepare-npm-oidc-publish.mjs
           # --ignore-scripts: this job already ran build-cli-deps, bundle, verify
           # and publish-prep as explicit steps above. prepublishOnly would run
           # them a second time, and by then publish-prep has emptied
