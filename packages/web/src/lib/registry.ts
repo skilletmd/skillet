@@ -400,6 +400,9 @@ function mapDetail(d: SkillDetailResponse): Skill {
     skill.mirrorSourceUrl = d.mirror_source_url ?? null
     skill.mirrorLicense = d.mirror_license ?? null
     if (d.mirror_upstream_blocked) skill.mirrorUpstreamBlocked = true
+    // No latest_hash means every version was held by the scanner: there is
+    // nothing to serve, so the page must not render an install path.
+    skill.hasInstallableVersion = Boolean(d.latest_hash)
   }
   if (d.deprecated) {
     skill.deprecated = true

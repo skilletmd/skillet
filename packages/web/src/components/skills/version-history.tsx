@@ -39,6 +39,7 @@ export function VersionHistory({
   slug,
   upstreamHeld = false,
   sourceUrl,
+  noneServable = false,
 }: {
   versions: SkillVersion[]
   author: string
@@ -48,6 +49,10 @@ export function VersionHistory({
   upstreamHeld?: boolean
   /** The mirror's source repo, linked from the held-version note. */
   sourceUrl?: string | null
+  /** True when NO version passed the scanner. The held-version note otherwise
+   *  claims "you're on the last one that passed", which is false here — there
+   *  is no passing version and nothing is installable. */
+  noneServable?: boolean
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null)
   const [states, setStates] = useState<Record<number, LoadState>>({})
@@ -132,8 +137,17 @@ export function VersionHistory({
             <path d="M8 11.5h.01" />
           </svg>
           <span>
-            A newer version in the {repoLink}{' '}
-            was held back by our scanner. You&rsquo;re on the last one that passed.
+            {noneServable ? (
+              <>
+                Every version in the {repoLink} was held back by our scanner, so there is
+                nothing to install here yet.
+              </>
+            ) : (
+              <>
+                A newer version in the {repoLink} was held back by our scanner.
+                You&rsquo;re on the last one that passed.
+              </>
+            )}
           </span>
         </p>
       )}

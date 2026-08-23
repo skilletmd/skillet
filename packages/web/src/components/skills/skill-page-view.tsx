@@ -173,6 +173,14 @@ export async function SkillPageView({
   // A moderator-quarantined skill has its downloads blocked at the registry, so
   // the page must surface the block instead of an install path that 403s.
   const quarantined = skill.moderationStatus === 'quarantined'
+  // The scanner blocks downloads the same way a moderator does, but leaves
+  // moderationStatus untouched — so a skill whose every version was held reads
+  // as unmoderated while serving nothing. `latest_hash` is null in that case;
+  // it is the only signal that survives, because scanStatus is itself derived
+  // from the version that does not exist. Treat it as blocked for every
+  // install affordance, or the page offers a command that 403s.
+  const noServableVersion = skill.hasInstallableVersion === false
+  const blocked = quarantined || noServableVersion
   const sec = skill.security
   const usedBy = skill.usedByPeople ?? []
   const hasUsedBy = (skill.usedByCount ?? 0) > 0 || usedBy.length > 0
@@ -295,16 +303,19 @@ export async function SkillPageView({
               follow={<HeaderFollowButton owner={author} appearance="secondary" showHandle />}
               isPrivate={skill.visibility === 'private'}
               badges={
-                skill.deprecated || quarantined ? (
+                skill.deprecated || blocked ? (
                   <>
                     {quarantined && <Badge variant="danger">quarantined</Badge>}
+                    {noServableVersion && !quarantined && (
+                      <Badge variant="danger">unavailable</Badge>
+                    )}
                     {skill.deprecated && <DeprecatedBadge />}
                   </>
                 ) : undefined
               }
               action={
                 <div className="flex flex-wrap items-center gap-2">
-                  {!(skill.deprecated || quarantined) && (
+                  {!(skill.deprecated || blocked) && (
                     <Suspense fallback={<SkillInstallSkeleton />}>
                       <AddToKitButton refName={ref} />
                     </Suspense>
@@ -332,6 +343,18 @@ export async function SkillPageView({
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {noServableVersion && !quarantined && (
+              <div className="mt-6 rounded-xl border border-(--danger-line) bg-(--danger-bg) px-4 py-3">
+                <p className="text-sm font-medium leading-[1.5] text-(--danger)">
+                  Not available to install.
+                </p>
+                <p className="mt-1 text-sm leading-[1.5] text-(--ink-2)">
+                  Every published version was held by our security scanner, so there is no
+                  version to serve. Nothing here was reviewed by a moderator.
+                </p>
               </div>
             )}
 
@@ -425,9 +448,10 @@ export async function SkillPageView({
 
             {/* Install — a secondary path below the content; the header Add is the
                 primary action, so this stays quiet and out of the decision flow.
-                Hidden for a deprecated skill (sunset) or a quarantined one, where
-                the registry blocks the download and the command would 403. */}
-            {!skill.deprecated && !quarantined && (
+                Hidden for a deprecated skill (sunset) or a blocked one — moderator
+                quarantine or every version held by the scanner — where the registry
+                blocks the download and the command would 403. */}
+            {!skill.deprecated && !blocked && (
               <div className="mt-8">
                 <SingleInstallPanel
                   command={skillInstallCommand(ref)}
@@ -444,6 +468,7 @@ export async function SkillPageView({
                   author={author}
                   slug={slug}
                   upstreamHeld={skill.mirrorUpstreamBlocked}
+                  noneServable={noServableVersion}
                   sourceUrl={skill.mirrorSourceUrl}
                 />
               )}

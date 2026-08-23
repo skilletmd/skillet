@@ -277,9 +277,18 @@ export interface Skill {
   mirrorSourceUrl?: string | null
   /** Mirror: source license. */
   mirrorLicense?: string | null
-  /** A newer upstream version was scanned as a secret/quarantine and held back;
-   *  the mirror stays installable on its last clean version. */
+  /** A newer upstream version was scanned as a secret/quarantine and held back.
+   *  Does NOT imply an older clean version exists — when every version was held,
+   *  `hasInstallableVersion` is false and the skill cannot be installed at all. */
   mirrorUpstreamBlocked?: boolean
+  /**
+   * False when the registry has no servable version: `latest_hash` is null
+   * because every published version was quarantined by the scanner. The skill is
+   * still listed, but downloads 403, so the page must not offer an install path.
+   * Distinct from `moderationStatus === 'quarantined'`, which is an admin action;
+   * this is the scanner's verdict and no moderator ever touched it.
+   */
+  hasInstallableVersion?: boolean
   /**
    * Approx token weight of the latest version (registry `token_count`) — the
    * full SKILL.md plus bundled scripts, a cross-vendor estimate, never an exact
