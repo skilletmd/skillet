@@ -27,6 +27,13 @@ const PATTERNS = [
       // Reject all-letter or all-digit forms used in docs.
       if (/^[0-9]+$/.test(tail)) return false;
       if (/^[A-Z]+$/.test(tail)) return false;
+      // AWS's own documentation placeholders end in EXAMPLE — AKIAIOSFODNN7EXAMPLE
+      // and AKIAI44QH8DHBEXAMPLE appear in AWS docs, SDK READMEs, and half the
+      // tutorials on the internet. They were quarantining skills that merely
+      // showed how to configure credentials. A real 16-char tail ending in
+      // exactly "EXAMPLE" is a 1-in-78-billion coincidence, and a key deliberately
+      // minted to look like a placeholder is not a leak we can reason about.
+      if (/EXAMPLE$/.test(tail)) return false;
       return true;
     },
   },
@@ -96,6 +103,18 @@ const PATTERNS = [
     detector: 'pem-private-key',
     confidence: 'high' as const,
     pattern: /-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g,
+    // The header alone is not a key. Docs that show where to paste one
+    // ("-----BEGIN RSA PRIVATE KEY-----\n<your key here>\n-----END…") were
+    // quarantining on the marker with no key material present at all. Require a
+    // real base64 body: at least 64 unbroken base64 chars somewhere between this
+    // header and the next END marker. A leaked key is thousands of chars, so the
+    // floor is far below any true positive and far above every placeholder.
+    accept: (m: RegExpExecArray, _file: string, contents: string) => {
+      const after = contents.slice(m.index + m[0].length);
+      const end = after.search(/-----END /);
+      const body = end === -1 ? after.slice(0, 4096) : after.slice(0, end);
+      return /[A-Za-z0-9+/]{64,}/.test(body.replace(/\s+/g, ''));
+    },
   },
   {
     category: 'secret' as const,

@@ -118,7 +118,11 @@ export const MALICIOUS_CORPUS_CORE: MaliciousCorpusEntry[] = [
     expectCategories: ['secret'],
     expectStatus: 'quarantined',
     bundle: new Map([
-      ['scripts/setup.sh', b('AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n')],
+      // NOT AKIAIOSFODNN7EXAMPLE: that is AWS's own published documentation
+      // placeholder, and this fixture asserting it must quarantine is what kept
+      // the EXAMPLE-suffix false positive in place. A "live-shaped" fixture has
+      // to carry a live-shaped value or it tests the opposite of its label.
+      ['scripts/setup.sh', b('AWS_ACCESS_KEY_ID=AKIA2E0A8F3B244C9986\n')],
     ]),
   },
   {

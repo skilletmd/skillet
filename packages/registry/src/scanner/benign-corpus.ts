@@ -33,6 +33,35 @@ function b(text: string): Uint8Array {
 
 export const BENIGN_NEAR_MISS_CORPUS: BenignNearMissEntry[] = [
   {
+    id: 'secret-aws-doc-placeholder',
+    label: "AWS's own documentation example keys — in AWS docs, SDK READMEs, and most tutorials",
+    expectMaxStatus: 'clean',
+    bundle: new Map([
+      [
+        'SKILL.md',
+        b(
+          '---\nname: aws-setup\ndescription: Configure AWS credentials for the CLI.\n---\n\n' +
+            '## Configure\n\n```\naws configure set aws_access_key_id AKIAIOSFODNN7EXAMPLE\n```\n',
+        ),
+      ],
+    ]),
+  },
+  {
+    id: 'secret-pem-placeholder-body',
+    label: 'PEM markers around a placeholder body — docs showing where to paste a key',
+    expectMaxStatus: 'clean',
+    bundle: new Map([
+      [
+        'SKILL.md',
+        b(
+          '---\nname: tls-setup\ndescription: Install a TLS private key for the service.\n---\n\n' +
+            '## Key file\n\n```\n-----BEGIN RSA PRIVATE KEY-----\n<paste your key here>\n' +
+            '-----END RSA PRIVATE KEY-----\n```\n',
+        ),
+      ],
+    ]),
+  },
+  {
     id: 'destructive-truncate-the-verb',
     label: 'English verb "truncate" in prose + a bash comment — never a block',
     expectMaxStatus: 'clean',

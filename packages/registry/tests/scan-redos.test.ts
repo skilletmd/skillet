@@ -43,13 +43,15 @@ describe('scanner ReDoS guards', () => {
 
   it('secretsBlockingScan detects a secret in a normal bundle (no regression)', () => {
     // AKIA + 16 base32-ish chars: a real-shape high-confidence secret.
-    const hit = secretsBlockingScan(bundle({ 'setup.sh': 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n' }));
+    // NOT AKIAIOSFODNN7EXAMPLE — that is AWS's published documentation
+    // placeholder and no longer blocks, by design.
+    const hit = secretsBlockingScan(bundle({ 'setup.sh': 'AWS_ACCESS_KEY_ID=AKIA2E0A8F3B244C9986\n' }));
     assert.ok(hit, 'high-confidence secret is flagged');
   });
 
   it('secretsBlockingScan is bounded and completes quickly on an oversized file', () => {
     // Secret is past the prefix cap, so it is not scanned — bounding is the point.
-    const big = 'x'.repeat(MAX_DETECT_BYTES + 50_000) + '\nAWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n';
+    const big = 'x'.repeat(MAX_DETECT_BYTES + 50_000) + '\nAWS_ACCESS_KEY_ID=AKIA2E0A8F3B244C9986\n';
     const start = performance.now();
     const hit = secretsBlockingScan(bundle({ 'big.sh': big }));
     const elapsed = performance.now() - start;
