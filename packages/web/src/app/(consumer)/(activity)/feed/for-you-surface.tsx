@@ -1,6 +1,12 @@
 import Image from 'next/image'
-import { redirect } from 'next/navigation'
-import { getFeed, getDiscoverFeed, type FeedResult } from '@/lib/registry'
+import {
+  getFeed,
+  getDiscoverFeed,
+  getFollowSuggestions,
+  type FeedResult,
+  type FollowSuggestion,
+} from '@/lib/registry'
+import { WhoToFollow } from '@/components/discovery-rail'
 import { FeedRows } from './feed-rows'
 import { FeedPanel } from './feed-panel'
 import { parseLens, type FeedSurfaceView, type FeedEventType } from './feed-lens'
@@ -13,6 +19,16 @@ export type { FeedSurfaceView }
 // Events per page for the feed's infinite scroll — large enough that the first
 // screen is full, small enough to keep the initial payload light.
 const FEED_PAGE_SIZE = 30
+
+/** Suggestions for the empty For-you state. Soft-fails to an empty list: a
+ *  suggestions outage should cost the rows, not the empty state around them. */
+async function loadFollowSuggestions(): Promise<FollowSuggestion[]> {
+  try {
+    return await getFollowSuggestions({ withSession: true })
+  } catch {
+    return []
+  }
+}
 
 /**
  * The feed body (For you / Discover / a team). Fetches the first page server-
@@ -64,13 +80,12 @@ export async function ForYouSurface({
     .filter((e) => e.kind !== 'follow')
     .filter((e) => (typeFilter ? e.kind === typeFilter : true))
 
-  // A brand-new user follows no one, so the default /feed would open on an empty
-  // room — land them on Global instead. Only on the bare /feed (no explicit lens,
-  // no type filter), and only when the following feed fetched fine and is truly
-  // empty; an explicit lens keeps its own empty state so the tabs stay honest.
-  if (resolved === 'following' && lens === undefined && !typeFilter && feed && events.length === 0) {
-    redirect(feedGlobalHref())
-  }
+  // An empty For-you feed renders its own empty state; it never redirects. Bare
+  // /feed IS the For-you tab's href, so redirecting an empty following feed to
+  // Global made the tab impossible to open and left no way to learn why. The empty
+  // state below carries the fix instead (who to follow, right there).
+  const emptyFollowing = resolved === 'following' && isAuthed && !typeFilter && events.length === 0
+  const suggestions = emptyFollowing ? await loadFollowSuggestions() : []
 
   let body: React.ReactNode
   if (resolved === 'following' && !isAuthed) {
@@ -113,11 +128,15 @@ export async function ForYouSurface({
       />
     )
   } else {
+    // The one empty state a viewer can act on from where they stand: follow rows
+    // inline (the right rail that normally carries them is hidden below lg, which
+    // is exactly where an empty feed feels most like a dead end), with Global as
+    // the way out for anyone who would rather browse first.
     body = (
       <FeedPanel
         title="Your feed is empty"
-        body="Follow people and their activity will land here. Browse the global feed to find people to follow."
-        cta={{ href: feedGlobalHref(), label: 'Open Global' }}
+        body="Follow people and their activity lands here."
+        cta={{ href: feedGlobalHref(), label: 'Browse the global feed' }}
         illustration={
           <Image
             src="/illustrations/empty-feed.png"
@@ -127,7 +146,16 @@ export async function ForYouSurface({
             className="empty-illo h-24 w-auto"
           />
         }
-      />
+      >
+        {/* lg:hidden — at lg and up the right rail already carries this exact
+            list, and two copies on one screen is just noise. Below lg the rail is
+            gone, which is where an empty feed reads as a dead end. */}
+        {suggestions.length > 0 ? (
+          <div className="lg:hidden">
+            <WhoToFollow suggestions={suggestions} />
+          </div>
+        ) : null}
+      </FeedPanel>
     )
   }
 
