@@ -34,6 +34,10 @@ export interface MirrorSource {
     /** 'per-skill' forces per-skill bundles (skips coupled skills) — for repos
      *  whose unified bundle would fail path-safety or bust the size cap. */
     syncMode?: 'auto' | 'per-skill';
+    /** Skill dirs to drop, matched as a path prefix. The per-source lever for a
+     *  good repo carrying a demo or linter corpus that no global rule can name
+     *  without taking real skills with it. See SyncContext.excludeDirs. */
+    excludeDirs?: string[];
     /** GitHub owner type of the source repo. Gates the claim paths: a User
      *  source can be claimed as a personal account; NULL/'Organization' offers
      *  team-claim only (the conservative default). */
@@ -163,6 +167,7 @@ export async function syncAllSourcesPrisma(prisma: PrismaClient, opts: SyncAllOp
                 ...(token ? { token } : {}),
                 ...(skillCap != null ? { maxSkills: skillCap } : {}),
                 ...(src.syncMode ? { syncMode: src.syncMode } : {}),
+                ...(src.excludeDirs?.length ? { excludeDirs: src.excludeDirs } : {}),
                 ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
                 dryRun,
             });

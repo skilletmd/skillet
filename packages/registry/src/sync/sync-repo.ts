@@ -75,6 +75,16 @@ export interface SyncContext {
     token?: string;
     /** Sync only these skill dirs (relative to repo root). Undefined = all skills. */
     selectedDirs?: string[];
+    /** Skill dirs to drop, matched as a path PREFIX (a dir and everything under
+     *  it). For a repo whose skills are real but whose tree also carries a
+     *  demo/linter corpus that the global fixture-segment rule can't name:
+     *  flutter/agent-plugins ships `tool/dart_skills_lint/example/skills/{valid,
+     *  invalid}` as its linter's own test corpus. `example` is NOT a global
+     *  exclusion — eleven live skills across topoteretes and tradermonty are
+     *  real skills that happen to sit under `examples/`. This is the per-source
+     *  lever for that case. Excluded dirs are absent from `seen`, so previously
+     *  published ones tombstone on the next sync. */
+    excludeDirs?: string[];
     /** Name for the linked kit (user-chosen). Defaults to the humanized repo name. */
     kitName?: string;
     /** Bundle >1 skill into a linked kit. Default true (a multi-skill repo is a
@@ -809,6 +819,10 @@ export async function syncRepoSkillsPrisma(prisma: PrismaClient, owner: string, 
     if (ctx.selectedDirs) {
         const want = new Set(ctx.selectedDirs);
         skills = skills.filter((s) => want.has(s.dir));
+    }
+    if (ctx.excludeDirs?.length) {
+        const drop = ctx.excludeDirs;
+        skills = skills.filter((s) => !drop.some((d) => s.dir === d || s.dir.startsWith(`${d}/`)));
     }
     // Always bound the per-sync skill count, even when the caller passes no
     // explicit maxSkills, so a repo with thousands of skill dirs can't force

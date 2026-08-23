@@ -169,7 +169,10 @@
       "sourceUrl": "https://github.com/flutter/agent-plugins",
       "maxSkills": 32,
       "syncMode": "per-skill",
-      "ownerType": "Organization"
+      "ownerType": "Organization",
+      "excludeDirs": [
+        "tool/dart_skills_lint/example"
+      ]
     },
     {
       "handle": "dotnet",
