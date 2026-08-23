@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { NATIVE_TARGETS } from "../scripts/build-native.mjs";
+import { NATIVE_TARGETS } from "../scripts/native-targets.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
@@ -50,4 +50,28 @@ test("each platform package packs whatever staging writes into bin", () => {
       `${key}: files must be ["bin"] so it packs the staged binary whatever it is named`,
     );
   }
+});
+
+// The set of platforms is stated in three places that cannot import each other:
+// the target table, one packages/cli-<key>/ directory per platform, and the
+// publish matrix (GitHub needs that one literal). Adding a platform and
+// updating two of the three is the failure this catches. It has not bitten yet;
+// it is the shape of bug that arrives with the first new platform.
+test("target table, platform package directories, and publish matrix agree", () => {
+  const expected = Object.keys(NATIVE_TARGETS).sort();
+
+  const dirs = readdirSync(join(repoRoot, "packages"))
+    .filter((d) => d.startsWith("cli-"))
+    .map((d) => d.slice("cli-".length))
+    .sort();
+  assert.deepEqual(dirs, expected, "packages/cli-*/ directories vs target table");
+
+  const workflow = readFileSync(
+    join(repoRoot, ".github", "workflows", "cli-publish.yml"),
+    "utf8",
+  );
+  const matrix = [...workflow.matchAll(/^\s*-\s*target:\s*(\S+)\s*$/gm)]
+    .map((m) => m[1])
+    .sort();
+  assert.deepEqual(matrix, expected, "cli-publish.yml matrix vs target table");
 });

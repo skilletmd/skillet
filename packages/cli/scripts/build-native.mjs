@@ -10,15 +10,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import { buildCliDeps } from './build-cli-deps.mjs';
+import { NATIVE_TARGETS } from './native-targets.mjs';
 
-/** @type {Record<string, { triple: string; ext?: string }>} */
-export const NATIVE_TARGETS = {
-  'darwin-arm64': { triple: 'aarch64-apple-darwin' },
-  'darwin-x64': { triple: 'x86_64-apple-darwin' },
-  'linux-x64': { triple: 'x86_64-unknown-linux-gnu' },
-  'linux-arm64': { triple: 'aarch64-unknown-linux-gnu' },
-  'win32-x64': { triple: 'x86_64-pc-windows-msvc', ext: '.exe' },
-};
+// Re-exported so existing importers keep working; new code should import from
+// ./native-targets.mjs directly, which has no module-body side effects.
+export { NATIVE_TARGETS };
+
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = join(here, '..');

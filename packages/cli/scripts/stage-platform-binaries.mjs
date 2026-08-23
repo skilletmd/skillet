@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { copyFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { NATIVE_TARGETS } from './build-native.mjs';
+import { NATIVE_TARGETS } from './native-targets.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..', '..', '..');
