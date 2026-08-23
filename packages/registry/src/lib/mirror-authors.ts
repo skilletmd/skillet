@@ -36,16 +36,22 @@ export async function upsertMirrorAuthorPrisma(prisma: PrismaDb, handle: string,
     const sourceUrl = profile?.sourceUrl ?? `https://github.com/${repoFull}`;
     const profileUrl = profile?.profileUrl ?? `https://github.com/${ownerLogin}`;
     const name = profile?.displayName ?? ownerLogin;
+    // Every mirror is a GitHub source, and `github.com/<login>.png` is that
+    // account's avatar — it is exactly what each curated seed already hardcodes
+    // in its `logo` field. Deriving it here means the QUEUE path gets one too:
+    // it passes no profile at all, so 39 approved authors had rendered as a
+    // generated illustration with no avatar, name detail, or bio.
+    const avatarUrl = profile?.avatarUrl ?? `https://github.com/${ownerLogin}.png`;
     const updateData = {
         profile_url: profileUrl,
         is_mirror: 1,
         mirror_source_url: sourceUrl,
         source_owner_type: ownerType,
-        // Profile fields refresh only when the caller supplies them (the seed
-        // path); the queue path leaves an existing name/bio/avatar alone.
+        // Name and bio refresh only when the caller supplies them (the seed
+        // path). The avatar is derived above, so it is always set.
         ...(profile?.displayName != null ? { name } : {}),
         ...(profile?.bio !== undefined ? { bio: profile.bio } : {}),
-        ...(profile?.avatarUrl !== undefined ? { avatar_url: profile.avatarUrl } : {}),
+        avatar_url: avatarUrl,
     };
     const createData = {
         id: handle,
@@ -55,7 +61,7 @@ export async function upsertMirrorAuthorPrisma(prisma: PrismaDb, handle: string,
         mirror_source_url: sourceUrl,
         source_owner_type: ownerType,
         ...(profile?.bio !== undefined ? { bio: profile.bio } : {}),
-        ...(profile?.avatarUrl !== undefined ? { avatar_url: profile.avatarUrl } : {}),
+        avatar_url: avatarUrl,
     };
     // Three count-0 cases are disambiguated by the guard read above and the
     // create fallback: claimed row (no-op by design), missing row (create),

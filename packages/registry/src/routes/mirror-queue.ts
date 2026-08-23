@@ -27,6 +27,7 @@ import { runPrismaTransaction } from '../db/prisma-client.js';
 import { requireAdmin, type Principal } from '../auth/middleware.js';
 import { ensureOrgAuthorRowPrisma } from '../lib/org-access.js';
 import { RealAuthorCollisionError, upsertMirrorAuthorPrisma } from '../lib/mirror-authors.js';
+import { guessCategory } from '../classify/heuristic.js';
 import { screenCandidate, parseOwnerRepo } from '../lib/mirror-screen.js';
 import { syncRepoSkillsPrisma } from '../sync/sync-repo.js';
 import type { BlobStore } from '../blob-store/types.js';
@@ -315,6 +316,28 @@ async function decideWithPrisma(prisma: PrismaClient, req: FastifyRequest, reply
     }
     catch (err) {
         req.log.warn({ err, id, handle, repo: repoFull }, 'mirror-queue approve: syncRepoSkills failed after author/org commit; marking row live anyway (skills backfill on next sync)');
+    }
+    // Categorize, exactly as the seed path does after its sync. Without this an
+    // approved mirror lands with every skill uncategorized, so it appears in no
+    // browse category and no category filter — 140 skills across 39 approved
+    // authors were invisible that way. Best-effort: a classification failure
+    // must not undo an otherwise-good promotion.
+    try {
+        const pending = await prisma.skills.findMany({
+            where: { author_id: handle, category: null, visibility: 'public' },
+            select: { id: true, slug: true, description: true },
+        });
+        for (const skill of pending) {
+            const guess = guessCategory({ slug: skill.slug, description: skill.description });
+            if (!guess) continue;
+            await prisma.skills.updateMany({
+                where: { id: skill.id, category: null },
+                data: { category: guess },
+            });
+        }
+    }
+    catch (err) {
+        req.log.warn({ err, id, handle }, 'mirror-queue approve: categorization failed; skills stay uncategorized');
     }
     // COALESCE source_owner_id: keep stored value when present, else use live id.
     await prisma.mirror_review_queue.update({
