@@ -52,7 +52,7 @@ jobs:
   # silently dead for its entire life. Everything in secret-scan above uses
   # node: builtins only and stays install-free.
   pm2-entrypoints:
-    name: PM2 entrypoints match their interpreter
+    name: Deploy config (PM2 entrypoints)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
