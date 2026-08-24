@@ -46,7 +46,7 @@ import type { ScanStatus } from './types.js';
  * dispatch as their interpreter language, so the code-shape threat detectors
  * scan them instead of skipping on the missing `.sh`/`.py` extension.
  */
-export const DETECTOR_CORPUS_VERSION = 17;
+export const DETECTOR_CORPUS_VERSION = 18;
 
 /**
  * Fingerprint of the THREAT detector set (every `category:detector` in the

@@ -22,8 +22,23 @@ const PATTERNS = [
     category: 'supply-chain' as const,
     detector: 'fetch-pipe-interpreter',
     confidence: 'high' as const,
+    // The attack is a BARE interpreter: `curl … | python3` runs the fetched
+    // bytes as code. `curl … | python3 tool.py` (or `| python3 -m json.tool`)
+    // does not — the interpreter runs a local, separately-scanned script and
+    // the fetched bytes arrive on stdin as DATA. That shape is how a CLI filter
+    // is documented, and firing on it quarantined K-Dense's paper-lookup for the
+    // usage examples in its own arxiv/PMC parsers' docstrings.
+    //
+    // So the trailing lookahead rejects a match once a TARGET follows: `-m
+    // <module>`, or any token not starting with `-`. Short option flags are
+    // skipped over first, so `| python3 -u tool.py` is still a target and
+    // `| python3 -u` is still bare. `-c`/`-e` are deliberately NOT skippable —
+    // `curl … | python3 -c '…'` takes code on the command line and has no
+    // honest reading, so it keeps firing. Horizontal-only whitespace
+    // (`[^\S\n]`) keeps the lookahead from stepping over a line break and
+    // mistaking the next line's first word for a script argument.
     pattern:
-      /\b(?:curl|wget)\b[^|\n]{0,200}\|\s*(?:sudo\s+)?(?:python3?|node|ruby|perl)\b/gi,
+      /\b(?:curl|wget)\b[^|\n]{0,200}\|\s*(?:sudo\s+)?(?:python3?|node|ruby|perl)\b(?!(?:[^\S\n]+-(?![A-Za-z]*[cem])[A-Za-z]+)*[^\S\n]+(?:-m\b|[^-\s]))/gi,
     accept: codeOrContainer,
   },
   {
