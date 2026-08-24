@@ -86,7 +86,11 @@ export function DocNav({ sections }: { sections: NavSection[] }) {
       </div>
 
       {/* Desktop sidebar */}
-      <aside className="sticky top-[var(--site-header-h)] hidden h-[calc(100vh-var(--site-header-h))] w-(--rail-nav) shrink-0 overflow-y-auto pr-4 pt-6 sm:block">
+      {/* pb-12, not just pt-6: the rail scrolls, but with no bottom padding the
+          last item sat flush against the viewport edge, which reads as cut off
+          rather than scrollable. On a short screen that is the difference between
+          "there is more" and "the nav is broken". */}
+      <aside className="sticky top-[var(--site-header-h)] hidden h-[calc(100vh-var(--site-header-h))] w-(--rail-nav) shrink-0 overflow-y-auto pb-12 pr-4 pt-6 sm:block">
         {navContent}
       </aside>
     </>

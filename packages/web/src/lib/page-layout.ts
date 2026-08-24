@@ -9,7 +9,7 @@ export const PAGE_CONTAINER_CLASS =
 
 /**
  * Narrow single-column variant (680px — the same content width settings use) for
- * form-/onboarding-led pages whose narrow reading column is the design (welcome,
+ * form-/onboarding-led pages whose narrow reading column is the design (setup,
  * import). Same gutters and vertical rhythm as {@link PAGE_CONTAINER_CLASS} so the
  * page frame matches its wide siblings; only the max-width differs.
  */

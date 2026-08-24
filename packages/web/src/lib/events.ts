@@ -6,7 +6,7 @@
 
 /** Custom `window` event names dispatched/listened across the web app. */
 export const SKILLET_EVENTS = {
-  /** A skill was added to the library — drives the connect prompt + welcome reveal. */
+  /** A skill was added to the library — drives the connect prompt + setup reveal. */
   skillAdded: 'skillet:skill-added',
   /** A device connected — lets the nav "Finish setup" pill clear without a reload. */
   deviceConnected: 'skillet:device-connected',

@@ -105,7 +105,7 @@ function isSkillMd(path: string): boolean {
 const GUTTER_GLYPH = { add: '+', del: '−', ctx: ' ' } as const
 
 /** What one file's change looks like: rendered content for a brand-new file,
- *  a colour-coded line view for an edit, plain fallbacks otherwise. */
+ *  a color-coded line view for an edit, plain fallbacks otherwise. */
 function FileBody({ file }: { file: ProposalFileDiff }) {
   if (file.binary) {
     return <p className="px-3 py-2 text-sm text-(--ink-2)">Binary file. No preview.</p>
@@ -140,7 +140,7 @@ function FileBody({ file }: { file: ProposalFileDiff }) {
                 : 'text-(--ink-2)'
           }`}
         >
-          {/* Colour alone can't carry add/delete (colourblind users, screenshots),
+          {/* Color alone can't carry add/delete (colorblind users, screenshots),
               so a +/− gutter does too — aria-hidden and select-none so the marker
               never enters copied text or screen-reader output. */}
           <span aria-hidden="true" className="w-4 shrink-0 select-none">
@@ -204,7 +204,7 @@ function FileRow({
 /**
  * The one renderer for a `ProposalFileDiff[]` — proposals, update cards, and
  * previews all show a diff through this. Files that changed are grouped with a
- * count summary; each edit is a colour-coded (plus gutter-marked) line view and
+ * count summary; each edit is a color-coded (plus gutter-marked) line view and
  * each brand-new file is rendered as its content.
  */
 export function FileDiff({

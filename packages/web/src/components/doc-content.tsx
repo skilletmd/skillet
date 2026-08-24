@@ -221,20 +221,28 @@ export function DocContent({ content }: { content: string }) {
               </td>
             )
           },
-          code({ className, children }) {
-            const match = /language-(\w+)/.exec(className || '')
-            if (!match) {
-              return (
-                <code className="whitespace-nowrap rounded border border-(--line) bg-(--surface) px-1 py-0.5 font-mono code-inline text-(--ink)">
-                  {children}
-                </code>
-              )
-            }
-            return <DocCodeBlock language={match[1]}>{children}</DocCodeBlock>
+          // `code` is ALWAYS inline here, and `pre` is always the block. Keying
+          // block-ness off a `language-*` class instead meant a bare ``` fence
+          // (no language) fell into the inline branch: `whitespace-nowrap`, no
+          // scroll container, and `pre` passing straight through. A long line in
+          // one of those pushed the whole page sideways instead of scrolling
+          // inside itself. `/docs/mcp`'s WWW-Authenticate challenge was doing
+          // exactly that.
+          code({ children }) {
+            return (
+              <code className="whitespace-nowrap rounded border border-(--line) bg-(--surface) px-1 py-0.5 font-mono code-inline text-(--ink)">
+                {children}
+              </code>
+            )
           },
           pre({ children }) {
-            // DocCodeBlock provides the pre wrapper; just pass through
-            return <>{children}</>
+            // The fenced language, when there is one, rides on the child `code`
+            // element's className. Unwrap it so the block keeps its label and the
+            // inline styling above never lands on a block.
+            const child = Array.isArray(children) ? children[0] : children
+            const props = (child as { props?: { className?: string; children?: React.ReactNode } })?.props
+            const language = /language-(\w+)/.exec(props?.className ?? '')?.[1]
+            return <DocCodeBlock language={language}>{props?.children ?? children}</DocCodeBlock>
           },
           blockquote({ children }) {
             return <DocBlockquote>{children}</DocBlockquote>

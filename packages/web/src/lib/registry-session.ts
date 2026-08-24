@@ -351,10 +351,10 @@ export async function fetchRegistryProfileBasics(
 
 /**
  * Has this account ever connected a device that finished a sync? Used to route a
- * genuinely-new user into /welcome. Returns `null` when the answer is unknown
+ * genuinely-new user into /setup. Returns `null` when the answer is unknown
  * (fetch failed) so callers can fail safe rather than dumping an established
  * user into onboarding. "Connected" means a device that reported runtimes
- * (`agents_reported_at`), matching the /welcome flow's own definition — a
+ * (`agents_reported_at`), matching the /setup flow's own definition — a
  * half-paired device that hasn't synced yet does not count.
  */
 export async function hasConnectedDevice(sessionToken: string): Promise<boolean | null> {

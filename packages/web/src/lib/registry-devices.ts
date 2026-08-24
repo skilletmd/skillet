@@ -1,5 +1,5 @@
 /**
- * Client-side device/pairing reads shared by the welcome flow surfaces. One copy
+ * Client-side device/pairing reads shared by the setup flow surfaces. One copy
  * of the device + materialization shapes and the fetch helpers so the guided
  * chat and the panel flow can't drift.
  */
