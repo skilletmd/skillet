@@ -19,6 +19,7 @@ import type { BlobStore } from '../blob-store/types.js';
 import { loadBundleForVersionPrisma } from '../blob-store/load-bundle.js';
 import { resolveScanCachedPrisma } from './index.js';
 import { persistVersionScanPrisma } from '../lib/skill-publish.js';
+import { lastCleanHashPrisma } from '../lib/sync-manifest.js';
 import { CAPABILITY_VERSION } from './capabilities/scan.js';
 import { DETECTOR_CORPUS_VERSION } from './cache.js';
 
@@ -60,6 +61,10 @@ export interface BackfillScansResult {
   targeted: number;
   processed: number;
   refreshed: number;
+  /** Skills whose `latest_hash` disagreed with the post-refresh scan status and
+   *  was corrected. Non-zero means the backfill un-stuck (or newly gated) skills,
+   *  not merely rewrote scan rows. */
+  reconciled: number;
   skippedUnavailable: number;
   skippedError: number;
 }
@@ -206,9 +211,14 @@ export async function backfillScansPrisma(
     targeted,
     processed: 0,
     refreshed: 0,
+    reconciled: 0,
     skippedUnavailable: 0,
     skippedError: 0,
   };
+
+  // Every skill the walk touched, so the reconcile pass below can ask whether the
+  // refreshed status changed which hash is servable.
+  const touched = new Set<string>();
 
   let cursor: ScanCursor | null = null;
   while (limit == null || result.processed < limit) {
@@ -220,6 +230,7 @@ export async function backfillScansPrisma(
 
     await mapWithConcurrency(rows, concurrency, async (row) => {
       const outcome = await processRowPrisma(prisma, blobStore, row, dryRun);
+      touched.add(row.skill_id);
       result.processed += 1;
       if (outcome === 'refreshed') result.refreshed += 1;
       else if (outcome === 'skipped-unavailable') result.skippedUnavailable += 1;
@@ -232,6 +243,33 @@ export async function backfillScansPrisma(
     );
 
     if (sleepMs > 0) await sleep(sleepMs);
+  }
+
+  // Refreshing the scan row is only half the job. `skills.latest_hash` is the
+  // servable pointer, and sync recomputes it only when CONTENT changes — so a
+  // corpus improvement that clears a quarantine used to leave the skill exactly
+  // as unservable as before, with a clean scan sitting right next to a NULL
+  // latest_hash. K-Dense's paper-lookup did that: the detector fix cleared its
+  // quarantine and the skill stayed uninstallable, viewer hidden, until the
+  // pointer was written by hand. It runs in the other direction too — a bump
+  // that newly quarantines the current version must retract the pointer, or the
+  // registry keeps serving a version the scanner now rejects.
+  if (!dryRun) {
+    for (const skillId of touched) {
+      try {
+        const want = await lastCleanHashPrisma(prisma, skillId);
+        const skill = await prisma.skills.findUnique({
+          where: { id: skillId },
+          select: { latest_hash: true },
+        });
+        if (skill == null || skill.latest_hash === want) continue;
+        await prisma.skills.update({ where: { id: skillId }, data: { latest_hash: want } });
+        result.reconciled += 1;
+        log(`  reconciled ${skillId}: latest_hash ${skill.latest_hash ?? 'NULL'} -> ${want ?? 'NULL'}`);
+      } catch {
+        // One unreadable skill must not abandon the rest of the reconcile pass.
+      }
+    }
   }
 
   return result;

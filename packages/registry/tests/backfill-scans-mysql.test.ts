@@ -188,4 +188,56 @@ describe('scan backfill (two-lane) mysql', { skip: !hasDatabaseUrl }, () => {
     assert.equal(result.skippedUnavailable, 2)
     assert.equal(result.refreshed, 0)
   })
+  // Refreshing the scan row is only half the job: `skills.latest_hash` is the
+  // servable pointer, and sync recomputes it on CONTENT change only. Before this,
+  // a corpus improvement that cleared a quarantine left the skill exactly as
+  // unservable as before — clean scan, NULL pointer, viewer hidden. That is what
+  // happened to K-Dense's paper-lookup on the corpus 17 -> 18 bump.
+  it('reconciles latest_hash when a refresh clears a quarantine', async () => {
+    await reset()
+    const store = new MemoryBlobStore(undefined, prisma)
+    const bytes = new TextEncoder().encode('# Tool\n\nDoes a thing for tests.\n')
+    const bhash = blobHash(bytes)
+    await store.put(bhash, bytes)
+    const versionHash = canonicalContentHash(new Map([['SKILL.md', bytes]]))
+
+    await seed('h', 'freed', versionHash, null, null, 1)
+    await prisma.skill_version_files.create({
+      data: { skill_id: 'h:freed', version_hash: versionHash, path: 'SKILL.md', blob_hash: bhash },
+    })
+    // The state a quarantine leaves behind: no servable pointer.
+    await prisma.skill_version_scans.update({
+      where: { skill_id_skill_version_id: { skill_id: 'h:freed', skill_version_id: versionHash } },
+      data: { status: 'quarantined' },
+    })
+    await prisma.skills.update({ where: { id: 'h:freed' }, data: { latest_hash: null } })
+
+    // The bundle is benign, so the re-scan comes back clean and the pointer must
+    // follow it back.
+    const result = await backfillScansPrisma(prisma, { blobStore: store })
+    assert.equal(result.refreshed, 1)
+    assert.equal(result.reconciled, 1)
+
+    const skill = await prisma.skills.findUnique({ where: { id: 'h:freed' }, select: { latest_hash: true } })
+    assert.equal(skill?.latest_hash, versionHash, 'latest_hash follows the cleared scan')
+  })
+
+  it('a dry run reconciles nothing', async () => {
+    await reset()
+    const store = new MemoryBlobStore(undefined, prisma)
+    const bytes = new TextEncoder().encode('# Tool\n\nDoes a thing for tests.\n')
+    const bhash = blobHash(bytes)
+    await store.put(bhash, bytes)
+    const versionHash = canonicalContentHash(new Map([['SKILL.md', bytes]]))
+    await seed('i', 'dry', versionHash, null, null, 1)
+    await prisma.skill_version_files.create({
+      data: { skill_id: 'i:dry', version_hash: versionHash, path: 'SKILL.md', blob_hash: bhash },
+    })
+    await prisma.skills.update({ where: { id: 'i:dry' }, data: { latest_hash: null } })
+
+    const result = await backfillScansPrisma(prisma, { blobStore: store, dryRun: true })
+    assert.equal(result.reconciled, 0)
+    const skill = await prisma.skills.findUnique({ where: { id: 'i:dry' }, select: { latest_hash: true } })
+    assert.equal(skill?.latest_hash, null, 'a dry run leaves the pointer alone')
+  })
 })
