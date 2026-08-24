@@ -33,6 +33,7 @@ import { checkMcpRateLimitPrisma } from '../ratelimit/mcp.js';
 import type { BlobStore } from '../blob-store/types.js';
 import { enableMcpLinkPrisma, findActiveMcpLinkPrisma, listMcpLinkClientsPrisma, regenerateMcpLinkPrisma, resolveServeAuthPrisma, revokeActiveMcpLinksPrisma, upsertMcpLinkClientPrisma, } from '../lib/mcp-links.js';
 import { createRegistrySkillSourcePrisma } from '../mcp/registry-source-prisma.js';
+import { createRegistryDiscoveryPrisma } from '../mcp/discovery-prisma.js';
 import { recordMcpSkillUsagePrisma } from '../mcp/record-usage.js';
 function encryptionKey(): Buffer {
     const secret = process.env.SKILLET_MCP_TOKEN_KEY ?? '';
@@ -468,6 +469,11 @@ export function registerMcpRoutes(app: FastifyInstance, db: DatabaseSync, blobSt
         if (!method || !PUBLIC_MCP_METHODS.has(method)) return undefined;
         return handleMessage(msg, {
             deepResearchAliases: true,
+            // initialize and tools/list are the two methods that DESCRIBE the
+            // server, so the unauthenticated probe must see the same tool list
+            // the authenticated caller gets. Anonymous principal: tools/call is
+            // not public, so nothing here can be invoked without a bearer.
+            discovery: createRegistryDiscoveryPrisma(prisma, blobStore, { principal: null }),
             serverVersion: process.env.SKILLET_REGISTRY_VERSION,
         });
     };
@@ -576,6 +582,12 @@ export function registerMcpRoutes(app: FastifyInstance, db: DatabaseSync, blobSt
         // through to Fastify's opaque global 500.
         const rpcResponse = await handleMessage(msg, {
             source,
+            // Summon: reaching PUBLIC skills beyond this caller's kit. Hosted
+            // only — the loopback server passes none and advertises no summon
+            // tools, so `skillet mcp` stays offline-capable.
+            discovery: createRegistryDiscoveryPrisma(prisma, blobStore, {
+                principal: auth.principal,
+            }),
             httpAuthorized: true,
             // Hosted surface carries the ChatGPT deep-research aliases (search/fetch)
             // on top of the three core tools; the local stdio server never sets this.
