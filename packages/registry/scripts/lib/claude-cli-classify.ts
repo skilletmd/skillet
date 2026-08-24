@@ -19,6 +19,12 @@ export interface ClassifyItem {
   id: string;
   slug: string;
   description: string | null;
+  /** SKILL.md head, optional. The cases that reach this classifier are the ones
+   *  the keyword heuristic could not decide, and they are usually undecidable
+   *  from the description ALONE — "Check Compound Engineering health and
+   *  repo-local config" names no category. The body is what carries the signal,
+   *  so include it when the caller has it. */
+  body?: string | null;
 }
 
 /** Build the batched classification prompt for a set of skills. */
@@ -28,13 +34,15 @@ export function buildBatchPrompt(items: ClassifyItem[]): string {
     id: it.id,
     slug: it.slug,
     desc: (it.description ?? '').slice(0, 400),
+    ...(it.body ? { body: it.body.slice(0, 700) } : {}),
   }));
   return (
     `You sort AI agent skills into exactly one category.\n` +
     `Allowed category keys (use verbatim): ${keys}\n\n` +
     `For EACH skill below, choose the single best key. Reply with ONLY a JSON ` +
     `array of {"id","category"} objects — no prose, no code fences, one entry ` +
-    `per skill, echoing the id exactly.\n\n` +
+    `per skill, echoing the id exactly. Judge by what the skill DOES; the ` +
+    `slug and description are the strongest signal and \`body\` is context.\n\n` +
     `Skills:\n${JSON.stringify(rows)}`
   );
 }
