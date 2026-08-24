@@ -833,6 +833,28 @@
       "maxSkills": 8,
       "logo": "https://github.com/loops-so.png",
       "sourceUrl": "https://github.com/loops-so/skills"
+    },
+    {
+      "handle": "mvanhorn",
+      "displayName": "Matt Van Horn",
+      "bio": "Printing Press: turn any API into a CLI built for agents, then publish, score and polish the result.",
+      "repo": "mvanhorn/cli-printing-press",
+      "license": "MIT",
+      "ownerType": "User",
+      "maxSkills": 12,
+      "logo": "https://github.com/mvanhorn.png",
+      "sourceUrl": "https://github.com/mvanhorn/cli-printing-press"
+    },
+    {
+      "handle": "tmchow",
+      "displayName": "Trevin Chow",
+      "bio": "Turns ideas and articles into original print-style editorial illustrations with a recurring mascot.",
+      "repo": "tmchow/illo-skill",
+      "license": "MIT",
+      "ownerType": "User",
+      "maxSkills": 4,
+      "logo": "https://github.com/tmchow.png",
+      "sourceUrl": "https://github.com/tmchow/illo-skill"
     }
   ]
 }

@@ -38,6 +38,13 @@ const EXCLUDED_DISCOVERY_SEGMENTS = new Set([
   'fixtures',
   '__fixtures__',
   'e2e',
+  // Reserved test-data directory names, and the reason the whole-segment rule
+  // needed widening: mvanhorn/cli-printing-press keeps ten golden-output skills
+  // under testdata/golden/expected/, whose segments are none of the above. Go's
+  // toolchain skips `testdata` outright and Jest owns `__snapshots__`, so
+  // neither can plausibly be where a real skill lives.
+  'testdata',
+  '__snapshots__',
 ]);
 
 /**

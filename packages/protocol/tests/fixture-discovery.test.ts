@@ -43,3 +43,28 @@ describe('fixture directories are not discovered', () => {
     assert.equal(isExcludedDiscoveryPath('spec/SKILL.md'), false)
   })
 })
+
+// mvanhorn/cli-printing-press: 21 SKILL.md files, 9 real under skills/ and 12
+// golden-output fixtures under testdata/. Only two of the twelve sat under a
+// `fixtures` segment; the other ten were testdata/golden/expected/…, which the
+// original list did not reach.
+describe('reserved test-data directories are not discovered', () => {
+  it('excludes testdata and __snapshots__ trees', () => {
+    for (const p of [
+      'testdata/golden/expected/generate-device-ble/ble-temperature-sensor/SKILL.md',
+      'testdata/golden/fixtures/dogfood-novel-doc-sync/cli/SKILL.md',
+      'src/__snapshots__/render/SKILL.md',
+    ])
+      assert.equal(isExcludedDiscoveryPath(p), true, `${p} should be excluded`)
+  })
+
+  it('keeps real skills beside them, including one NAMED for test data', () => {
+    // Segment matching, not substring matching, is the whole safety property.
+    for (const p of [
+      'skills/printing-press-publish/SKILL.md',
+      'skills/printing-press-score/SKILL.md',
+      'skills/generate-testdata-helper/SKILL.md',
+    ])
+      assert.equal(isExcludedDiscoveryPath(p), false, `${p} should be kept`)
+  })
+})
