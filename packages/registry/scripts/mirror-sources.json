@@ -840,6 +840,7 @@
       "bio": "Printing Press: turn any API into a CLI built for agents, then publish, score and polish the result.",
       "repo": "mvanhorn/cli-printing-press",
       "license": "MIT",
+      "syncMode": "per-skill",
       "ownerType": "User",
       "maxSkills": 12,
       "logo": "https://github.com/mvanhorn.png",
