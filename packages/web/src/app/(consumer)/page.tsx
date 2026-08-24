@@ -1,12 +1,11 @@
 import { ClaudeLogo, CursorLogo, OpenAiLogo } from '@/components/brand-logos'
 import type { Metadata } from 'next'
-import { Suspense, type ComponentType } from 'react'
-import { Button } from '@/components/ui/button'
-import { Avatar } from '@/components/ui/avatar'
-import { CoverArt } from '@/components/cover/cover'
+import Link from 'next/link'
+import { Suspense } from 'react'
+import { CommandBlock } from '@/components/command-block'
 import { HomeCatalogShelves, HomeBlogShelf, HomeActivityRail } from '@/components/home/home-shelves'
 import { SummonDemo, InstallBox } from '@/components/home/install-steps'
-import { GetAppButton } from '@/components/home/get-app-button'
+import { SummonLine } from '@/components/home/summon-line'
 import { CatalogShelvesSkeleton } from '@/components/home/shelf-skeleton'
 import { PAGE_CONTAINER_CLASS } from '@/lib/page-layout'
 import { ogMeta, OG } from '@/lib/og'
@@ -38,11 +37,16 @@ export const metadata: Metadata = {
   twitter: { ...HOME_OG.twitter, title: HOME_SHARE_TITLE, description: HOME_SHARE_DESCRIPTION },
 }
 
-// No CTA row under the install box. It only ever rendered for signed-in
-// viewers, and both of its destinations (Browse, and the wordmark to Feed) sit
-// in the header on every page, so it duplicated persistent chrome while
-// competing with the install command for the eye. Dropping it also removes the
-// page's only auth() call, which lets the whole hero prerender.
+// The borrow band. One action, and it costs nothing: `SummonLine` replaced the
+// install box that used to sit here. The headline promises borrowing, so an
+// install box under it argued against the sentence above it, and it fired six
+// CTAs at a visitor before the catalog had said who is on Skillet at all.
+// Install moved to the adopt band at the bottom of the page.
+//
+// (The older note here explained why there is no CTA row under the box: both
+// destinations already sit in the header on every page, and dropping it removed
+// the page's only auth() call so the whole hero prerenders. Still true, and now
+// also true of the band as a whole.)
 function Hero() {
   return (
     <section className="relative overflow-hidden border-b border-(--line)">
@@ -52,9 +56,9 @@ function Hero() {
           <div className="text-center lg:text-left">
             <h1 className="hero-title leading-[1.03]">Summon anyone&apos;s genius.</h1>
             <p className="mx-auto mt-3 max-w-[40ch] text-xl leading-[1.4] text-(--ink-2) sm:text-2xl lg:mx-0">
-              @ their name to borrow their brain.
+              Borrow anyone&apos;s whole library for one task.
             </p>
-            <InstallBox />
+            <SummonLine />
           </div>
           <SummonDemo />
         </div>
@@ -63,34 +67,11 @@ function Hero() {
   )
 }
 
-// Rungs 2-4 of the ladder (rung 1, summon, is the hero). Kept below the proof
-// (featured kits) as a single quiet band: progressive disclosure down the page
-// so a scroller gets the full story without it crowding the summon hero.
-// Each pillar's mark IS its concept, in the product's own visual language:
-// the agent logos (every AI tool), kit covers (new skills in your feed), a
-// facepile (your team). Presented identically — same overlapping circular cluster — so the row
-// reads as one set instead of three different shapes.
+// The agent-logo cluster: "every AI tool", in the product's own visual
+// language. Its two siblings (kit covers for the feed, a facepile for teams)
+// went with the ladder cards they belonged to.
 const FRAME =
   'flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden ring-2 ring-(--bg)'
-
-function SyncMotif() {
-  const kits = ['frontend', 'design', 'marketing']
-  return (
-    <div className="flex -space-x-2.5">
-      {kits.map((cat) => (
-        <span
-          key={cat}
-          className={`${FRAME} relative rounded-xl border border-(--line) ring-[3px]`}
-        >
-          <CoverArt seed={`ladder-kit-${cat}`} categories={[cat]} className="h-full w-full" />
-          {/* subtle dark inner edge so the art reads as framed on any color,
-              without the heavy white halo a light ring gives on saturated art */}
-          <span className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-black/10" />
-        </span>
-      ))}
-    </div>
-  )
-}
 
 function PublishMotif() {
   const agents = [
@@ -112,82 +93,55 @@ function PublishMotif() {
   )
 }
 
-function TeamsMotif() {
-  const team = ['ada', 'lin', 'jo']
+// The adopt band. One action, and the argument for taking it.
+//
+// This replaced a three-column ladder of peers: Get app / See feed / Set up
+// teams. Three equal buttons is not a sequence, the order ran adopt, discover,
+// team (backwards against the funnel), and the lead card, "Bring your skills
+// everywhere", talked about skills a first-time visitor does not have yet. The
+// discover third of it is the catalog above, which makes the same point with
+// real people in it, so only the adopt third survives here.
+//
+// The argument is the two lines side by side. The hero's borrow line works in
+// any agent and costs a paste every time; installed, the same thing is four
+// words the agent reaches for on its own. Nobody has to be told installing is
+// worth it once they can see both.
+function AdoptBand() {
   return (
-    <div className="flex -space-x-2.5">
-      {team.map((k) => (
-        <Avatar
-          key={k}
-          name={k}
-          colorKey={k}
-          size="md"
-          className="border border-(--line) ring-2 ring-(--bg)"
-        />
-      ))}
-    </div>
-  )
-}
-
-const LADDER: ReadonlyArray<{
-  title: string
-  body: string
-  href: string
-  cta: string
-  Motif: ComponentType
-}> = [
-  {
-    title: 'Bring your skills everywhere',
-    body: 'The desktop app keeps your skills backed up and synced across every agent and machine.',
-    href: '/download',
-    cta: 'Get app',
-    Motif: PublishMotif,
-  },
-  {
-    title: 'New skills from people you trust',
-    body: 'Follow experts and friends. Their latest skills show up in your feed, one click to add.',
-    href: '/feed',
-    cta: 'See feed',
-    Motif: SyncMotif,
-  },
-  {
-    title: 'Keep your team in sync',
-    body: 'One shared set of skills, with approval and versioning on every change.',
-    href: '/settings/teams',
-    cta: 'Set up teams',
-    Motif: TeamsMotif,
-  },
-]
-
-function HomeLadder() {
-  return (
-    <section className="border-b border-(--line)">
-      <div className="mx-auto max-w-[1120px] px-[clamp(16px,4vw,32px)]">
-        <div className="grid divide-y divide-(--line) border-x border-(--line) sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-          {LADDER.map((r) => (
-            <div key={r.href} className="flex flex-col items-start py-8 sm:px-8">
-              <div className="flex h-11 items-center">
-                <r.Motif />
-              </div>
-              <h2 className="mt-6 text-lg font-semibold leading-snug text-(--ink)">{r.title}</h2>
-              <p className="mt-3 text-sm leading-[1.55] text-(--ink-2) sm:min-h-[2.75rem]">
-                {r.body}
-              </p>
-              {r.href === '/download' ? (
-                <GetAppButton href={r.href} label={r.cta} className="mt-7" />
-              ) : (
-                <Button href={r.href} variant="secondary" size="md" className="group mt-7">
-                  {r.cta}
-                  <span
-                    aria-hidden="true"
-                    className="transition-transform duration-200 [@media(hover:hover)]:group-hover:translate-x-0.5"
-                  >
-                    &rarr;
-                  </span>
-                </Button>
-              )}
+    <section className="border-t border-(--line)">
+      <div className="mx-auto max-w-[1120px] px-[clamp(16px,4vw,32px)] py-[clamp(40px,6vw,64px)]">
+        <div className="grid items-start gap-x-12 gap-y-8 lg:grid-cols-2">
+          <div>
+            <div className="flex h-11 items-center">
+              <PublishMotif />
             </div>
-          ))}
+            <h2 className="mt-6 text-2xl font-semibold leading-snug text-(--ink)">
+              Keep what you borrow
+            </h2>
+            <p className="mt-3 max-w-[48ch] text-base leading-[1.55] text-(--ink-2)">
+              Install once and summoning is four words, in every agent on every machine, with the
+              agent reaching for the right skill on its own. Updates from the people you follow
+              arrive as a diff you approve.{' '}
+              <Link
+                href="/settings/teams"
+                className="font-medium text-(--ink) underline decoration-(--line) underline-offset-2 transition-colors hover:text-(--accent)"
+              >
+                Teams share one set
+              </Link>
+              , with versioning on every change.
+            </p>
+            <div className="mt-6">
+              <CommandBlock
+                command="/skillet @mattpocock review my PR"
+                accent="@mattpocock"
+                prompt={null}
+                size="sm"
+                wrap
+                bare
+              />
+            </div>
+          </div>
+          <InstallBox />
         </div>
       </div>
     </section>
@@ -212,8 +166,9 @@ export default function Home() {
       />
       <Hero />
 
-      <HomeLadder />
-
+      {/* Discover, before adopt: the catalog answers "who is on here", which is
+          the question a stranger has after the hero and before any reason to
+          install exists. It used to sit below the feature grid. */}
       <div className={PAGE_CONTAINER_CLASS}>
         <div className="surface-grid">
           <div className="surface-main">
@@ -236,6 +191,8 @@ export default function Home() {
           </aside>
         </div>
       </div>
+
+      <AdoptBand />
     </main>
   )
 }

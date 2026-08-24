@@ -110,6 +110,15 @@ export async function HomeCatalogShelves({
 
   const shelves = (
     <>
+      <ChartsRow
+        skills={popular.skills}
+        kits={kits.items}
+        creators={creators}
+        viewerHandle={viewerHandle}
+        chartSize={chartSize}
+        seeAll={seeAll}
+      />
+
       {featuredKits.length > 0 && (
         // On /browse (seeAll=false) the page's own "Featured" h1 already labels
         // this, so the shelf title would double up — drop it there.
@@ -144,14 +153,7 @@ export async function HomeCatalogShelves({
         </Shelf>
       )}
 
-      <ChartsRow
-        skills={popular.skills}
-        kits={kits.items}
-        creators={creators}
-        viewerHandle={viewerHandle}
-        chartSize={chartSize}
-        seeAll={seeAll}
-      />
+
 
       {showNewlyPublished && newlyPublished.length > 0 && (
         <Shelf

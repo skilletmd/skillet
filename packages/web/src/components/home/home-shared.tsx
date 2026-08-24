@@ -328,6 +328,10 @@ export function ChartsRow({
   chartSize?: number
   seeAll?: boolean
 }) {
+  // Creators lead. The unit people summon is a handle, not a file: "whose
+  // skills do I run" is the question the catalog exists to answer, and a chart
+  // of individual skills answers a narrower one. Skills and kits still sit
+  // beside it, one column over.
   const avatarByHandle = new Map(creators.map((c) => [c.handle, c.avatarUrl]))
   const content = mergeContent(skills, kits, avatarByHandle, viewerHandle, chartSize)
   const topCreators = creators.slice(0, chartSize)
@@ -336,43 +340,6 @@ export function ChartsRow({
   return (
     <section className="mt-12 first:mt-0">
       <div className="grid grid-cols-1 gap-x-8 gap-y-10 sm:grid-cols-2">
-        {content.length > 0 && (
-          <MiniChart
-            title="Top skills & kits"
-            blurb="Most popular across Skillet."
-            seeAllHref={seeAll ? '/browse' : undefined}
-          >
-            {content.map((c, i) => (
-              <RankRow
-                key={c.key}
-                rank={i + 1}
-                href={c.href}
-                visual={c.visual}
-                title={c.title}
-                subtitle={
-                  // Above the row's stretched title link (relative z-[1]) so the
-                  // byline routes to the author, not the skill/kit.
-                  <Link
-                    href={`/${c.owner}`}
-                    className="relative z-[1] flex min-w-0 items-center gap-1.5 hover:text-(--ink) hover:underline underline-offset-2"
-                  >
-                    <Avatar
-                      src={c.ownerAvatarUrl}
-                      name={c.owner}
-                      colorKey={c.owner}
-                      size="xxs"
-                      aria-hidden="true"
-                    />
-                    <span className="truncate font-medium">@{c.owner}</span>
-                  </Link>
-                }
-                {...metricCount(c.value, c.metricLabel)}
-                action={c.action}
-              />
-            ))}
-          </MiniChart>
-        )}
-
         {topCreators.length > 0 && (
           <MiniChart
             title="Top creators"
@@ -411,6 +378,43 @@ export function ChartsRow({
             ))}
           </MiniChart>
         )}
+        {content.length > 0 && (
+          <MiniChart
+            title="Top skills & kits"
+            blurb="Most popular across Skillet."
+            seeAllHref={seeAll ? '/browse' : undefined}
+          >
+            {content.map((c, i) => (
+              <RankRow
+                key={c.key}
+                rank={i + 1}
+                href={c.href}
+                visual={c.visual}
+                title={c.title}
+                subtitle={
+                  // Above the row's stretched title link (relative z-[1]) so the
+                  // byline routes to the author, not the skill/kit.
+                  <Link
+                    href={`/${c.owner}`}
+                    className="relative z-[1] flex min-w-0 items-center gap-1.5 hover:text-(--ink) hover:underline underline-offset-2"
+                  >
+                    <Avatar
+                      src={c.ownerAvatarUrl}
+                      name={c.owner}
+                      colorKey={c.owner}
+                      size="xxs"
+                      aria-hidden="true"
+                    />
+                    <span className="truncate font-medium">@{c.owner}</span>
+                  </Link>
+                }
+                {...metricCount(c.value, c.metricLabel)}
+                action={c.action}
+              />
+            ))}
+          </MiniChart>
+        )}
+
       </div>
     </section>
   )

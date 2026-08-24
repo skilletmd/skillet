@@ -243,12 +243,18 @@ export function classifyRoute(pathname: string): RouteVerdict {
         return { kind: 'registry', check: { type: 'author', author: first! } }
       }
       if (!SKILL_SLUG_RE.test(third!)) return { kind: 'unknown' }
-      if (segments.length === 3 || (segments.length === 4 && rest[0] === 'edit')) {
+      // `summon` is the kit's agent surface (a JSON route handler, not a page),
+      // sibling to `edit`. Both resolve only if the kit itself does.
+      if (
+        segments.length === 3 ||
+        (segments.length === 4 && (rest[0] === 'edit' || rest[0] === 'summon'))
+      ) {
         return { kind: 'registry', check: { type: 'kit', owner: first!, slug: third! } }
       }
       return { kind: 'unknown' }
     }
-    // followers / following / installs — profile sub-pages, no deeper routes.
+    // followers / following / installs / summon — length-2 only. The first
+    // three are profile sub-pages; `summon` is the handle's agent surface.
     if (segments.length === 2) {
       return { kind: 'registry', check: { type: 'author', author: first! } }
     }
