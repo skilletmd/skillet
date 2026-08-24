@@ -83,18 +83,26 @@ ChatGPT and Claude.ai run in the cloud, so they connect to your **hosted MCP lin
 
 **ChatGPT** (web; Plus, Pro, Business, Enterprise, and Edu):
 
-1. **Settings → Security and login → turn on Developer mode.** (Some accounts still keep this under **Settings → Connectors → Advanced settings** while OpenAI migrates the setting; check there if it's missing.)
-2. Open **Settings → Plugins** (or [chatgpt.com/plugins](https://chatgpt.com/plugins)) and add a plugin. In the **New Plugin** dialog: name it Skillet, keep the connection on **Server URL**, and paste your link.
-3. Set **Authentication** to **No Authentication**, check **I understand and want to continue**, then **Create**.
-4. On the **Add Skillet to ChatGPT** screen, click **Connect**.
-5. In a chat, type **@skillet** to call it, then ask *"list my skillet skills"*.
+**On the web (chatgpt.com):**
+
+1. **Settings → Security and login → Developer mode**, on. It carries an **ELEVATED RISK** badge and is a hard prerequisite: the New Plugin form will not accept an unverified connector without it.
+2. **Settings → Plugins → New Plugin.** Direct link: [chatgpt.com/plugins#settings/Connectors?create-connector=true](https://chatgpt.com/plugins#settings/Connectors?create-connector=true&redirectAfter=%2Fplugins)
+3. Name it Skillet and keep **Connection** on **Server URL**. Paste your private MCP link. An icon is optional (PNG, 256x256 or larger, 10 KB max).
+4. Set **Authentication** to **None**. It defaults to **OAuth**, which fails against a link-authenticated server, and it is the only field here with a wrong default.
+5. Tick **I understand and want to continue**, then **Create**.
+6. On the **Add Skillet to ChatGPT** screen, click **Connect**. Permissions default to **Allow low-risk actions**, which covers Skillet's five read-only tools, so there is nothing to change here (unlike Claude, where the default is Needs approval).
+
+**In the desktop app**, the form differs: **Add MCP Server**, then set **Type** to **Streamable HTTP**. Not **STDIO**, which launches a local process (command, arguments, environment, working directory) and is how you would wire `skillet mcp` on loopback rather than the hosted link.
+7. In a chat, call it with **/skillet** plus what you want, for example *"/skillet help me with my brand"*. ChatGPT runs `list_skills`, picks the match, loads it with `get_skill`, and answers from the skill.
 
 **Claude.ai** (all plans; Free is capped at one connector):
 
 1. **Settings → Connectors → Add custom connector.**
-2. Name it Skillet, paste your link, and leave the OAuth Client ID / Secret fields blank (the link is No-Auth).
-3. Click **Add**, then **Connect** on the Skillet card.
-4. In a chat, open **＋ → Connectors**, toggle **Skillet** on, and use **Add from Skillet** to browse your kit. Then ask *"list my skillet skills"*.
+2. Name it Skillet, paste your link, and click **Continue**.
+3. Leave **Authentication** on **None**. Claude detects it and preselects it, and warns that anyone with the URL can use the connector: that is correct, the link IS the credential. Treat it like a password and regenerate from Settings if it leaks.
+4. Add the connector, then **Connect** on the Skillet card.
+5. On the Skillet card, set **Read-only tools** to **Always allow**. All five (Fetch, Get skill, List skills, Search, Search skills) only read your own kit, and the group dropdown switches them together. Left on **Needs approval**, Claude prompts every time it looks at a skill, which defeats the point of the agent reaching for the right one on its own.
+6. In a chat, open **＋ → Connectors** and toggle **Skillet** on. Call it with **@skillet** plus what you want, for example *"@skillet write a blog post"*. The mention matches the connector name from step 2, so renaming it there changes what you type here.
 
 See [ChatGPT](/docs/runtimes/chatgpt) and [Claude.ai](/docs/runtimes/claude-ai) for the full runtime pages. Bundle upload still works as the snapshot alternative. Later, an OAuth pop-up may replace the copy-paste.
 
@@ -104,7 +112,7 @@ See [ChatGPT](/docs/runtimes/chatgpt) and [Claude.ai](/docs/runtimes/claude-ai) 
 
 The link token is a read-only credential, encrypted at rest. Regenerate it in Settings → Account to revoke it; clients on the old link disconnect. Requests are rate-limited per token, quarantined skills are filtered, and a version still being scanned falls back to the last clean one.
 
-Both servers expose the same tools (`list_skills`, `get_skill`, `search_skills`), and the hosted link adds `search`/`fetch` aliases for ChatGPT deep research, with citations resolving to skill pages on skillet.md.
+Both servers expose the same kit tools (`list_skills`, `get_skill`, `search_skills`). The hosted link adds two things the local server does not: the summon tools, which reach public skills you have not added, and `search`/`fetch` aliases for ChatGPT deep research, with citations resolving to skill pages on skillet.md.
 
 ## Transports
 
@@ -162,6 +170,13 @@ The server presents a small, fixed tool set: not one tool per skill, and never a
 | `list_skills()` | Kit manifest: slug, name, description, version hash, author |
 | `get_skill(slug)` | The SKILL.md body plus the skill's supporting-file resources |
 | `search_skills(query)` | The skills whose name or description matches the query |
+| `summon(handle)` | Everything a person has published, as routing candidates. Hosted link only |
+| `search_public(keywords)` | Skills across every author, for when a summoned handle has nothing that fits. Hosted link only |
+| `author_standing(handle)` | An author's bio and standing, for naming who a suggestion comes from. Hosted link only |
+
+The last three reach skills you have not added, so they are served only by the
+hosted link. `skillet mcp` runs offline against your local store and does not
+advertise them.
 
 Each file in a skill is also exposed as an MCP **resource** under the URI scheme `skillet://{owner}/{slug}/{path}`. The SKILL.md body is the headline resource; supporting files are siblings. Metadata is cheap to list, the body is fetched on demand: the same progressive-disclosure model skills use everywhere else.
 
