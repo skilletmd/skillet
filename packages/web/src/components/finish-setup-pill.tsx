@@ -40,7 +40,7 @@ export function FinishSetupPill() {
   if (!handle || hasDevice !== false) return null
   return (
     <Link
-      href="/welcome"
+      href="/setup"
       className="hidden shrink-0 rounded-full bg-(--accent) px-3 py-1.5 text-sm font-semibold text-(--surface) transition-opacity hover:opacity-90 sm:inline-flex"
     >
       Finish setup

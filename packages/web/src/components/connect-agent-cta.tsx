@@ -7,7 +7,7 @@ import { SKILLET_EVENTS } from '@/lib/events'
 /**
  * The empty "Runs" slot on your own profile: a nudge to connect an agent so your
  * detected runtimes show up. Opens the connect dialog in place (the nav's
- * "Finish setup" pill links to /welcome instead).
+ * "Finish setup" pill links to /setup instead).
  */
 export function ConnectAgentCta() {
   return (

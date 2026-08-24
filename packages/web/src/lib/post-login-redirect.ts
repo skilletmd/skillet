@@ -31,6 +31,6 @@ export function resolvePostLoginPath(input: PostLoginRedirectInput): string {
   if (safeCallback) return safeCallback
 
   // Land everyone in the app (Feed is the logged-in home). Device setup isn't a
-  // gate: the nav's Finish-setup pill carries /welcome until a device connects.
+  // gate: the nav's Finish-setup pill carries /setup until a device connects.
   return '/feed'
 }

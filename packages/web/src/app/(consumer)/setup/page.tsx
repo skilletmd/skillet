@@ -3,12 +3,12 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { getFollowSuggestions, getSkill } from '@/lib/registry'
 import { parseKitSkillRef } from '@/lib/kits'
-import { WelcomeFlow, type FeaturedPick } from '@/components/welcome/welcome-flow'
+import { SetupFlow, type FeaturedPick } from '@/components/setup/setup-flow'
 import { detectInstallPlatform } from '@/lib/install-platform'
 import { PAGE_CONTAINER_NARROW_CLASS } from '@/lib/page-layout'
 import { PageIntro } from '@/components/page-intro'
 
-export const metadata = { title: 'Welcome · Skillet' }
+export const metadata = { title: 'Set up Skillet' }
 
 // First-run guided picks. Existing published skills only — no auto-seed.
 // Curation is a content decision; swap these freely.
@@ -25,7 +25,7 @@ const FEATURED_PICKS: FeaturedPick[] = [
   },
 ]
 
-export default async function WelcomePage({
+export default async function SetupPage({
   searchParams,
 }: {
   searchParams: Promise<{ preview?: string }>
@@ -41,7 +41,7 @@ export default async function WelcomePage({
   // pair-code / "connect this browser" paths remain available from /login.
   const session = await auth()
   if (!scriptedPreview && !session?.user) {
-    redirect('/login?callbackUrl=/welcome')
+    redirect('/login?callbackUrl=/setup')
   }
 
   const suggestions = await getFollowSuggestions().catch(() => [])
@@ -72,9 +72,9 @@ export default async function WelcomePage({
   // the scripted preview runs the same UI on canned data.
   return (
     <main className={PAGE_CONTAINER_NARROW_CLASS}>
-      <PageIntro eyebrow="Welcome" title="Let’s get your skills everywhere" />
+      <PageIntro eyebrow="Setup" title="Let’s get your skills everywhere" />
       <div className="mt-6">
-        <WelcomeFlow
+        <SetupFlow
           featured={liveFeatured}
           suggestions={suggestions}
           live={!scriptedPreview}

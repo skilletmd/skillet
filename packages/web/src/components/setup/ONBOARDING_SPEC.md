@@ -1,8 +1,8 @@
-# Skillet welcome flow — growth spec (Dropbox-derived)
+# Skillet setup flow — growth spec (Dropbox-derived)
 
 The ask is identical to Dropbox's: install background software that touches your
 filesystem. Dropbox's four moves, mapped onto the current flow
-(`welcome-flow.tsx`: Get app → Connect → Add first skill → trust → done).
+(`setup-flow.tsx`: Get app → Connect → Add first skill → trust → done).
 
 ## North-star activation event
 
@@ -69,7 +69,7 @@ in-product.
 **Change:**
 - Headline the share with what *they* get: *"Get [reward] — add a teammate"*,
   not "Invite friends."
-- Surface the same prompt in three places, not just welcome: the **desktop app**
+- Surface the same prompt in three places, not just setup: the **desktop app**
   (post-sync), web **Settings**, and this flow. Dropbox's reach came from the
   prompt being everywhere value was felt.
 - Grant the reward natively and instantly — show the counter tick up in-product,

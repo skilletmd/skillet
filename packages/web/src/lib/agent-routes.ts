@@ -84,7 +84,7 @@ export const KNOWN_TOP_LEVEL_SEGMENTS: ReadonlySet<string> = new Set([
   'skills',
   'stats',
   'updates',
-  'welcome',
+  'setup',
   // Machine-readable surfaces. `.well-known` covers every RFC 8615 suffix we
   // publish; the individual files under it are real routes.
   '.well-known',
@@ -108,7 +108,7 @@ export const KNOWN_TOP_LEVEL_SEGMENTS: ReadonlySet<string> = new Set([
   'avatars',
   'brand',
   'illustrations',
-  'welcome',
+  'setup',
 ])
 
 /** Browse category keys, plus the `all` pseudo-category the route also serves. */

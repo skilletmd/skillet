@@ -15,14 +15,14 @@ import {
 const textLink = 'font-medium text-(--ink) underline-offset-2 hover:underline'
 
 /**
- * OS-detected app-download block for the welcome chat. Leads with the one app the
+ * OS-detected app-download block for the setup chat. Leads with the one app the
  * visitor can run (Mac or Windows); the other desktop OS and the CLI sit on a
  * single quiet line beneath. Linux/mobile lead with the CLI instead. Kept
  * deliberately terse — the greeting already says what the app is for, so this is
  * button + three short lines, not a paragraph. `initialPlatform` comes from the
  * server (UA header) to avoid a flash; the client refines it on mount.
  */
-export function WelcomeAppDownload({
+export function SetupAppDownload({
   initialPlatform,
   onDownload,
 }: {

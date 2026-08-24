@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Panel } from '@/components/ui/panel'
-import { DeviceMini, type AgentStatus } from '@/components/welcome/welcome-hero'
-import { WelcomeAppDownload } from '@/components/welcome/welcome-app-download'
+import { DeviceMini, type AgentStatus } from '@/components/setup/setup-hero'
+import { SetupAppDownload } from '@/components/setup/setup-app-download'
 import { WhoToFollow } from '@/components/discovery-rail'
 import { TrustPanel } from '@/components/trust-panel'
 import { AddToKitButton } from '@/components/add-to-kit-button'
@@ -136,7 +136,7 @@ function AppPeek() {
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src="/welcome/app-menubar.jpg"
+            src="/setup/app-menubar.jpg"
             alt="The Skillet app in the menu bar, showing a synced kit"
             className="block w-full"
             onError={() => setFailed(true)}
@@ -166,7 +166,7 @@ function Reveal({ children, className }: { children: React.ReactNode; className?
 
 // ── flow ─────────────────────────────────────────────────────────────────────
 
-export function WelcomeFlow({
+export function SetupFlow({
   featured,
   suggestions,
   live = false,
@@ -383,7 +383,7 @@ export function WelcomeFlow({
             </p>
           ) : (
             <>
-              <WelcomeAppDownload
+              <SetupAppDownload
                 initialPlatform={initialPlatform}
                 onDownload={() => setDownloadClicked(true)}
               />
