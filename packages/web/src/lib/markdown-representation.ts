@@ -136,7 +136,9 @@ async function profileMarkdown(handle: string): Promise<string | null> {
     `- Profile: ${abs(`/${profile.username}`)}`,
     `- Kit (everything they publish): ${abs(`/${profile.username}/kit`)}`,
     `- Public skills: ${publicSkills.length}`,
-    profile.followers != null ? `- Followers: ${profile.followers}` : null,
+    // Same rule the HTML header follows: a zero argues against the profile it
+    // is describing, and at launch every profile has zeros in every slot.
+    profile.followers ? `- Followers: ${profile.followers}` : null,
     '',
     '## Skills',
     '',

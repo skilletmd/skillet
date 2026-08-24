@@ -8,7 +8,6 @@ import { ConnectAgentCta } from '@/components/connect-agent-cta'
 import { AgentGlyph } from '@/components/agent-glyph'
 import { Tooltip } from '@/components/ui/tooltip'
 import { Check, VerifiedBadge } from '@/components/ui/icons'
-import { GitHubMark } from '@/components/mirror-notice'
 import { runtimeLabel } from '@/lib/runtime-labels'
 import { avatarHue, readAvatarHue } from '@/lib/avatar-color'
 import { heroWash } from '@/components/cover/hero-wash'
@@ -161,19 +160,15 @@ export function ProfileHeader({
 
   const identityInner = (
     <>
+      {/* No mirror badge here. Where a profile's data came from is a fact about
+          the data; sitting beside the display name it read as a qualifier on the
+          PERSON, which is the wrong thing to say on the page you send an author
+          when you want them to claim it. The rail's SOURCE block says the same
+          thing without standing next to their name. */}
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
         <h1 className="text-2xl font-semibold leading-[1.15] tracking-tight text-(--ink) sm:text-3xl">
           {profile.displayName}
         </h1>
-        {profile.isMirror && (
-          <span
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-(--line) bg-(--surface) px-2.5 py-1 text-xs font-medium text-(--ink-2)"
-            title="This profile mirrors a GitHub repo. Its owner hasn't joined Skillet."
-          >
-            <GitHubMark className="h-3.5 w-3.5" />
-            Mirror
-          </span>
-        )}
       </div>
       <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-(--ink-2)">
         {meta.map((item, i) =>

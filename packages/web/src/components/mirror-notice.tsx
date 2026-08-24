@@ -1,6 +1,7 @@
 import { AppLink } from '@/components/app-link'
 import { Badge } from '@/components/ui/badge'
 import { loginHref } from '@/lib/urls'
+import { Eyebrow } from '@/components/ui/eyebrow'
 
 /**
  * Compact repo label: trims the scheme and any deep tree/blob path down to
@@ -122,6 +123,14 @@ export function MirrorNotice({
  * What survives is what a reader (or a license) actually needs: the source repo,
  * its license, the sync cadence, and the claim path. The claim trigger stays a
  * separate child so it keeps its own line and its own weight.
+ *
+ * The heading is BACK, and the badge is the half that went. That dedup was
+ * resolved the other way originally and is deliberately reversed here: profiles
+ * became the page authors are sent to, and of the two, only the badge was
+ * standing next to a person's name qualifying it. A labelled block in the rail
+ * carries the same fact where it reads as provenance. `SOURCE` rather than
+ * `MIRROR` because the block answers where this came from, and "mirror" still
+ * faintly means "not the real one".
  */
 export function MirrorProfileCard({
   sourceUrl,
@@ -137,9 +146,12 @@ export function MirrorProfileCard({
   children?: React.ReactNode
 }) {
   return (
-    <div className="space-y-3 text-sm">
-      <MirrorNotice sourceUrl={sourceUrl} license={license} live />
-      {children}
+    <div className="text-sm">
+      <Eyebrow>Source</Eyebrow>
+      <div className="mt-3 space-y-3">
+        <MirrorNotice sourceUrl={sourceUrl} license={license} live />
+        {children}
+      </div>
     </div>
   )
 }
