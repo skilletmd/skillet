@@ -28,6 +28,7 @@ import { pathToFileURL } from 'node:url';
 import { createPrismaClient } from '../src/db/prisma-client.js';
 import { createPrismaBlobStore } from '../src/blob-store/create-blob-store.js';
 import { loadSources } from '../src/mirror-ops/sync-sources.js';
+import { upsertMirrorAuthorPrisma } from '../src/lib/mirror-authors.js';
 import { loadDenylist } from '../src/mirror-ops/denylist.js';
 import { syncRepoSkillsPrisma } from '../src/sync/sync-repo.js';
 import { normalizeRepoKey } from '../src/lib/mirror-screen.js';
@@ -49,6 +50,10 @@ interface Target {
   repo: string;
   license: string | null;
   origin: 'seed' | 'queue';
+  /** Seed metadata, present only for seed targets — enough to CREATE the author
+   *  row. A queue mirror's author already exists (approval created it) and its
+   *  profile fields are not in any file, so there is nothing to upsert from. */
+  profile?: { displayName: string; bio: string | null; logo: string; sourceUrl: string };
   maxSkills?: number;
   syncMode?: 'auto' | 'per-skill';
   excludeDirs?: string[];
@@ -77,6 +82,7 @@ async function resolveTargets(
       repo: s.repo,
       license: s.license,
       origin: 'seed',
+      profile: { displayName: s.displayName, bio: s.bio ?? null, logo: s.logo, sourceUrl: s.sourceUrl },
       ...(s.maxSkills != null ? { maxSkills: s.maxSkills } : {}),
       ...(s.syncMode ? { syncMode: s.syncMode } : {}),
       ...(s.excludeDirs?.length ? { excludeDirs: s.excludeDirs } : {}),
@@ -171,6 +177,20 @@ async function main(): Promise<void> {
       console.log(`\n@${t.handle}  <-  ${t.repo} (${t.origin}, ${t.license ?? 'no license recorded'})`);
       const before = await prisma.skills.count({ where: { author_id: t.handle } });
       try {
+        // A seeded source added to the file but never synced has no author row,
+        // and every skill upsert then fails the author_id foreign key one at a
+        // time — 'skipped: Foreign key constraint violated' per skill, and a
+        // 0 -> 0 summary that looks like "nothing to do". Create it first, the
+        // same way the seed sync does.
+        if (apply && t.profile) {
+          await upsertMirrorAuthorPrisma(prisma, t.handle, owner, t.repo, null, {
+            displayName: t.profile.displayName,
+            bio: t.profile.bio,
+            avatarUrl: t.profile.logo,
+            profileUrl: t.profile.sourceUrl,
+            sourceUrl: t.profile.sourceUrl,
+          });
+        }
         const r = await syncRepoSkillsPrisma(prisma, owner, repo, {
           authorHandle: t.handle,
           repoFull: t.repo,
