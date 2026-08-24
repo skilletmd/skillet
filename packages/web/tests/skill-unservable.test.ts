@@ -22,10 +22,11 @@ describe('a skill with no servable version', () => {
   it('treats a scanner block like a moderator block for install affordances', () => {
     expect(view).toContain('const noServableVersion = skill.hasInstallableVersion === false')
     expect(view).toContain('const blocked = quarantined || noServableVersion')
-    // Both install paths — the header action and the panel below the content.
+    // Both install paths — the header Add and the delivery bar under it. The
+    // panel below the content is gone, and the bar took its guard, so the same
+    // negated form now appears twice rather than two different spellings.
     expect(view).toContain('skill.deprecated || blocked ?')
-    expect(view).toContain('{!(skill.deprecated || blocked) && (')
-    expect(view).toContain('{!skill.deprecated && !blocked && (')
+    expect(view.split('{!(skill.deprecated || blocked) && (').length - 1).toBe(2)
   })
 
   it('does not gate install on moderationStatus alone', () => {

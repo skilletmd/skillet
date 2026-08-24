@@ -85,7 +85,7 @@ export function useKitMembership(author: string, slug: string) {
           return
         }
         // Drives the first-add "connect your agent" prompt (ConnectActivation)
-        // and the /welcome reveal. detail carries the ref so listeners can match
+        // and the /setup reveal. detail carries the ref so listeners can match
         // the specific skill; existing listeners ignore it (backward-compatible).
         window.dispatchEvent(new CustomEvent(SKILLET_EVENTS.skillAdded, { detail: { author, slug } }))
       }

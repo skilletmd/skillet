@@ -46,6 +46,18 @@ vi.mock('@/lib/registry', () => ({
   getAuthorProfile: vi.fn().mockResolvedValue(null),
 }))
 
+// Signed-in paths also reach the MCP lookup, which reads cookies() outside any
+// request scope under the test renderer.
+vi.mock('next/headers', () => ({
+  cookies: vi.fn().mockResolvedValue({ get: () => undefined }),
+}))
+vi.mock('@/lib/session-cookie', () => ({
+  readSessionCookie: () => null,
+}))
+vi.mock('@/lib/mcp-link', () => ({
+  fetchMcpLink: vi.fn().mockResolvedValue({ ok: true, enabled: false }),
+}))
+
 // Signed-in paths reach team lookups, which read cookies() outside any request
 // scope under the test renderer.
 vi.mock('@/lib/orgs-server', () => ({
@@ -77,53 +89,53 @@ async function renderKitPage(author = 'alice', slug = 'essentials') {
   return render(jsx)
 }
 
-describe('KitPage delivery is gated on adding, not offered beside it', () => {
+describe('KitPage: one decision, then the bar answers it', () => {
   beforeEach(async () => {
     mockGetKitByHandle.mockResolvedValue({ kind: 'ok', kit: baseKit })
     const { auth } = await import('@/auth')
     vi.mocked(auth).mockResolvedValue(null as never)
   })
 
-  it('offers a logged-out visitor something to do that costs nothing', async () => {
+  it('offers one button and nothing competing with it', async () => {
     await renderKitPage()
 
-    expect(screen.getByText('Try it now, nothing installed')).toBeInTheDocument()
-    const summon = screen.getAllByText((_c, el) =>
-      Boolean(el?.textContent?.includes('skillet.md/@alice/kit/essentials/summon')),
-    )
-    expect(summon.length).toBeGreaterThan(0)
+    // Copy prompt used to sit beside Add. A second button at the page's only
+    // decision point competed with the one thing worth pressing.
+    expect(screen.queryByRole('button', { name: /Copy/i })).toBeNull()
+  })
+
+  it('prints nothing under the buttons until one is pressed', async () => {
+    // The prompt used to sit here as bare monospace with no container, which
+    // read as debug output rather than as something to paste. It moved into the
+    // bar, which only speaks when spoken to.
+    await renderKitPage()
+
+    expect(screen.queryByText(/skillet\.md\/@alice\/kit\/essentials\/summon/)).toBeNull()
+    expect(screen.queryByText(/Copied\./)).toBeNull()
   })
 
   it('does not pitch install before the kit has been added', async () => {
-    // Install is the second half of Add kit, not an alternative to it. Shown
-    // side by side it made one decision look like three, and it asked a visitor
-    // who had committed to nothing to install a CLI.
+    // Install is the second half of Add, not an alternative to it.
     await renderKitPage()
 
-    expect(screen.queryByText('Install')).not.toBeInTheDocument()
     expect(screen.queryByText('Get the Skillet app')).not.toBeInTheDocument()
   })
 
-  it('offers both install paths once the kit is added and no client is connected', async () => {
-    mockGetKitByHandle.mockResolvedValue({
-      kind: 'ok',
-      kit: { ...baseKit, subscribed: true },
-    })
+  it('offers all three ways in once the kit is added', async () => {
+    mockGetKitByHandle.mockResolvedValue({ kind: 'ok', kit: { ...baseKit, subscribed: true } })
     const { auth } = await import('@/auth')
     vi.mocked(auth).mockResolvedValue({ handle: 'bob' } as never)
 
     await renderKitPage()
 
-    expect(screen.getByText('Get the Skillet app')).toBeInTheDocument()
-    const matches = screen.getAllByText((_c, el) =>
-      Boolean(el?.textContent?.includes('npx skilletmd add kit @alice/essentials -y')),
-    )
-    expect(matches.length).toBeGreaterThan(0)
+    // Three doors, not a bespoke app-or-npx pair: that pair silently drops the
+    // one way in that installs nothing.
+    expect(screen.getByRole('link', { name: /Mac app/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Copy the install command/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /ChatGPT/i })).toBeInTheDocument()
   })
 
-  it('drops the make-your-own prompt from someone else\u2019s kit page', async () => {
-    // A supply call to action on a demand page, competing with the one decision
-    // the page is asking for.
+  it("drops the make-your-own prompt from someone else's kit page", async () => {
     await renderKitPage()
 
     expect(screen.queryByText('Make your own')).not.toBeInTheDocument()

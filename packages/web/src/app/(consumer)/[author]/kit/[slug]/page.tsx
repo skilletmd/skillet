@@ -1,17 +1,19 @@
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { auth } from '@/auth'
+import { readSessionCookie } from '@/lib/session-cookie'
+import { fetchMcpLink } from '@/lib/mcp-link'
 import { getKitByHandle, getKitCapabilities, getKitVersions, getRelatedKits } from '@/lib/kits-server'
 import { getAuthorProfile } from '@/lib/registry'
 import { KitCard, KitRow } from '@/components/kit-card'
 import { SkillCard } from '@/components/skill-card'
-import { SubscribeKitButton } from '@/components/kits/subscribe-kit-button'
+import { KitActionRow } from '@/components/kits/kit-action-row'
 import { TeamKitSyncButton } from '@/components/team/team-kit-sync-button'
 import { listMyOrgs, getMutedTeamKitIds } from '@/lib/orgs-server'
 import { viewerOrgRole } from '@/lib/orgs'
 import { HeaderFollowButton } from '@/components/header-follow-button'
-import { KitBorrowLine } from '@/components/kits/kit-borrow-line'
-import { KitDelivery } from '@/components/kits/kit-delivery'
+import { AuthorAboutRow } from '@/components/author-about-row'
 import { KitPageLayout } from '@/components/kits/kit-page-layout'
 import { kitInstallCommand } from '@/lib/cli-install-commands'
 import { Button } from '@/components/ui/button'
@@ -57,6 +59,15 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   }
 }
 
+/** The viewer's MCP link, or null when off, unauthenticated, or unavailable.
+ *  Never throws: the Chat door degrades to "turn it on" rather than the page
+ *  failing over a connector lookup. */
+async function viewerMcpLink() {
+  const token = readSessionCookie(await cookies())
+  if (!token) return null
+  return fetchMcpLink(token).catch(() => null)
+}
+
 export async function KitPageContent({ params }: { params: Promise<Params> }) {
   const { author, slug } = await params
   const [session, result] = await Promise.all([auth(), getKitByHandle(author, slug)])
@@ -89,6 +100,7 @@ export async function KitPageContent({ params }: { params: Promise<Params> }) {
     // In the batch, not after it: awaiting it separately cost every signed-in
     // reader an extra serial round trip.
     viewerProfile,
+    mcpLink,
   ] = await Promise.all([
     getKitVersions(kit.id),
     getAuthorProfile(kit.owner).catch(() => null),
@@ -97,7 +109,12 @@ export async function KitPageContent({ params }: { params: Promise<Params> }) {
     session?.handle ? listMyOrgs() : Promise.resolve({ kind: 'unauthorized' as const }),
     session?.handle ? getMutedTeamKitIds() : Promise.resolve(new Set<string>()),
     session?.handle ? getAuthorProfile(session.handle).catch(() => null) : Promise.resolve(null),
+    // MCP state for the Chat door: whether a link already exists decides between
+    // "turn it on" and "here it is". Same source Settings reads.
+    session?.handle ? viewerMcpLink() : Promise.resolve(null),
   ])
+
+  const mcpUrl = mcpLink?.ok && mcpLink.enabled ? mcpLink.link.url : null
 
   const viewerRuntimes = (
     viewerProfile?.runtimes?.map((r) => r.key) ?? viewerProfile?.detectedRuntimes ?? []
@@ -167,47 +184,38 @@ export async function KitPageContent({ params }: { params: Promise<Params> }) {
         ) : isTeamMember ? (
           <TeamKitSyncButton kitId={kit.id} initialMuted={mutedKitIds.has(kit.id)} />
         ) : (
-          <SubscribeKitButton
+          // One client boundary. The bar under these buttons has to know which
+          // one you just pressed, and the server's initial `subscribed` can only
+          // describe how the page arrived.
+          <KitActionRow
             kitId={kit.id}
+            owner={kit.owner}
             initialSubscribed={!!kit.subscribed}
             viewerHandle={viewerHandle}
-            owner={kit.owner}
-            hero
+            runtimes={viewerRuntimes}
+            mcpUrl={mcpUrl}
           />
         )
       }
-      follow={
-        isOwner ? null : (
-          <HeaderFollowButton
-            owner={kit.owner}
-            isTeam={ownerProfile?.kind === 'team'}
-            appearance="secondary"
-            showHandle
-          />
-        )
+      authorRow={
+        <AuthorAboutRow
+          handle={kit.owner}
+          displayName={ownerProfile?.displayName}
+          avatarUrl={ownerProfile?.avatarUrl ?? null}
+          isTeam={ownerProfile?.kind === 'team'}
+          follow={
+            isOwner ? null : (
+              <HeaderFollowButton
+                owner={kit.owner}
+                isTeam={ownerProfile?.kind === 'team'}
+                appearance="inline"
+              />
+            )
+          }
+        />
       }
-      usedByBlock={
-        hasUsedBy ? (
-          <UsedBy
-            layout="stacked"
-            kind="kit"
-            id={kit.id}
-            initial={kit.subscriber_count ?? 0}
-            faces={usedByFaces}
-          />
-        ) : undefined
-      }
-      borrow={<KitBorrowLine owner={kit.owner} slug={kit.slug} />}
       mainExtra={
         <>
-          {/* Delivery, not an alternative to adding. Renders only once the kit
-              is added, and only while the viewer still needs a client. */}
-          <KitDelivery
-            added={!!kit.subscribed}
-            runtimes={viewerRuntimes}
-            command={kitInstallCommand(kit.owner, kit.slug)}
-            accent={`@${kit.owner}/${kit.slug}`}
-          />
 
           {versions.length > 0 && (
             <section>

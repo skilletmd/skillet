@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
-import { CommandBlock } from '@/components/command-block'
 import {
   ClaudeCodeLogo,
   ClaudeLogo,
@@ -15,9 +14,7 @@ import {
   OpenAiLogo,
   WindsurfLogo,
 } from '@/components/brand-logos'
-import { AppleLogo, WindowsLogo } from '@/components/os-logos'
 import { Avatar } from '@/components/ui/avatar'
-import { detectInstallPlatform, type InstallPlatform } from '@/lib/install-platform'
 
 // Real, recognizable authors from the crawled mirror library (mirror-sources.json).
 // specialty + slug point at the person's real mirrored skill, so the reply links
@@ -294,185 +291,8 @@ export function SummonDemo() {
 }
 
 // ── The action: the install card, quieter, below ─────────────────────────────
-// Three full-width tabs the visitor self-selects by where they work, each
-// previewing its coverage with the real product logos.
-const TABS: ReadonlyArray<{
-  id: 'terminal' | 'desktop' | 'chat'
-  label: string
-  icons: IconComponent[]
-}> = [
-  { id: 'terminal', label: 'Terminal', icons: [ClaudeCodeLogo, CodexLogo, CursorLogo] },
-  { id: 'desktop', label: 'Desktop App', icons: [AppleLogo, WindowsLogo] },
-  { id: 'chat', label: 'Chat', icons: [OpenAiLogo, ClaudeLogo] },
-]
-
-const PMS = [
-  { id: 'npx', label: 'npx', command: 'npx skilletmd', prompt: '$' as string | null },
-  { id: 'pnpm', label: 'pnpm', command: 'pnpm dlx skilletmd', prompt: '$' as string | null },
-  { id: 'yarn', label: 'yarn', command: 'yarn dlx skilletmd', prompt: '$' as string | null },
-  { id: 'bun', label: 'bun', command: 'bunx skilletmd', prompt: '$' as string | null },
-  {
-    id: 'agent',
-    label: 'agent instructions',
-    command: 'Run `npx skilletmd` to add the Skillet skill, so I can summon with /skillet @handle.',
-    prompt: null as string | null,
-  },
-] as const
-
-const ACTION =
-  'inline-flex items-center gap-2 rounded-lg border border-(--line) bg-(--surface) px-3 py-2 text-sm font-medium text-(--ink) transition-colors hover:border-(--ink-2)'
-
-const DOWNLOADS = [
-  { id: 'mac', short: 'Mac', Logo: AppleLogo },
-  { id: 'windows', short: 'Windows', Logo: WindowsLogo },
-] as const
-
-export function InstallBox() {
-  const reduce = useReducedMotion()
-  const [tab, setTab] = useState<'terminal' | 'desktop' | 'chat'>('terminal')
-  const [pm, setPm] = useState('npx')
-  const [os, setOs] = useState<InstallPlatform | null>(null)
-  const pmEntry = PMS.find((x) => x.id === pm)!
-  const managers = PMS.filter((x) => x.id !== 'agent')
-  const agentPm = PMS.find((x) => x.id === 'agent')!
-  const pmClass = (id: string) =>
-    `transition-colors hover:text-(--ink) ${pm === id ? 'font-semibold text-(--ink)' : ''}`
-
-  // OS is a client-only signal; SSR + first paint default to Mac-first, then
-  // reorder to the viewer's platform after hydration.
-  useEffect(() => {
-    setOs(detectInstallPlatform(navigator.userAgent, navigator.platform))
-  }, [])
-  const downloads = os === 'windows' ? [DOWNLOADS[1], DOWNLOADS[0]] : DOWNLOADS
-
-  return (
-    <div className="mx-auto mt-10 w-full max-w-[420px] lg:mx-0">
-      {/* Section header: title left, tab selector right, on one line. */}
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-        <h2 className="pb-1 text-base font-semibold text-(--ink)">Install Skillet</h2>
-        <div className="flex items-center gap-5">
-          {TABS.map((t) => {
-            const active = tab === t.id
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTab(t.id)}
-                className={`relative pb-1 text-xs font-medium transition-colors ${
-                  active ? 'text-(--ink)' : 'text-(--ink-2) hover:text-(--ink)'
-                }`}
-              >
-                {t.label}
-                {/* One shared underline that slides between tabs, instead of
-                    blinking off under the old tab and on under the new one. */}
-                {active && (
-                  <motion.span
-                    layoutId="install-tab-underline"
-                    className="absolute inset-x-0 -bottom-px h-0.5 bg-(--ink)"
-                    transition={
-                      reduce
-                        ? { duration: 0 }
-                        : { type: 'spring', stiffness: 480, damping: 38, mass: 0.7 }
-                    }
-                  />
-                )}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Fixed height so switching tabs (Terminal is taller) doesn't shift the page. */}
-      <div className="mt-1 min-h-[96px] text-left">
-        {/* mode="wait" so the outgoing panel is gone before the next arrives.
-            Opacity only, no layout animation: the min-height above already holds
-            the box steady, so nothing needs to measure or move. */}
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={tab}
-            initial={reduce ? false : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: reduce ? 0 : 0.12, ease: [0.16, 1, 0.3, 1] }}
-          >
-            {tab === 'terminal' && (
-              <>
-                <CommandBlock
-                  command={pmEntry.command}
-                  accent="skilletmd"
-                  prompt={pmEntry.prompt}
-                  size="sm"
-                  wrap
-                  bare
-                  className="bg-(--surface)"
-                />
-                <div className="mt-2 flex items-center justify-between px-1 text-xs text-(--ink-2)">
-                  <div className="flex items-center gap-3">
-                    {managers.map((x) => (
-                      <button
-                        key={x.id}
-                        type="button"
-                        onClick={() => setPm(x.id)}
-                        className={pmClass(x.id)}
-                      >
-                        {x.label}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setPm(agentPm.id)}
-                    className={pmClass(agentPm.id)}
-                  >
-                    {agentPm.label}
-                  </button>
-                </div>
-              </>
-            )}
-
-            {tab === 'desktop' && (
-              <div className="flex flex-col items-start gap-2.5">
-                <p className="text-xs text-(--ink-2)">
-                  Get the app. It syncs every agent automatically.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {downloads.map((d, i) => (
-                    <Link key={d.id} href="/install" className={ACTION}>
-                      <d.Logo className="h-4 w-4" />
-                      {i === 0 ? `Download for ${d.short}` : d.short}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {tab === 'chat' && (
-              <div className="flex flex-col items-start gap-2.5">
-                <p className="text-xs text-(--ink-2)">
-                  Follow the setup guide, or connect over{' '}
-                  <Link
-                    href="/docs/mcp"
-                    className="font-medium text-(--ink) underline decoration-(--line) underline-offset-2 transition-colors hover:text-(--accent)"
-                  >
-                    MCP
-                  </Link>
-                  .
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <Link href="/docs/runtimes/chatgpt" className={ACTION}>
-                    <OpenAiLogo className="h-4 w-4" />
-                    ChatGPT
-                  </Link>
-                  <Link href="/docs/runtimes/claude-ai" className={ACTION}>
-                    <ClaudeLogo className="h-4 w-4" />
-                    Claude.ai
-                  </Link>
-                </div>
-              </div>
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-    </div>
-  )
-}
+/**
+ * The homepage's install affordance. A thin wrapper now: the picker itself is
+ * shared with the kit page's post-add bar, because install told three different
+ * ways in three places is how three places drift.
+ */

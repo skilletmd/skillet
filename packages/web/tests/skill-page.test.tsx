@@ -172,13 +172,18 @@ describe('SkillPage', () => {
     expect(screen.getByText('v1')).toBeInTheDocument()
   })
 
-  it('shows the npx install command in the sidebar', async () => {
+  it('does not offer install before the skill is added', async () => {
     mockGetSkill.mockResolvedValue(baseSkill)
     await renderSkillPage()
-    const matches = screen.getAllByText((_content, el) =>
+
+    // The standalone panel that always sat below the content is gone. Install is
+    // the second half of Add now, the same as on a kit page: a visitor who has
+    // not added anything has nowhere to install it to, so a command here was
+    // answering a question they had not asked yet.
+    const matches = screen.queryAllByText((_content, el) =>
       Boolean(el?.textContent?.includes('npx skilletmd add @test-author/test-skill -y')),
     )
-    expect(matches.length).toBeGreaterThan(0)
+    expect(matches.length).toBe(0)
   })
 
   it('renders the install control (CLI now lives inside it)', async () => {
@@ -211,10 +216,11 @@ describe('SkillPage', () => {
   it('includes author breadcrumb link to author profile', async () => {
     mockGetSkill.mockResolvedValue(baseSkill)
     await renderSkillPage()
-    expect(screen.getByRole('link', { name: '@test-author' })).toHaveAttribute(
-      'href',
-      '/test-author',
-    )
+    // Two now, and deliberately: the byline is attribution above the title,
+    // the rail's About row is the identity card. Both route to the profile.
+    const links = screen.getAllByRole('link', { name: '@test-author' })
+    expect(links.length).toBeGreaterThan(0)
+    for (const link of links) expect(link).toHaveAttribute('href', '/test-author')
   })
 
   it('drops the published date from the header meta (it lives in version history)', async () => {

@@ -4,6 +4,7 @@ import { DetailHeader } from '@/components/detail-header'
 import { KitSkillList } from '@/components/kits/kit-skill-list'
 import { TrustPanel } from '@/components/skills/trust-panel'
 import { Eyebrow } from '@/components/ui/eyebrow'
+import { AuthorAboutRow } from '@/components/author-about-row'
 import { WorksWithRail } from '@/components/works-with-rail'
 import { heroWash } from '@/components/cover/hero-wash'
 import { coverHue } from '@/components/cover/cover-hue'
@@ -72,7 +73,6 @@ export function KitPageLayout({
   hideByline,
   isPrivate,
   action,
-  follow,
   // Body
   heroSeed,
   skills,
@@ -81,9 +81,9 @@ export function KitPageLayout({
   /** Extra sections in the main column, below the skill list (a named kit's
    *  install command + version history; empty for the virtual author-kit). */
   mainExtra,
-  /** The zero-cost action, rendered directly under the header actions: run this
-   *  kit now with nothing installed. */
-  borrow,
+  /** Author identity for the About block. The person lives in the rail now,
+   *  not the byline, so this carries the avatar, full name, handle, and Follow. */
+  authorRow,
   /** Extra rail sections (more-from-owner + people-also-added on a named kit;
    *  empty on the author-kit). */
   railExtra,
@@ -101,13 +101,12 @@ export function KitPageLayout({
   hideByline?: boolean
   isPrivate?: boolean
   action?: ReactNode
-  follow?: ReactNode
   heroSeed: string
   skills: KitSkillEntry[]
   capabilities: KitCapabilities
   usedByBlock?: ReactNode
   mainExtra?: ReactNode
-  borrow?: ReactNode
+  authorRow?: ReactNode
   railExtra?: ReactNode
 }) {
   return (
@@ -135,6 +134,7 @@ export function KitPageLayout({
             <section className="py-4 first:pt-0">
               <Eyebrow>About</Eyebrow>
               <div className="mt-3 flex flex-col items-stretch gap-2.5 text-sm text-(--ink-2)">
+                {authorRow}
                 <AboutRow icon={<SkillsGlyph />}>
                   {skillCount} {skillCount === 1 ? 'skill' : 'skills'}
                 </AboutRow>
@@ -146,7 +146,14 @@ export function KitPageLayout({
               </div>
             </section>
 
-            {usedByBlock && <div className="hidden lg:block">{usedByBlock}</div>}
+            {/* The desktop-only wrapper makes UsedBy's `py-4 first:pt-0` section
+                the first child of a NEW parent, so `pt-0` fires and this block
+                loses the top padding every other rail section has. Restore it
+                here rather than in UsedBy, which renders correctly wherever it
+                is not wrapped. */}
+            {usedByBlock && (
+              <div className="hidden lg:block [&>section:first-child]:pt-4">{usedByBlock}</div>
+            )}
 
             {railExtra}
 
@@ -164,22 +171,11 @@ export function KitPageLayout({
               kind="kit"
               title={name}
               owner={owner}
-              ownerAvatarUrl={ownerAvatar}
-              ownerIsTeam={ownerIsTeam}
               description={description}
               hideByline={hideByline}
               isPrivate={isPrivate}
-              action={
-                (action || follow) && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    {action}
-                    {follow}
-                  </div>
-                )
-              }
+              action={action}
             />
-
-            {borrow}
 
             {/* Mobile only — social proof up top instead of buried in the rail. */}
             {usedByBlock && <div className="mt-8 lg:hidden">{usedByBlock}</div>}

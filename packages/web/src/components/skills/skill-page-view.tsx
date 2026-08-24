@@ -6,6 +6,7 @@ import { MirrorNotice, ClaimMirrorCta } from '@/components/mirror-notice'
 import { ReportDialog } from '@/components/skills/report-dialog'
 import { DetailHeader } from '@/components/detail-header'
 import { HeaderFollowButton } from '@/components/header-follow-button'
+import { AuthorAboutRow } from '@/components/author-about-row'
 import { heroWash } from '@/components/cover/hero-wash'
 import { CoverArt } from '@/components/cover/cover'
 import { coverHue } from '@/components/cover/cover-hue'
@@ -17,9 +18,8 @@ import { UsedBy } from '@/components/kits/used-by'
 import { WorksWithRail } from '@/components/works-with-rail'
 import { PAGE_CONTAINER_CLASS } from '@/lib/page-layout'
 import { AddToKitButton } from '@/components/add-to-kit-button'
-import { SingleInstallPanel } from '@/components/single-install-panel'
+import { SkillDelivery } from '@/components/skills/skill-delivery'
 import { TrustPanel } from '@/components/skills/trust-panel'
-import { skillInstallCommand } from '@/lib/cli-install-commands'
 import { evidenceSnippet } from '@/lib/evidence-snippet'
 import { fetchEvidenceFileTexts } from '@/lib/skill-bundle-evidence'
 import { SkillOwnerControls } from '@/components/skills/skill-owner-controls'
@@ -163,6 +163,8 @@ export async function SkillPageView({
    *  blank. Empty/omitted is fine — the fallback section just won't render. */
   popularSkills?: RailSkill[]
   authorProfile: {
+    /** Full name for the rail's author row; falls back to the handle. */
+    displayName?: string | null
     avatarUrl?: string | null
     /** Team owners render the byline avatar as a monogram, never a person face. */
     kind?: 'user' | 'team'
@@ -297,10 +299,11 @@ export async function SkillPageView({
               kind="skill"
               title={skill.title}
               owner={author}
-              ownerAvatarUrl={authorProfile?.avatarUrl}
-              ownerIsTeam={authorProfile?.kind === 'team'}
               description={skill.description}
-              follow={<HeaderFollowButton owner={author} appearance="secondary" showHandle />}
+              // Attribution stays on the byline: who made this, before the
+              // thing is even named. The rail's About row is the identity card
+              // (avatar, full name, Follow) and owns the only follow control,
+              // so the two say different things rather than saying it twice.
               isPrivate={skill.visibility === 'private'}
               badges={
                 skill.deprecated || blocked ? (
@@ -326,6 +329,14 @@ export async function SkillPageView({
                 </div>
               }
             />
+            {/* What follows Add, exactly as on a kit page. Its own boundary, and
+                a null fallback: the bar has nothing to say until Add is pressed,
+                so it can stream in rather than holding up the header. */}
+            {!(skill.deprecated || blocked) && (
+              <Suspense fallback={null}>
+                <SkillDelivery author={author} slug={slug} />
+              </Suspense>
+            )}
             {/* Mobile only — keeps social proof near the top instead of buried at
                 the bottom when the rail stacks under the content. */}
             {hasUsedBy && <div className="mt-8 lg:hidden">{usedByBlock}</div>}
@@ -446,20 +457,11 @@ export async function SkillPageView({
               </div>
             )}
 
-            {/* Install — a secondary path below the content; the header Add is the
-                primary action, so this stays quiet and out of the decision flow.
-                Hidden for a deprecated skill (sunset) or a blocked one — moderator
-                quarantine or every version held by the scanner — where the registry
-                blocks the download and the command would 403. */}
-            {!skill.deprecated && !blocked && (
-              <div className="mt-8">
-                <SingleInstallPanel
-                  command={skillInstallCommand(ref)}
-                  accent={ref}
-                  slashCommand={skill.hasCommand ? slug : undefined}
-                />
-              </div>
-            )}
+            {/* The install path used to sit here as a quiet panel handing over
+                one copy command. It moved under Add, where the kit page already
+                puts it: install is the second half of adding, not a separate
+                route buried past the content, and the panel never mentioned the
+                two surfaces that need no install at all. */}
 
             <div className="mt-8 space-y-6">
               {skill.versions.length > 0 && (
@@ -516,8 +518,17 @@ export async function SkillPageView({
             <section className="py-4 first:pt-0">
               <Eyebrow>About</Eyebrow>
               <div className="mt-3 flex flex-col items-stretch gap-2.5 text-sm text-(--ink-2)">
-                {/* Provenance leads — for a mirror, where it comes from is the
-                    strongest identity fact in the block. */}
+                {/* The author leads. Who made this is not the same class of
+                    thing as a token count, and the order says so. Provenance
+                    follows, which for a mirror is the next strongest identity
+                    fact in the block. */}
+                <AuthorAboutRow
+                  handle={author}
+                  displayName={authorProfile?.displayName}
+                  avatarUrl={authorProfile?.avatarUrl ?? null}
+                  isTeam={authorProfile?.kind === 'team'}
+                  follow={<HeaderFollowButton owner={author} appearance="inline" />}
+                />
                 {isFromGitHub && (
                   <MirrorNotice
                     sourceUrl={skill.mirrorSourceUrl}

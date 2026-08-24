@@ -1,10 +1,14 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import { cookies } from 'next/headers'
 import { auth } from '@/auth'
+import { readSessionCookie } from '@/lib/session-cookie'
+import { fetchMcpLink } from '@/lib/mcp-link'
+import { getAuthorProfile } from '@/lib/registry'
 import { getAuthorKit, getKitCapabilities } from '@/lib/kits-server'
 import { authorKitTagline } from '@/lib/author-kit'
 import { KitCoverStack } from '@/components/kit-card'
-import { SubscribeAuthorButton } from '@/components/kits/subscribe-author-button'
+import { AuthorKitActionRow } from '@/components/kits/author-kit-action-row'
 import { Button } from '@/components/ui/button'
 import { UsedBy } from '@/components/kits/used-by'
 import { KitPageLayout } from '@/components/kits/kit-page-layout'
@@ -39,6 +43,22 @@ export default async function AuthorKitPage({ params }: { params: Promise<Params
   const kit = result.kit
 
   const viewerHandle = session?.handle ?? null
+
+  // Same viewer state a named kit page reads, for the same bar. Both lookups
+  // degrade to null rather than failing the page.
+  const [viewerProfile, mcpLink] = await Promise.all([
+    viewerHandle ? getAuthorProfile(viewerHandle).catch(() => null) : Promise.resolve(null),
+    viewerHandle
+      ? (async () => {
+          const token = readSessionCookie(await cookies())
+          return token ? fetchMcpLink(token).catch(() => null) : null
+        })()
+      : Promise.resolve(null),
+  ])
+  const viewerRuntimes = (
+    viewerProfile?.runtimes?.map((r) => r.key) ?? viewerProfile?.detectedRuntimes ?? []
+  ).filter(Boolean)
+  const mcpUrl = mcpLink?.ok && mcpLink.enabled ? mcpLink.link.url : null
   const isOwner = viewerHandle === kit.owner
   const initial = (kit.name || kit.owner).slice(0, 2).toUpperCase()
   const skillRefs = kit.skills.map((s) => s.skill_id.replace(':', '/'))
@@ -86,11 +106,12 @@ export default async function AuthorKitPage({ params }: { params: Promise<Params
             View profile
           </Button>
         ) : (
-          <SubscribeAuthorButton
+          <AuthorKitActionRow
             author={kit.owner}
             initialSubscribed={!!kit.subscribed}
             viewerHandle={viewerHandle}
-            variant="inline"
+            runtimes={viewerRuntimes}
+            mcpUrl={mcpUrl}
           />
         )
       }

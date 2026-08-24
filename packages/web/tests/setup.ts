@@ -1,5 +1,14 @@
 import '@testing-library/jest-dom'
 import { vi } from 'vitest'
+import { MotionGlobalConfig } from 'motion/react'
+
+// jsdom has no rAF-driven compositor, so a motion spring never settles: an
+// element leaving an AnimatePresence stays mounted for the whole test and
+// assertions about what is on screen see both the old and new content. Skipping
+// animations makes every transition resolve immediately, which is what a unit
+// test wants to assert about anyway. Motion feel is not testable here; it is
+// reviewed in a browser.
+MotionGlobalConfig.skipAnimations = true
 
 // Tests run in the dev-auth posture: no real SKILLET_WEB_SIGNING_SECRET is set,
 // so webInternalSecret() would fail closed. Opt into the same explicit dev-auth

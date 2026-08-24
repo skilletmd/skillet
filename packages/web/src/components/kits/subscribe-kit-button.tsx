@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/cn'
 import { Button, buttonClasses } from '@/components/ui/button'
@@ -33,6 +34,7 @@ export function SubscribeKitButton({
   owner,
   variant = 'button',
   hero = false,
+  onSubscribedChange,
 }: {
   kitId: string
   initialSubscribed: boolean
@@ -42,6 +44,10 @@ export function SubscribeKitButton({
   variant?: 'button' | 'link'
   /** The singular primary on a kit detail page: loud solid-black, sized up. */
   hero?: boolean
+  /** Fires when the optimistic add/remove flips, including on revert. The kit
+   *  page's action bar needs to know what you JUST did, which the server's
+   *  initial `subscribed` cannot tell it. */
+  onSubscribedChange?: (subscribed: boolean) => void
 }) {
   const ctx = useMyKitsOptional()
   // Optimistic flip + 401 redirect + revert + context/router refresh all live in
@@ -56,6 +62,14 @@ export function SubscribeKitButton({
     // logged-out funnel can never drift from the logged-in add path.
     addRequest: () => subscribeToKit(kitId),
   })
+
+  // Report the optimistic value, not the request outcome: the bar should track
+  // what the button is showing, and follow it back if the request reverts.
+  const notify = useRef(onSubscribedChange)
+  notify.current = onSubscribedChange
+  useEffect(() => {
+    notify.current?.(added)
+  }, [added])
 
   if (viewerHandle === owner) return null
 

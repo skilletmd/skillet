@@ -13,6 +13,7 @@ export function SubscribeAuthorButton({
   viewerHandle,
   isTeam = false,
   variant = 'card',
+  hero = false,
 }: {
   author: string
   /** Server's best guess; the live follow graph (context) overrides it once loaded. */
@@ -21,6 +22,14 @@ export function SubscribeAuthorButton({
   isTeam?: boolean
   /** 'card' = full banner; 'inline' = just the subscribe button (for kit rows). */
   variant?: 'card' | 'inline'
+  /**
+   * The singular CTA on an author kit's detail page, matching `hero` on
+   * SubscribeKitButton and `variant="hero"` on SkillKitControl. Without it this
+   * rendered at the default `md` while the other two detail pages rendered `lg`,
+   * so the same decision looked like a smaller decision depending on which kind
+   * of page you were on.
+   */
+  hero?: boolean
 }) {
   const ctx = useMyKitsOptional()
   const [error, setError] = useState<string | null>(null)
@@ -41,7 +50,9 @@ export function SubscribeAuthorButton({
   if (variant === 'inline') {
     if (!viewerHandle) {
       return (
-        <Button href={loginHref(`/${author}`)} variant="secondary">
+        // primary, like the other two detail pages: a signed-out visitor is
+        // being asked the page's one question, and secondary read as optional.
+        <Button href={loginHref(`/${author}`)} variant={hero ? 'primary' : 'secondary'} size={hero ? 'lg' : 'md'}>
           Add
         </Button>
       )
@@ -50,6 +61,7 @@ export function SubscribeAuthorButton({
       <Button
         type="button"
         variant={subscribed ? 'secondary' : 'primary'}
+        size={hero ? 'lg' : 'md'}
         onClick={toggle}
         disabled={pending}
       >

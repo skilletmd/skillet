@@ -27,10 +27,7 @@ export function DetailHeader({
   kind,
   title,
   owner,
-  ownerAvatarUrl,
-  ownerIsTeam,
   description,
-  follow,
   badges,
   titleBadge,
   media,
@@ -49,14 +46,7 @@ export function DetailHeader({
   hideByline?: boolean
   /** Private object — prepends a lock + "Private" to the eyebrow label. */
   isPrivate?: boolean
-  /** Owner avatar shown next to the @handle. */
-  ownerAvatarUrl?: string | null
-  /** Owner is a team/org — avatar renders as a monogram square, not a face. */
-  ownerIsTeam?: boolean
   description?: string | null
-  /** Follow button, grouped with the primary action (never on your own objects —
-   *  the control hides itself for the owner). */
-  follow?: ReactNode
   /** Inline state badges (eval…) shown on the byline row. */
   badges?: ReactNode
   /** State of the OBJECT itself (private) — sits beside the eyebrow, like the kit
@@ -93,19 +83,14 @@ export function DetailHeader({
             </p>
             {!hideByline && (
               <PersonHoverName handle={owner}>
+                {/* Attribution only, no avatar. The face lives once, on the
+                    rail's author row, where it has room to be a person. A 16px
+                    copy of it up here was decoration. */}
                 <Link
                   href={`/${owner}`}
-                  className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-(--ink) transition-colors hover:text-(--accent)"
+                  className="shrink-0 text-sm font-semibold text-(--ink) transition-colors hover:text-(--accent)"
                 >
-                  <Avatar
-                    name={owner}
-                    src={ownerAvatarUrl}
-                    colorKey={owner.replace(/^@/, '')}
-                    kind={ownerIsTeam ? 'team' : 'person'}
-                    size="xxs"
-                    aria-hidden="true"
-                  />
-                  <span>@{owner}</span>
+                  @{owner}
                 </Link>
               </PersonHoverName>
             )}
@@ -125,12 +110,7 @@ export function DetailHeader({
             </p>
           )}
           {worksWith && <div className="mt-4">{worksWith}</div>}
-          {(action || follow) && (
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              {action}
-              {follow}
-            </div>
-          )}
+          {action && <div className="mt-5 flex flex-wrap items-center gap-3">{action}</div>}
         </div>
       </div>
     </header>
