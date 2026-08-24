@@ -61,7 +61,7 @@ export function MirrorNotice({
           a second line on a long repo path and keeps the whole name. */}
       <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
         {repo && sourceUrl ? (
-          // Same size/weight/colour as the rest of the meta line — the GitHub
+          // Same size/weight/color as the rest of the meta line — the GitHub
           // mark already says "source link", so no mono, no underline.
           <AppLink
             href={sourceUrl}

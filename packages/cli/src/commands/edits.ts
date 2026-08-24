@@ -46,7 +46,7 @@ import { stripControlChars, formatScanFinding } from "../sanitize-output.js";
  * so a user typing any of them resolves the same local entry (R2 crossing
  * consistency). Unparseable input (a local-only lineage's bare slug, or a
  * malformed arg) falls back to the raw string, preserving the old exact-match
- * behaviour and letting a bad ref simply fail to match rather than throw.
+ * behavior and letting a bad ref simply fail to match rather than throw.
  */
 function canonicalRef(ref: string): string {
   try {

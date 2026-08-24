@@ -12,7 +12,7 @@ widget rule. This is the single source of truth so primitives can't drift apart
   which merges Tailwind conflicts.
 - **Variants use `cva`** (class-variance-authority). See `button.tsx`,
   `badge.tsx`, `avatar.tsx`.
-- **Behavioural primitives wrap Radix** (focus trap, keyboard, ARIA, positioning
+- **Behavioral primitives wrap Radix** (focus trap, keyboard, ARIA, positioning
   come for free) and we style the parts with our tokens. See `dropdown-menu.tsx`.
   Do **not** pull in shadcn's pre-styled defaults — they ship a neutral theme;
   take the Radix primitive and apply our tokens.

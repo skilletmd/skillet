@@ -6,7 +6,7 @@
 // than the canonical 16px, so the stroke is thinned to 1.1 — at 22px that lands
 // on the house's ~1.5px effective weight (1.1 × 22/16), matching the nav and
 // file-editor icons instead of reading heavier. The icon inherits the row's text
-// colour, so a flagged row turns the icon amber for free. Every glyph is
+// color, so a flagged row turns the icon amber for free. Every glyph is
 // decorative (aria-hidden) — the text label carries the meaning.
 
 import type { ReactNode } from 'react'

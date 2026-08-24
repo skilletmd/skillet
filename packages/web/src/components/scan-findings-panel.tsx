@@ -53,7 +53,7 @@ export function ScanFindingsPanel({
   // Only HIGH-confidence findings actually block a publish; medium/low are
   // worth-a-look warnings that would ship on their own. Splitting them is the
   // honest story: fix the blockers and you can publish.
-  // Worst first — the dot colour is the severity signal, so the order should
+  // Worst first — the dot color is the severity signal, so the order should
   // reinforce it rather than follow scan-discovery order.
   const findings = [...verdict.findings].sort(
     (a, b) => CONFIDENCE_RANK[b.confidence] - CONFIDENCE_RANK[a.confidence],

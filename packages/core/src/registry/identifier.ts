@@ -60,7 +60,7 @@ export function parseSkillRef(input: string): SkillRef {
   // Strict wire input shape: the shared `parseRef` is tolerant of a missing
   // `@` and of the `owner:slug` form, but this parser has always required the
   // canonical `@author/slug` wire ref. Gate those looser forms out here so the
-  // behaviour matches the historical `REF_RE` (`/^@([a-z0-9-]+)\/([a-z0-9-]+)$/`).
+  // behavior matches the historical `REF_RE` (`/^@([a-z0-9-]+)\/([a-z0-9-]+)$/`).
   if (!input.startsWith('@') || input.includes(':')) {
     throw new SkillRefError(
       'invalid_ref',

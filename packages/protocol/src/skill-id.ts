@@ -112,7 +112,7 @@ function isDecodableSlugPart(part: string): boolean {
  *
  * parseRef THROWS rather than returning null — matching the stricter existing
  * parser (`core/registry/identifier.ts`, which throws `SkillRefError`) so the
- * delegation in later units is behaviour-preserving. {@link fromSlugDir}, by
+ * delegation in later units is behavior-preserving. {@link fromSlugDir}, by
  * contrast, returns `null` (matching `parseSkilletSlugDir`) because "is this a
  * skillet dir?" is a test, not a parse.
  */

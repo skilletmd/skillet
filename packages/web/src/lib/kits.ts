@@ -494,7 +494,7 @@ export async function unsubscribeAuthorRequest(
  * Loose, display-only split of a `@author/slug` kit ref into its parts, or
  * `null` when it doesn't look like one. Named `parseKitSkillRef` (not
  * `parseSkillRef`) so it can't be confused with core's strict, throwing
- * `parseSkillRef` — same name, divergent behaviour. Intentionally lenient: this
+ * `parseSkillRef` — same name, divergent behavior. Intentionally lenient: this
  * only feeds UI, never a URL/path sink, so it does no grammar validation.
  */
 export function parseKitSkillRef(refName: string): { author: string; slug: string } | null {

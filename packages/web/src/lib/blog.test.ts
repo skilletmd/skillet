@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
  * EXISTS, which will not add a column to a database that already holds rows.
  * Production's blog.db is exactly that case, so the column add has to be
  * separately idempotent. These cover that, and the title fallback that keeps an
- * unset seo_title rendering today's behaviour.
+ * unset seo_title rendering today's behavior.
  */
 describe('blog store', () => {
   let dbPath: string

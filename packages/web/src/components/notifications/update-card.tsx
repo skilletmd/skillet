@@ -68,7 +68,7 @@ function Chevron({ open }: { open: boolean }) {
  * One pending update — an App Store "what's new" tile. Header row leads with the
  * skill's cover, name, and author, with Update as the primary action and a quiet
  * Skip under it. A full-width "What changed" panel flips out a readable preview:
- * rendered content for a new skill, a clean colour-coded diff for an edit.
+ * rendered content for a new skill, a clean color-coded diff for an edit.
  */
 export function UpdateCard({
   item,

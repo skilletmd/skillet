@@ -32,7 +32,7 @@ function formatDate(iso: string | null): string {
 /**
  * Each story sits on its own soft two-hue wash, the same treatment the docs use
  * for their illustration panels (`.docs-img-panel` + `panelHues`). Seeded on the
- * slug, so a post's colour is stable across reloads and neighbouring cards
+ * slug, so a post's color is stable across reloads and neighbouring cards
  * differ. Low saturation on purpose: the headline stays the hero.
  */
 function panelStyle(seed: string): CSSProperties {

@@ -117,7 +117,7 @@ export function githubRepoTarget(input: string): GitHubRepoTarget | null {
  * NOTE: named `normalizeGithubSkillUrl` (not `resolveSkillRef`) so it can never
  * be confused with the registry's `resolveSkillRef` (a DB/alias resolver of a
  * completely different shape) — the two once shared a name with divergent
- * behaviour.
+ * behavior.
  */
 export function normalizeGithubSkillUrl(input: string): string | null {
   let ref = input.trim()

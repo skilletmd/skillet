@@ -819,7 +819,7 @@ describe("hosted HTTP transport — registry-validated auth", () => {
     await handle.stop();
   });
 
-  it("rejects non-loopback host WITHOUT hosted option (existing behaviour preserved)", async () => {
+  it("rejects non-loopback host WITHOUT hosted option (existing behavior preserved)", async () => {
     await expect(startHttpTransport({ port: 9999, host: "0.0.0.0" })).rejects.toThrow(
       /loopback-only/i,
     );

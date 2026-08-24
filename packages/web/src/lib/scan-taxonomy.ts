@@ -109,7 +109,7 @@ export function capabilityDescribe(key: string): string | null {
   return PERMISSIONS[key]?.describe ?? null
 }
 
-/** The traffic-light severity scale — one consistent word, dot colour, and faint
+/** The traffic-light severity scale — one consistent word, dot color, and faint
  *  row tint per confidence, shared by every surface. Amber is a brighter hue than
  *  red, so the red wash carries more weight to keep blockers reading strongest.
  *  Presentation-only (driven by finding confidence); not part of the shared

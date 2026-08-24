@@ -266,7 +266,7 @@ describe("codex project adapter contract", () => {
       //     hit the global .agents, so materialize declines and hands off to the
       //     global adapter (src/index.ts guard)
       // On Windows tmpdir is inside the home dir, so a real ~/.agents makes the
-      // second one fire. Assert the behaviour — project mode refuses — not which
+      // second one fire. Assert the behavior — project mode refuses — not which
       // sentence it refuses with.
       await expect(
         adapter.materialize("my-skill", bundle({ "SKILL.md": "x" }), { cwd: orphan }),

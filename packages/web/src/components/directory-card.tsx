@@ -82,5 +82,5 @@ export function kitCoverCategories(
   return Array.from({ length: n }, (_, i) => fallback ?? seedCategory(`${seed}:${i}`))
 }
 
-/** A face in the "Used by" pile — handle drives the link colour, name the initials. */
+/** A face in the "Used by" pile — handle drives the link color, name the initials. */
 export type UsedByFace = { handle: string; name: string; avatarUrl: string | null }

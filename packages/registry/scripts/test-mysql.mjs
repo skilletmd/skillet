@@ -7,7 +7,7 @@
  * `pnpm test:mysql` failed on Windows before reaching a single test.
  *
  * DATABASE_URL is only defaulted when unset, matching the old `${VAR:-default}`
- * behaviour. The harness rewrites whatever it gets to the `_test` sibling
+ * behavior. The harness rewrites whatever it gets to the `_test` sibling
  * database, so this never points at a developer's dev data.
  */
 import { spawnSync } from 'node:child_process';

@@ -201,7 +201,7 @@ export interface ViewerAuthorKit {
 }
 
 /**
- * One grouped notification: a colour-coded type glyph in the gutter, a facepile
+ * One grouped notification: a color-coded type glyph in the gutter, a facepile
  * of the actors (each hoverable to a person card with Follow), a "lead and N
  * others <verb>" line, and the adopted kit/skill as context. Notifications are
  * authed-only, so the hover cards always have a live Follow.

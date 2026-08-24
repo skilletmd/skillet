@@ -39,7 +39,7 @@ const TRI_PATH = roundPoly(
 /**
  * A category bullet: the SHAPE encodes its section (square = Code, triangle =
  * Grow, circle = Create — the same key the cover art uses) and the FILL is the
- * category's colour. So the mark does double duty without a separate legend.
+ * category's color. So the mark does double duty without a separate legend.
  * Shared by the browse rail, the category chips, and anywhere a category needs
  * its recognizable mark.
  */

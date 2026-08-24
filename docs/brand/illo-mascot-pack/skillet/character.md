@@ -20,7 +20,7 @@ Sibling pack: `skillet-full` (full-body version for editorial scenes)
   sitting on top of the head; its lower band narrows into two short vertical sides
   that tuck just behind the head. The toque is large — roughly as tall as the head.
 - **Face**: a bold, softly-rounded chevron `>` for the winking left eye; a small
-  open ring (a hollow circle outline, bold even stroke, small white centre) for
+  open ring (a hollow circle outline, bold even stroke, small white center) for
   the right eye; a small shallow upturned smile centered below and between them.
   No eyebrows, nothing else.
 - **Shoulders**: two symmetric curved strokes sweeping **down and outward** from

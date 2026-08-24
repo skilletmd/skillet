@@ -64,7 +64,7 @@ export async function detectedAgentsPhrase(): Promise<string> {
   return `in ${labels[0]}, ${labels[1]}, and ${labels.length - 2} more`;
 }
 
-/** Pair-code prompt: greyed placeholder carries the cancel affordance, Esc exits. */
+/** Pair-code prompt: grayed placeholder carries the cancel affordance, Esc exits. */
 async function promptPairCode(): Promise<string> {
   const entry = await clack.text({
     message: "Pair code",
