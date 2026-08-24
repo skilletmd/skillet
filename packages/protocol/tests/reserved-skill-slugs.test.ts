@@ -4,7 +4,7 @@ import { RESERVED_SKILL_SLUGS, isReservedSkillSlug, isValidSkillSlug } from '../
 
 describe('reserved skill slugs', () => {
   it('reserves the static owner-namespace route segments', () => {
-    for (const slug of ['kit', 'followers', 'following', 'installs']) {
+    for (const slug of ['kit', 'followers', 'following', 'installs', 'summon']) {
       assert.equal(isReservedSkillSlug(slug), true, slug)
     }
   })
@@ -24,7 +24,10 @@ describe('reserved skill slugs', () => {
   // the permalink-routing test must be updated in lockstep. Hard-coded mirror of
   // the static segments so an accidental removal here fails CI.
   it('contains exactly the known static owner-namespace segments', () => {
-    assert.deepEqual([...RESERVED_SKILL_SLUGS].sort(), ['followers', 'following', 'installs', 'kit'])
+    assert.deepEqual(
+      [...RESERVED_SKILL_SLUGS].sort(),
+      ['followers', 'following', 'installs', 'kit', 'summon'],
+    )
   })
 })
 

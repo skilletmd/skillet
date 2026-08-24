@@ -89,7 +89,11 @@ export function ProfileHeader({
       @{author}
     </span>,
   ]
-  if (!isTeam) {
+  // Counts appear only once there is one to show. A zero argues against the
+  // profile it sits on, and at launch every profile has zeros in every slot,
+  // so the header would open with two arguments against itself. Same rule the
+  // route skill already follows when it prints an author's standing.
+  if (!isTeam && (profile.followers ?? 0) > 0) {
     meta.push(
       <Link
         key="followers"
@@ -100,29 +104,31 @@ export function ProfileHeader({
         {profile.followers === 1 ? 'follower' : 'followers'}
       </Link>,
     )
-    if (!profile.isMirror) {
-      meta.push(
-        <Link
-          key="following"
-          href={`/${author}/following`}
-          className="transition-colors hover:text-(--ink)"
-        >
-          <span className="font-semibold text-(--ink)">{formatNumber(profile.following ?? 0)}</span>{' '}
-          following
-        </Link>,
-      )
-    }
   }
-  meta.push(
-    <Link
-      key="installs"
-      href={`/${author}/installs`}
-      className="transition-colors hover:text-(--ink)"
-    >
-      <span className="font-semibold text-(--ink)">{formatNumber(profile.totalInstalls)}</span>{' '}
-      {profile.totalInstalls === 1 ? 'install' : 'installs'}
-    </Link>,
-  )
+  if (!isTeam && !profile.isMirror && (profile.following ?? 0) > 0) {
+    meta.push(
+      <Link
+        key="following"
+        href={`/${author}/following`}
+        className="transition-colors hover:text-(--ink)"
+      >
+        <span className="font-semibold text-(--ink)">{formatNumber(profile.following ?? 0)}</span>{' '}
+        following
+      </Link>,
+    )
+  }
+  if (profile.totalInstalls > 0) {
+    meta.push(
+      <Link
+        key="installs"
+        href={`/${author}/installs`}
+        className="transition-colors hover:text-(--ink)"
+      >
+        <span className="font-semibold text-(--ink)">{formatNumber(profile.totalInstalls)}</span>{' '}
+        {profile.totalInstalls === 1 ? 'install' : 'installs'}
+      </Link>,
+    )
+  }
   if (!isTeam) {
     for (const t of profile.teams ?? []) {
       meta.push(

@@ -8,8 +8,9 @@
 //
 // HARD COUPLING: this set MUST equal the static child route segments of
 // `packages/web/src/app/(consumer)/[author]/`. Today those are `kit`,
-// `followers`, `following`, and `installs`. If a new static `[author]/<segment>`
-// route is added, add `<segment>` here too (and cover it in the permalink-routing test).
+// `followers`, `following`, `installs`, and `summon`. If a new static
+// `[author]/<segment>` route is added, add `<segment>` here too (and cover it in
+// the permalink-routing test).
 //
 // This is distinct from RESERVED_HANDLES, which guards TOP-LEVEL handles
 // (`/{handle}`). This set guards per-owner skill slugs one level down.
@@ -20,6 +21,9 @@ export const RESERVED_SKILL_SLUGS: ReadonlySet<string> = new Set<string>([
   'followers',
   'following',
   'installs',
+  // The zero-install summon endpoint: an agent handed `skillet.md/@handle/summon`
+  // gets the handle's routable candidate list without anything on disk.
+  'summon',
 ])
 
 /** Protocol grammar for skill slugs (matches core `parseSkillRef`). */
