@@ -76,22 +76,29 @@ export async function KitPageContent({ params }: { params: Promise<Params> }) {
     redirect(`/${kit.owner}?tab=saved#saved-skills`)
   }
 
-  const [versionsResult, ownerProfile, relatedResult, kitCapabilities, myOrgs, mutedKitIds] =
-    await Promise.all([
-      getKitVersions(kit.id),
-      getAuthorProfile(kit.owner).catch(() => null),
-      getRelatedKits(kit.id),
-      getKitCapabilities(kit.skills).catch(() => null),
-      session?.handle ? listMyOrgs() : Promise.resolve({ kind: 'unauthorized' as const }),
-      session?.handle ? getMutedTeamKitIds() : Promise.resolve(new Set<string>()),
-    ])
+  const [
+    versionsResult,
+    ownerProfile,
+    relatedResult,
+    kitCapabilities,
+    myOrgs,
+    mutedKitIds,
+    // Whether install still has anything to say to this viewer. Same signal the
+    // profile header reads for its connect nudge; per-account, not per-machine,
+    // which is why the connected state keeps a path for an unpaired laptop.
+    // In the batch, not after it: awaiting it separately cost every signed-in
+    // reader an extra serial round trip.
+    viewerProfile,
+  ] = await Promise.all([
+    getKitVersions(kit.id),
+    getAuthorProfile(kit.owner).catch(() => null),
+    getRelatedKits(kit.id),
+    getKitCapabilities(kit.skills).catch(() => null),
+    session?.handle ? listMyOrgs() : Promise.resolve({ kind: 'unauthorized' as const }),
+    session?.handle ? getMutedTeamKitIds() : Promise.resolve(new Set<string>()),
+    session?.handle ? getAuthorProfile(session.handle).catch(() => null) : Promise.resolve(null),
+  ])
 
-  // Whether install still has anything to say to this viewer. Same signal the
-  // profile header reads for its connect nudge; per-account, not per-machine,
-  // which is why the connected state keeps a path for an unpaired laptop.
-  const viewerProfile = session?.handle
-    ? await getAuthorProfile(session.handle).catch(() => null)
-    : null
   const viewerRuntimes = (
     viewerProfile?.runtimes?.map((r) => r.key) ?? viewerProfile?.detectedRuntimes ?? []
   ).filter(Boolean)
