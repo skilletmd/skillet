@@ -81,8 +81,11 @@ export function KitPageLayout({
   /** Extra sections in the main column, below the skill list (a named kit's
    *  install command + version history; empty for the virtual author-kit). */
   mainExtra,
-  /** Extra rail sections above the shared "Make your own" (more-from-owner +
-   *  people-also-added on a named kit; empty on the author-kit). */
+  /** The zero-cost action, rendered directly under the header actions: run this
+   *  kit now with nothing installed. */
+  borrow,
+  /** Extra rail sections (more-from-owner + people-also-added on a named kit;
+   *  empty on the author-kit). */
   railExtra,
 }: {
   kitId: string
@@ -104,6 +107,7 @@ export function KitPageLayout({
   capabilities: KitCapabilities
   usedByBlock?: ReactNode
   mainExtra?: ReactNode
+  borrow?: ReactNode
   railExtra?: ReactNode
 }) {
   return (
@@ -148,18 +152,10 @@ export function KitPageLayout({
 
             <WorksWithRail />
 
-            <section className="py-4 first:pt-0">
-              <Eyebrow>Make your own</Eyebrow>
-              <p className="mt-2 text-sm leading-relaxed text-(--ink-2)">
-                Bundle your favorite skills into a kit to share or deploy.
-              </p>
-              <Link
-                href="/kits/new"
-                className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-(--accent) hover:underline"
-              >
-                Create a kit
-              </Link>
-            </section>
+            {/* No "Make your own" here. Authoring is a supply action on a
+                demand page: this visitor came for someone else's kit, and the
+                prompt competed with the one decision the page is asking for.
+                Creating has a home in the header + and on your own profile. */}
           </aside>
 
           {/* MAIN — KIT BY @owner identity + actions, then the kit body. */}
@@ -182,6 +178,8 @@ export function KitPageLayout({
                 )
               }
             />
+
+            {borrow}
 
             {/* Mobile only — social proof up top instead of buried in the rail. */}
             {usedByBlock && <div className="mt-8 lg:hidden">{usedByBlock}</div>}

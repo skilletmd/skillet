@@ -8,6 +8,7 @@ export function SingleInstallPanel({
   command,
   accent,
   slashCommand,
+  lead = 'It\u2019s free, and every skill you add syncs into every AI tool on your computer, instantly.',
 }: {
   command: string
   /** Substring highlighted gold in the command, e.g. `@owner/slug`. */
@@ -15,6 +16,11 @@ export function SingleInstallPanel({
   /** When the skill exposes a `/command`, show how to run it after install.
    *  Omitted for model-invoked-only skills (running is automatic — no line). */
   slashCommand?: string
+  /** The sentence above the buttons. The default pitches install to someone who
+   *  has not committed to anything yet, which is right on a skill page. A caller
+   *  that only renders this AFTER an add (see {@link KitDelivery}) should say
+   *  what just happened instead. */
+  lead?: string
 }) {
   return (
     <section>
@@ -22,10 +28,7 @@ export function SingleInstallPanel({
           button is the goal (adds on Skillet auto-sync); the command is the quiet
           fallback, the one bordered copy field. */}
       <Eyebrow>Install</Eyebrow>
-      <p className="mt-3 max-w-[64ch] text-sm leading-snug text-(--ink-2)">
-        It&rsquo;s free, and every skill you add syncs into every AI tool on your computer,
-        instantly.
-      </p>
+      <p className="mt-3 max-w-[64ch] text-sm leading-snug text-(--ink-2)">{lead}</p>
       <div className="mt-3 flex flex-wrap items-stretch gap-3">
         <Button href="/install" variant="primary" className="shrink-0">
           Get the Skillet app

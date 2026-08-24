@@ -10,7 +10,8 @@ import { TeamKitSyncButton } from '@/components/team/team-kit-sync-button'
 import { listMyOrgs, getMutedTeamKitIds } from '@/lib/orgs-server'
 import { viewerOrgRole } from '@/lib/orgs'
 import { HeaderFollowButton } from '@/components/header-follow-button'
-import { SingleInstallPanel } from '@/components/single-install-panel'
+import { KitBorrowLine } from '@/components/kits/kit-borrow-line'
+import { KitDelivery } from '@/components/kits/kit-delivery'
 import { KitPageLayout } from '@/components/kits/kit-page-layout'
 import { kitInstallCommand } from '@/lib/cli-install-commands'
 import { Button } from '@/components/ui/button'
@@ -84,6 +85,16 @@ export async function KitPageContent({ params }: { params: Promise<Params> }) {
       session?.handle ? listMyOrgs() : Promise.resolve({ kind: 'unauthorized' as const }),
       session?.handle ? getMutedTeamKitIds() : Promise.resolve(new Set<string>()),
     ])
+
+  // Whether install still has anything to say to this viewer. Same signal the
+  // profile header reads for its connect nudge; per-account, not per-machine,
+  // which is why the connected state keeps a path for an unpaired laptop.
+  const viewerProfile = session?.handle
+    ? await getAuthorProfile(session.handle).catch(() => null)
+    : null
+  const viewerRuntimes = (
+    viewerProfile?.runtimes?.map((r) => r.key) ?? viewerProfile?.detectedRuntimes ?? []
+  ).filter(Boolean)
 
   const viewerHandle = session?.handle ?? null
   const isOwner = viewerHandle === kit.owner
@@ -179,15 +190,17 @@ export async function KitPageContent({ params }: { params: Promise<Params> }) {
           />
         ) : undefined
       }
+      borrow={<KitBorrowLine owner={kit.owner} slug={kit.slug} />}
       mainExtra={
         <>
-          {/* Install — secondary path below the content; the header Add is primary. */}
-          <div>
-            <SingleInstallPanel
-              command={kitInstallCommand(kit.owner, kit.slug)}
-              accent={`@${kit.owner}/${kit.slug}`}
-            />
-          </div>
+          {/* Delivery, not an alternative to adding. Renders only once the kit
+              is added, and only while the viewer still needs a client. */}
+          <KitDelivery
+            added={!!kit.subscribed}
+            runtimes={viewerRuntimes}
+            command={kitInstallCommand(kit.owner, kit.slug)}
+            accent={`@${kit.owner}/${kit.slug}`}
+          />
 
           {versions.length > 0 && (
             <section>
