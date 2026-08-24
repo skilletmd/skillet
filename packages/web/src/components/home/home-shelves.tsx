@@ -13,6 +13,7 @@ import {
   CHART_SIZE,
   ChartsRow,
   FromTheBlog,
+  BlogRail,
   KITS_GRID_CLASS,
   Shelf,
   SkillEventGrid,
@@ -173,6 +174,11 @@ export async function HomeCatalogShelves({
 /** Blog shelf — full-width 3-up at the bottom of the homepage main column. */
 export function HomeBlogShelf() {
   return <FromTheBlog posts={getAllPosts().slice(0, 3)} />
+}
+
+/** The same three posts, sized for the right rail rather than the main column. */
+export function HomeBlogRail() {
+  return <BlogRail posts={getAllPosts().slice(0, 3)} />
 }
 
 /** Live registry activity for the logged-out homepage right rail — first page is

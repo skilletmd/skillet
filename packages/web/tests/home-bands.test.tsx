@@ -28,32 +28,41 @@ async function renderHome() {
   return renderToStaticMarkup(Home())
 }
 
-describe('homepage bands run discover then adopt', () => {
+describe('the hero asks one thing', () => {
   beforeEach(() => {
     vi.resetModules()
   })
 
-  it('puts the borrow line in the hero and no install box with it', async () => {
+  it('leads with the install doors', async () => {
     const html = await renderHome()
 
-    const summonAt = html.indexOf('/summon and use their best skill')
     const installAt = html.indexOf('Install Skillet')
+    const catalogAt = html.indexOf('surface-grid')
 
-    expect(summonAt).toBeGreaterThan(-1)
+    // Install is the hero's action now. The same four doors the kit page uses,
+    // so "where do I put this" has one answer everywhere it is asked.
     expect(installAt).toBeGreaterThan(-1)
-    // The hero's promise is borrowing. An install box under it argued with the
-    // sentence above it, so install now lives in the adopt band further down.
-    expect(summonAt).toBeLessThan(installAt)
+    expect(installAt).toBeLessThan(catalogAt)
   })
 
-  it('answers "who is on here" before it asks for an install', async () => {
+  it('offers all four doors, including the two that install nothing', async () => {
     const html = await renderHome()
 
-    const catalogAt = html.indexOf('surface-grid')
-    const installAt = html.indexOf('Install Skillet')
+    // The hero has room for the long form; the kit page's single row keeps
+    // "Mac app". Server render has no UA, so it lands on Mac.
+    expect(html).toContain('Download for Mac')
+    expect(html).toContain('npx skilletmd')
+    expect(html).toContain('ChatGPT')
+    expect(html).toContain('Claude.ai')
+  })
 
-    expect(catalogAt).toBeGreaterThan(-1)
-    expect(catalogAt).toBeLessThan(installAt)
+  it('sends a logged-out visitor to the docs rather than a server action', async () => {
+    const html = await renderHome()
+
+    // signedIn=false renders the cloud doors as plain links. That is what keeps
+    // the hero session-free and fully prerendered; an expandable panel here
+    // would call a server action a logged-out visitor cannot use.
+    expect(html).toContain('/docs/mcp')
   })
 
   it('offers the install affordance exactly once', async () => {
@@ -61,18 +70,63 @@ describe('homepage bands run discover then adopt', () => {
 
     expect(html.split('Install Skillet').length - 1).toBe(1)
   })
+})
 
-  it('drops the three-card ladder and its competing calls to action', async () => {
-    const html = await renderHome()
-
-    expect(html).not.toContain('Bring your skills everywhere')
-    expect(html).not.toContain('See feed')
-    expect(html).not.toContain('Set up teams')
+describe('the closing ladder', () => {
+  beforeEach(() => {
+    vi.resetModules()
   })
 
-  it('shows the installed shorthand as the reason to adopt', async () => {
+  it('comes after the catalog, not before it', async () => {
     const html = await renderHome()
 
-    expect(html).toContain('/skillet @mattpocock review my PR')
+    const catalogAt = html.indexOf('surface-grid')
+    const ladderAt = html.indexOf('Keep your team in sync')
+
+    // Three equal boxes above the catalog inverted the funnel. Below it they
+    // answer a question the visitor has actually formed.
+    expect(ladderAt).toBeGreaterThan(-1)
+    expect(catalogAt).toBeLessThan(ladderAt)
+  })
+
+  it('leads with reach, then follow, then team', async () => {
+    const html = await renderHome()
+
+    const reachAt = html.indexOf('One kit, every agent')
+    const feedAt = html.indexOf('New skills from people you trust')
+    const teamAt = html.indexOf('Keep your team in sync')
+
+    expect(reachAt).toBeGreaterThan(-1)
+    expect(reachAt).toBeLessThan(feedAt)
+    expect(feedAt).toBeLessThan(teamAt)
+  })
+
+  it('does not argue with the hero it sits under', async () => {
+    const html = await renderHome()
+
+    // The hero asks for an install. A "borrow with nothing installed" rung
+    // directly beneath it contradicted that, which is the same problem the
+    // hero itself had before install moved into it.
+    expect(html).not.toContain('Borrow with nothing installed')
+  })
+
+  it('does not repeat the hero install CTA', async () => {
+    const html = await renderHome()
+
+    // The lead rung was "Get app", which duplicates the Mac app door up top.
+    // The borrow story took its place.
+    expect(html).not.toContain('Bring your skills everywhere')
+    expect(html).not.toContain('Get app')
+  })
+
+  it('gives all three rungs the same shape', async () => {
+    const html = await renderHome()
+
+    // Title, body, button, three times. One rung carrying a command block
+    // instead of a button made the row read as two things, and its wrapped
+    // URL broke mid-handle.
+    expect(html).toContain('See the runtimes')
+    expect(html).toContain('See feed')
+    expect(html).toContain('Set up teams')
   })
 })

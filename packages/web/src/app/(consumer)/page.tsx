@@ -1,11 +1,14 @@
 import { ClaudeLogo, CursorLogo, OpenAiLogo } from '@/components/brand-logos'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Suspense } from 'react'
+import { Suspense, type ComponentType } from 'react'
 import { CommandBlock } from '@/components/command-block'
-import { HomeCatalogShelves, HomeBlogShelf, HomeActivityRail } from '@/components/home/home-shelves'
-import { SummonDemo, InstallBox } from '@/components/home/install-steps'
-import { SummonLine } from '@/components/home/summon-line'
+import { HomeCatalogShelves, HomeBlogRail, HomeActivityRail } from '@/components/home/home-shelves'
+import { SummonDemo } from '@/components/home/install-steps'
+import { InstallActions } from '@/components/install/install-picker'
+import { Button } from '@/components/ui/button'
+import { Avatar } from '@/components/ui/avatar'
+import { CoverArt } from '@/components/cover/cover'
 import { CatalogShelvesSkeleton } from '@/components/home/shelf-skeleton'
 import { PAGE_CONTAINER_CLASS } from '@/lib/page-layout'
 import { ogMeta, OG } from '@/lib/og'
@@ -19,9 +22,9 @@ const HOME_OG = ogMeta(OG.home())
 // the <title>/description name the runtimes people query for (the layout's brand
 // title, inherited before this, named none of them), while the OG/Twitter pair
 // keeps the pitch a shared link should lead with. Hero copy is untouched.
-const HOME_SHARE_TITLE = "Summon anyone's genius · Skillet"
+const HOME_SHARE_TITLE = "Genius on tap · Skillet"
 const HOME_SHARE_DESCRIPTION =
-  "Type a name and borrow their brain. Run anyone's public skills in your agent, and keep your own current everywhere."
+  "You pick the person, your agent picks the skill. Tag anyone on Skillet and their whole public library is available in the agent you already use."
 
 export const metadata: Metadata = {
   title: 'Skillet · Skills for Claude Code, Codex, and Cursor',
@@ -37,30 +40,90 @@ export const metadata: Metadata = {
   twitter: { ...HOME_OG.twitter, title: HOME_SHARE_TITLE, description: HOME_SHARE_DESCRIPTION },
 }
 
-// The borrow band. One action, and it costs nothing: `SummonLine` replaced the
-// install box that used to sit here. The headline promises borrowing, so an
-// install box under it argued against the sentence above it, and it fired six
-// CTAs at a visitor before the catalog had said who is on Skillet at all.
-// Install moved to the adopt band at the bottom of the page.
+// The hero. One action group: the four doors, the same component the kit page
+// uses, so "where do I put this" has one answer everywhere it is asked.
 //
-// (The older note here explained why there is no CTA row under the box: both
-// destinations already sit in the header on every page, and dropping it removed
-// the page's only auth() call so the whole hero prerenders. Still true, and now
-// also true of the band as a whole.)
+// The copyable summon line that briefly lived here moved to the ladder at the
+// bottom, next to the reasons to install. It argues for itself better beside
+// them than above them: the visitor can see what borrowing costs every time
+// against what installing costs once.
+//
+// Still no CTA row under it: both destinations sit in the header on every page,
+// and the hero reads no session, so the whole band prerenders. `InstallActions`
+// with signedIn=false renders the cloud doors as links to /docs/mcp rather than
+// panels that call a server action, which is what keeps that true.
+// Narrower than the column it sits in. 560px left the longest label, "Download
+// for Mac", trailing most of its cell, so the four buttons read as four wide
+// bars rather than four options. Sized to the content plus breathing room, and
+// still flush left with the headline above.
+function HeroInstall() {
+  return (
+    <div className="mx-auto w-full max-w-[480px] lg:mx-0">
+      <p className="text-sm font-medium text-(--ink)">
+        Install Skillet where you want to use it:
+      </p>
+      <div className="mt-3">
+        {/* Two by two: the hero column is half of a 1120px grid, so four
+            content-sized buttons cannot share a line and a flex wrap strands
+            the fourth one. */}
+        <InstallActions layout="pairs" />
+      </div>
+    </div>
+  )
+}
+
 function Hero() {
   return (
     <section className="relative overflow-hidden border-b border-(--line)">
       <div className="hero-glow absolute inset-0" />
       <div className="relative mx-auto max-w-[1120px] px-[clamp(16px,4vw,32px)] py-[clamp(40px,6vw,72px)]">
+        {/* Three children, placed explicitly on lg.
+            On a phone the single column follows source order, which is the
+            order the argument needs: say it, SHOW it, then ask. On desktop the
+            demo sits beside the copy, so the visitor reads what it does while
+            the ask is already in view; stacking install first on mobile threw
+            that away and asked before explaining anything. Explicit row/column
+            placement rebuilds the two-column arrangement without rendering the
+            install block twice. */}
         <div className="grid items-center gap-x-12 gap-y-10 lg:grid-cols-2">
-          <div className="text-center lg:text-left">
-            <h1 className="hero-title leading-[1.03]">Summon anyone&apos;s genius.</h1>
-            <p className="mx-auto mt-3 max-w-[40ch] text-xl leading-[1.4] text-(--ink-2) sm:text-2xl lg:mx-0">
-              Borrow anyone&apos;s whole library for one task.
+          <div className="text-center lg:col-start-1 lg:row-start-1 lg:text-left">
+            {/* The claim, then the keystroke. No competitor in it.
+                Naming the category we are not ("not a leaderboard", "900,000
+                skills") argues with someone who is not in the room: a cold
+                visitor has usually never heard of a skill directory, and a
+                headline that defends against one reads as defensive rather than
+                confident. The differentiating work moves to the subhead and to
+                the demo beside it, both of which show a HANDLE as the unit,
+                which is the actual difference.
+
+                "Tag" carries the mechanic without the sigil: everyone already
+                knows what tagging a person means, and a line opening on `@`
+                reads as a fragment and is announced as "at anyone". The demo
+                beside this shows the literal `/skillet @handle`, so the syntax
+                is taught there rather than spent here. "You trust" is the POV:
+                the unit is a person you already rate, not a rank.
+
+                One line. The parallel carries itself at this length without a
+                forced break, and the wider measure keeps it from wrapping on a
+                desktop hero at all.
+
+                The real barrier to skills is not supply, it is decision. People
+                do not know which skill, when, or how to get it, and a directory
+                of hundreds of thousands makes that worse. So the promise is
+                that the choice is not theirs to make: they bring a name, the
+                agent brings the judgment. It also states the difference without
+                arguing with anyone, since a catalog cannot say it. */}
+            <h1 className="hero-title leading-[1.03]">Genius on tap.</h1>
+            <p className="mx-auto mt-3 max-w-[52ch] text-xl leading-[1.4] text-(--ink-2) sm:text-2xl lg:mx-0">
+              You pick the person. Your agent picks the skill.
             </p>
-            <SummonLine />
           </div>
-          <SummonDemo />
+          <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
+            <SummonDemo />
+          </div>
+          <div className="lg:col-start-1 lg:row-start-2">
+            <HeroInstall />
+          </div>
         </div>
       </div>
     </section>
@@ -93,55 +156,110 @@ function PublishMotif() {
   )
 }
 
-// The adopt band. One action, and the argument for taking it.
+// The closing ladder: three boxes, read after the catalog rather than before it.
 //
-// This replaced a three-column ladder of peers: Get app / See feed / Set up
-// teams. Three equal buttons is not a sequence, the order ran adopt, discover,
-// team (backwards against the funnel), and the lead card, "Bring your skills
-// everywhere", talked about skills a first-time visitor does not have yet. The
-// discover third of it is the catalog above, which makes the same point with
-// real people in it, so only the adopt third survives here.
+// It ran as a three-column band above the catalog once and was cut, because
+// three equal buttons is not a sequence and the order inverted the funnel. Down
+// here that objection is gone: the visitor has already seen who is on Skillet,
+// so these are answers to a question they have actually formed rather than
+// three doors fired at a stranger.
 //
-// The argument is the two lines side by side. The hero's borrow line works in
-// any agent and costs a paste every time; installed, the same thing is four
-// words the agent reaches for on its own. Nobody has to be told installing is
-// worth it once they can see both.
-function AdoptBand() {
+// The lead rung used to be "Get app", which now duplicates the Mac app door in
+// the hero. It answers what installing BUYS instead: one kit in every agent.
+// A "borrow with nothing installed" rung sat here briefly and argued with the
+// hero directly above it, which now asks for an install; that is the same
+// contradiction the hero itself had last night, moved down a screen.
+function SyncMotif() {
+  const kits = ['frontend', 'design', 'marketing']
+  return (
+    <div className="flex -space-x-2.5">
+      {kits.map((cat) => (
+        <span
+          key={cat}
+          className={`${FRAME} relative rounded-xl border border-(--line) ring-[3px]`}
+        >
+          <CoverArt seed={`ladder-kit-${cat}`} categories={[cat]} className="h-full w-full" />
+          {/* subtle dark inner edge so the art reads as framed on any color,
+              without the heavy white halo a light ring gives on saturated art */}
+          <span className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-black/10" />
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function TeamsMotif() {
+  const team = ['ada', 'lin', 'jo']
+  return (
+    <div className="flex -space-x-2.5">
+      {team.map((k) => (
+        <Avatar
+          key={k}
+          name={k}
+          colorKey={k}
+          size="md"
+          className="border border-(--line) ring-2 ring-(--bg)"
+        />
+      ))}
+    </div>
+  )
+}
+
+const LADDER: ReadonlyArray<{
+  title: string
+  body: string
+  href: string
+  cta: string
+  Motif: ComponentType
+}> = [
+  {
+    title: 'One kit, every agent',
+    body: 'Claude Code, Cursor, Codex, ChatGPT and six more. Add a skill once and it is there in all of them, on every machine.',
+    href: '/docs/runtimes',
+    cta: 'See the runtimes',
+    Motif: PublishMotif,
+  },
+  {
+    title: 'New skills from people you trust',
+    body: 'Follow experts and friends. Their latest skills show up in your feed, one click to add.',
+    href: '/feed',
+    cta: 'See feed',
+    Motif: SyncMotif,
+  },
+  {
+    title: 'Keep your team in sync',
+    body: 'One shared set of skills, with approval and versioning on every change.',
+    href: '/settings/teams',
+    cta: 'Set up teams',
+    Motif: TeamsMotif,
+  },
+]
+
+function HomeLadder() {
   return (
     <section className="border-t border-(--line)">
-      <div className="mx-auto max-w-[1120px] px-[clamp(16px,4vw,32px)] py-[clamp(40px,6vw,64px)]">
-        <div className="grid items-start gap-x-12 gap-y-8 lg:grid-cols-2">
-          <div>
-            <div className="flex h-11 items-center">
-              <PublishMotif />
+      <div className="mx-auto max-w-[1120px] px-[clamp(16px,4vw,32px)]">
+        <div className="grid divide-y divide-(--line) border-x border-(--line) sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          {LADDER.map((r) => (
+            <div key={r.title} className="flex flex-col items-start py-8 sm:px-8">
+              <div className="flex h-11 items-center">
+                <r.Motif />
+              </div>
+              <h2 className="mt-6 text-lg font-semibold leading-snug text-(--ink)">{r.title}</h2>
+              <p className="mt-3 text-sm leading-[1.55] text-(--ink-2) sm:min-h-[5.5rem]">
+                {r.body}
+              </p>
+              <Button href={r.href} variant="secondary" size="md" className="group mt-7">
+                {r.cta}
+                <span
+                  aria-hidden="true"
+                  className="transition-transform duration-200 [@media(hover:hover)]:group-hover:translate-x-0.5"
+                >
+                  &rarr;
+                </span>
+              </Button>
             </div>
-            <h2 className="mt-6 text-2xl font-semibold leading-snug text-(--ink)">
-              Keep what you borrow
-            </h2>
-            <p className="mt-3 max-w-[48ch] text-base leading-[1.55] text-(--ink-2)">
-              Install once and summoning is four words, in every agent on every machine, with the
-              agent reaching for the right skill on its own. Updates from the people you follow
-              arrive as a diff you approve.{' '}
-              <Link
-                href="/settings/teams"
-                className="font-medium text-(--ink) underline decoration-(--line) underline-offset-2 transition-colors hover:text-(--accent)"
-              >
-                Teams share one set
-              </Link>
-              , with versioning on every change.
-            </p>
-            <div className="mt-6">
-              <CommandBlock
-                command="/skillet @mattpocock review my PR"
-                accent="@mattpocock"
-                prompt={null}
-                size="sm"
-                wrap
-                bare
-              />
-            </div>
-          </div>
-          <InstallBox />
+          ))}
         </div>
       </div>
     </section>
@@ -180,19 +298,21 @@ export default function Home() {
                 showNewlyPublished={false}
               />
             </Suspense>
-            <HomeBlogShelf />
           </div>
           <aside className="surface-aside">
             <div className="surface-aside-stack">
               <Suspense fallback={null}>
                 <HomeActivityRail />
               </Suspense>
+              {/* Under the activity, not above it: activity is live and the
+                  reason to keep glancing at the rail; the blog is evergreen. */}
+              <HomeBlogRail />
             </div>
           </aside>
         </div>
       </div>
 
-      <AdoptBand />
+      <HomeLadder />
     </main>
   )
 }

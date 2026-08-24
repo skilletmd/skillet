@@ -434,6 +434,58 @@ function postDate(iso: string | null): string {
   return `${MONTHS[m - 1]} ${d}, ${y}`
 }
 
+/**
+ * The blog, sized for the right rail.
+ *
+ * `FromTheBlog` is a three-column grid of cards with descriptions, which is a
+ * main-column shape: dropped into a ~300px rail its cards become one narrow
+ * column of tall boxes. This is the same three posts as a list, matching the
+ * activity rail above it, so the two read as one stack rather than as a rail
+ * and a transplanted shelf.
+ */
+export function BlogRail({ posts }: { posts: Post[] }) {
+  if (posts.length === 0) return null
+  return (
+    <div className="wtf-card">
+      <div className="flex items-baseline justify-between gap-2 px-0.5 pb-1">
+        <span className="text-xs font-semibold uppercase tracking-[0.05em] text-(--ink-2)">
+          From the blog
+        </span>
+        <Link
+          href="/blog"
+          className="text-xs text-(--ink-2) underline-offset-2 hover:text-(--ink) hover:underline"
+        >
+          See all
+        </Link>
+      </div>
+      <ul>
+        {posts.map((post) => (
+          <li key={post.slug}>
+            <Link
+              href={`/blog/${post.slug}`}
+              className="group flex flex-col gap-0.5 rounded-lg px-0.5 py-2 transition-colors hover:bg-(--accent-bg)/40"
+            >
+              {/* No category eyebrow. In a rail the tag is the loudest thing in
+                  the row and it is the least useful: three posts do not need
+                  sorting, and the title already says what each one is. */}
+              <span className="text-sm font-medium leading-[1.35] text-(--ink) group-hover:underline">
+                {post.title}
+              </span>
+              {/* Date and read time only. The description is what makes the card
+                  version tall, and in a rail the title is doing the selling. */}
+              <span className="text-xs text-(--ink-2)/70">
+                {[postDate(post.publishedAt), post.readTime ? `${post.readTime} min read` : '']
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export function FromTheBlog({ posts }: { posts: Post[] }) {
   if (posts.length === 0) return null
   return (
