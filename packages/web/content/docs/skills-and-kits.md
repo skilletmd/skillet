@@ -1,8 +1,8 @@
 ---
 title: Skills and kits
 description: "Two nouns and two verbs: what a skill is, what a kit is, and how Follow and Add work."
-order: 2
-section: Get started
+order: 1
+section: Using Skillet
 image: /docs/concepts.png
 ---
 

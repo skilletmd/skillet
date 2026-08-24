@@ -10,6 +10,7 @@ A **skill** is a short set of instructions you give an AI: how you like things w
 
 | I want to... | Start here |
 | --- | --- |
+| Try someone's skills right now, nothing installed | [Summon a kit](/docs/summon) |
 | Run skills from people I trust | [Add skills](/docs/add-skills) |
 | Keep my skills current across tools and machines | [Install](/docs/install) |
 | Share one kit with my team | [Teams](/docs/teams) |
@@ -18,7 +19,7 @@ A **skill** is a short set of instructions you give an AI: how you like things w
 
 Skillet ranks skills by the people you follow, not by install count. Follow someone whose taste you trust and their published skills are one click from your kit, or [publish your own](/docs/publish).
 
-Once skills are in your kit, `/skillet <task>` picks the right one for the job. Usage recording is opt-in and never includes your prompt or task. [What `/skillet` records](/docs/privacy) lists exactly what is stored.
+Once skills are in your kit, `/skillet <task>` picks the right one for the job. You can also run someone's skills before adding anything: `/skillet @handle <task>`, or one pasted URL with nothing installed at all. See [Summon a kit](/docs/summon). Usage recording is opt-in and never includes your prompt or task. [What `/skillet` records](/docs/privacy) lists exactly what is stored.
 
 ## Keep skills current everywhere
 

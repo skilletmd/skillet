@@ -14,9 +14,14 @@ import { API_REFERENCE_ITEMS } from './docs-nav-api.generated'
 export const DOC_NAV: NavSection[] = [
   {
     title: 'Get started',
+    // Ordered by what a reader does, not by what the product needs explained.
+    // Summoning is second because it is the only step that costs nothing and
+    // the only one they can finish before deciding to install. "Skills & kits"
+    // moved to Using Skillet: it is the model, and the model reads better once
+    // you have run something.
     items: [
       { title: 'What is Skillet?', href: '/docs' },
-      { title: 'Skills & kits', href: '/docs/skills-and-kits' },
+      { title: 'Summon a kit', href: '/docs/summon' },
       { title: 'Install', href: '/docs/install' },
       { title: 'Add skills', href: '/docs/add-skills' },
     ],
@@ -24,6 +29,7 @@ export const DOC_NAV: NavSection[] = [
   {
     title: 'Using Skillet',
     items: [
+      { title: 'Skills & kits', href: '/docs/skills-and-kits' },
       { title: 'Approve updates', href: '/docs/updates' },
       { title: 'Publish a skill', href: '/docs/publish' },
       { title: 'Teams', href: '/docs/teams' },
