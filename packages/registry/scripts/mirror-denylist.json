@@ -48,6 +48,10 @@
     {
       "repo": "romainsimon/paperasse",
       "reason": "Non-English catalog policy: French."
+    },
+    {
+      "repo": "chengyi-ai/native-subtitle-quote-image",
+      "reason": "Non-English catalog policy: the single skill's description and body are Chinese. Reached the catalog through the review queue, where the English gate did not apply."
     }
   ]
 }
