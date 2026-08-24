@@ -15,5 +15,15 @@ export { startHttpTransport, type HttpTransportOptions, type HttpTransportHandle
 export { isValidToken, tokenFromHeader, visibleSkills, createRegistryValidator, authorizeBearerToken, isLoopbackSecretToken, type RegistryValidator, type RegistryValidatorOptions } from "./auth.js";
 export { ensureLoopbackToken, readLoopbackToken, loopbackTokenPath } from "./loopback-token.js";
 export { buildUri, parseUri, type ParsedUri } from "./resources.js";
-export { TOOLS, DEEP_RESEARCH_TOOLS } from "./handler.js";
-export { localSkillSource, type SkillSource, type SkillEntry } from "./store.js";
+export { TOOLS, DEEP_RESEARCH_TOOLS, SUMMON_TOOLS } from "./handler.js";
+export {
+  localSkillSource,
+  type SkillSource,
+  type SkillEntry,
+  type DiscoverySource,
+  type SummonCandidate,
+  type SummonResult,
+  type AuthorStanding,
+  type PublicSkill,
+  type PublicReadOptions,
+} from "./store.js";

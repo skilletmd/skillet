@@ -96,3 +96,102 @@ export const localSkillSource: SkillSource = {
     return readSkillFile(slug, path);
   },
 };
+
+// ── Discovery source (optional; hosted transport only) ───────────────────────
+
+/**
+ * Reaching PUBLIC content, as distinct from the caller's kit.
+ *
+ * `SkillSource` above is kit-scoped and both transports implement it. Summon
+ * needs the opposite: everyone else's public skills. Widening `SkillSource`
+ * would force the on-disk loopback store to implement registry lookups it has
+ * no business doing and would put a network concept into a package that
+ * currently has none, so this is a separate capability the host may omit.
+ *
+ * When a host supplies no `DiscoverySource`, the summon tools are never
+ * advertised — `skillet mcp` on loopback keeps exactly its current tool surface
+ * and stays offline-capable. The hosted registry server supplies one.
+ *
+ * The shape mirrors the `/skillet` route skill's summon flow
+ * (`packages/cli/bundled-skills/skillet-route/SKILL.md`) rather than inventing
+ * an MCP dialect: same candidate set, same `via`/`ref` split, same fallback.
+ * Two summon implementations that drift are worse than one slightly awkward
+ * over MCP.
+ */
+export interface DiscoverySource {
+  /** A handle's public kit as routing candidates. */
+  summon(handle: string): Promise<SummonResult>;
+  /** Cross-author fallback when the named handle has nothing that fits. */
+  searchPublic(keywords: string): Promise<SummonCandidate[]>;
+  /** Who an author is, for proposing someone the user did not name. */
+  authorStanding(handle: string): Promise<AuthorStanding | null>;
+  /** Load a public skill's body by ref. Records summon attribution when told. */
+  readPublicSkill(ref: string, opts?: PublicReadOptions): Promise<PublicSkill | null>;
+}
+
+/** One summon candidate: a public skill a handle authored or curated. */
+export interface SummonCandidate {
+  /**
+   * Canonical `owner/slug` of the TRUE author. For a curated skill this is not
+   * the summoned handle — that goes in `via`. Collapsing the two would credit
+   * the curator for someone else's work.
+   */
+  ref: string;
+  /**
+   * Display name when the source has one. The registry stores a name only in
+   * version frontmatter, not on the skill row, so a candidate list built from
+   * skill rows legitimately has none and the slug stands in.
+   */
+  name?: string | null;
+  description: string | null;
+  hash: string;
+  versionLabel?: string | null;
+  /** The curator's handle when this skill reached the set via their public kit. */
+  via?: string | null;
+}
+
+/**
+ * Unknown handle and "exists but publishes nothing" are different answers, and
+ * the client branches on them differently: correct the handle, versus fall
+ * back to searching everyone. The HTTP endpoint already separates them (404 vs
+ * an empty array), so don't collapse them here.
+ */
+export type SummonResult =
+  | { kind: "ok"; handle: string; candidates: SummonCandidate[] }
+  | { kind: "unknown-handle"; handle: string };
+
+/**
+ * An author's standing, for naming who you are proposing.
+ *
+ * Counts are omitted when zero rather than reported as zero: at launch every
+ * count is zero, and "used by 0 people" argues against the recommendation.
+ */
+export interface AuthorStanding {
+  handle: string;
+  name?: string | null;
+  bio?: string | null;
+  installs?: number;
+  summons?: number;
+  /** Set when the profile mirrors an upstream source rather than being authored here. */
+  mirrorSource?: string | null;
+}
+
+export interface PublicReadOptions {
+  /** Pin to a specific version; omit for latest. */
+  hash?: string | null;
+  /**
+   * The summoned handle this ref came from. Present means the read originated
+   * in a summon, which is what moves the author's summon count.
+   */
+  via?: string | null;
+}
+
+export interface PublicSkill {
+  ref: string;
+  name?: string | null;
+  description: string | null;
+  hash: string;
+  versionLabel?: string | null;
+  skillMd: string | null;
+  resources: string[];
+}

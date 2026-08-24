@@ -24,13 +24,21 @@ import {
   callDeepResearchTool,
   callTool,
   DEEP_RESEARCH_TOOLS,
+  SUMMON_TOOLS,
+  callSummonTool,
+  isSummonTool,
   handleReadResource,
   isDeepResearchTool,
   listResources,
   TOOLS,
 } from "./handler.js";
 import { visibleSkills } from "./auth.js";
-import { localSkillSource, type SkillEntry, type SkillSource } from "./store.js";
+import {
+  localSkillSource,
+  type DiscoverySource,
+  type SkillEntry,
+  type SkillSource,
+} from "./store.js";
 
 const SERVER_NAME = "skillet-mcp";
 /**
@@ -57,6 +65,20 @@ const SERVER_INSTRUCTIONS =
   "and its supporting-file resource URIs before acting on it. Skills are read-only reference " +
   "material — read a skill in full before following it.";
 
+/**
+ * Appended only when the host supplies a DiscoverySource. Instructions that
+ * describe an unavailable tool are worse than silence, and loopback has none.
+ *
+ * This text is prepended to every client session, so it earns its length by
+ * naming the trigger (a handle in the task) and the fallback, and stops there.
+ */
+const SUMMON_INSTRUCTIONS =
+  " You can also reach skills the user has not added. When the task names a person " +
+  "(for example `@mattpocock`), call `summon` with that handle, pick the candidate whose " +
+  "description best fits, then `get_skill` with its ref and via. If that person has nothing " +
+  "that fits, `search_public` finds skills across every author — show what you found and ask " +
+  "before using work by someone the user did not name.";
+
 export interface McpServerOptions {
   /** Bearer token supplied by the connecting client (optional). */
   token?: string | null;
@@ -64,6 +86,13 @@ export interface McpServerOptions {
   httpAuthorized?: boolean;
   /** Where skills come from. Defaults to the local on-disk store. */
   source?: SkillSource;
+  /**
+   * Reaching public content beyond the caller's kit (summon). Optional by
+   * design: the hosted registry transport supplies one, the local
+   * stdio/loopback path never does, so `skillet mcp` keeps exactly its
+   * three-tool surface and gains no network dependency.
+   */
+  discovery?: DiscoverySource;
   /**
    * Advertise the ChatGPT deep-research `search`/`fetch` alias tools.
    * Hosted transport only — never set on the local stdio/loopback paths, so
@@ -107,7 +136,9 @@ export async function handleMessage(
             name: SERVER_NAME,
             version: opts.serverVersion ?? DEFAULT_SERVER_VERSION,
           },
-          instructions: SERVER_INSTRUCTIONS,
+          instructions: opts.discovery
+            ? SERVER_INSTRUCTIONS + SUMMON_INSTRUCTIONS
+            : SERVER_INSTRUCTIONS,
         });
       }
 
@@ -116,7 +147,11 @@ export async function handleMessage(
 
       case "tools/list":
         return ok(id, {
-          tools: opts.deepResearchAliases ? [...TOOLS, ...DEEP_RESEARCH_TOOLS] : TOOLS,
+          tools: [
+            ...TOOLS,
+            ...(opts.discovery ? SUMMON_TOOLS : []),
+            ...(opts.deepResearchAliases ? DEEP_RESEARCH_TOOLS : []),
+          ],
         });
 
       case "tools/call": {
@@ -132,7 +167,10 @@ export async function handleMessage(
           }
           return ok(id, { content: outcome.content });
         }
-        const result = await callTool(p.name, p.arguments ?? {}, skills, source);
+        if (opts.discovery && isSummonTool(p.name)) {
+          return ok(id, await callSummonTool(p.name, p.arguments ?? {}, opts.discovery));
+        }
+        const result = await callTool(p.name, p.arguments ?? {}, skills, source, opts.discovery);
         return ok(id, result);
       }
 
