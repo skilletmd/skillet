@@ -275,7 +275,9 @@ function mergeContent(
     key: `skill:${s.skill_id}`,
     href: skillHref(s.author, s.slug),
     owner: s.author,
-    ownerAvatarUrl: avatarByHandle.get(s.author) ?? null,
+    // The row carries its own author avatar; the creators map is only a
+    // fallback (it covers the top-N creators, not every byline on the chart).
+    ownerAvatarUrl: s.author_avatar_url ?? avatarByHandle.get(s.author) ?? null,
     title: s.title?.trim() ? s.title : humanizeSlug(s.slug),
     value: s.install_count ?? 0,
     metricLabel: 'installs',
@@ -294,7 +296,7 @@ function mergeContent(
     key: `kit:${k.id}`,
     href: kitHref(k.owner, k.slug),
     owner: k.owner,
-    ownerAvatarUrl: avatarByHandle.get(k.owner) ?? null,
+    ownerAvatarUrl: k.ownerAvatarUrl ?? avatarByHandle.get(k.owner) ?? null,
     title: k.name,
     value: k.subscriberCount,
     metricLabel: k.subscriberCount === 1 ? 'sub' : 'subs',
