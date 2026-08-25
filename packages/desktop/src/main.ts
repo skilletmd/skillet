@@ -140,26 +140,55 @@ function previewCardStateOverride(): HeroCardState | null {
 }
 
 // First time each skill was seen locally — approximates "when it synced in".
-function skillFirstSeen(slugs: string[]): Record<string, number> {
-  let map: Record<string, number> = {}
+function readFirstSeen(): Record<string, number> {
   try {
-    map = JSON.parse(localStorage.getItem('skillFirstSeen') ?? '{}') as Record<string, number>
+    return JSON.parse(localStorage.getItem('skillFirstSeen') ?? '{}') as Record<string, number>
   } catch {
-    map = {}
+    return {}
   }
+}
+
+function writeFirstSeen(map: Record<string, number>): void {
+  try {
+    localStorage.setItem('skillFirstSeen', JSON.stringify(map))
+  } catch {
+    /* private mode */
+  }
+}
+
+/**
+ * Forget slugs this device no longer has.
+ *
+ * The stamp is written once and used as "when this arrived", so without a prune
+ * a skill you removed and re-added weeks later kept its ORIGINAL stamp: it sorted
+ * to the bottom of Latest and displayed an age of days, which is the opposite of
+ * what Latest promises. It also grew forever — one author subscription left ~400
+ * dead entries behind after the skills were gone.
+ *
+ * `known` MUST be every slug on the device, never a per-view subset, or a view
+ * that lists fewer skills would forget all the others.
+ */
+function pruneSkillFirstSeen(known: string[]): void {
+  const keep = new Set(known)
+  const map = readFirstSeen()
+  let changed = false
+  for (const slug of Object.keys(map))
+    if (!keep.has(slug)) {
+      delete map[slug]
+      changed = true
+    }
+  if (changed) writeFirstSeen(map)
+}
+
+function skillFirstSeen(slugs: string[]): Record<string, number> {
+  const map = readFirstSeen()
   let changed = false
   for (const s of slugs)
     if (!(s in map)) {
       map[s] = Date.now()
       changed = true
     }
-  if (changed) {
-    try {
-      localStorage.setItem('skillFirstSeen', JSON.stringify(map))
-    } catch {
-      /* private mode */
-    }
-  }
+  if (changed) writeFirstSeen(map)
   return map
 }
 // ── Data layer: real `skillet` CLI, or mock when the CLI isn't found ───────────────
@@ -1044,6 +1073,9 @@ function renderLibraryHtml(
   const kits = resolveTraySyncKitsForTray(trayKit ?? null)
   const inKit = new Set<string>()
   for (const g of kits) for (const sk of g.skills) inKit.add(sk.slug)
+  // Prune against the FULL device set (local skills + every kit member), not the
+  // per-view subset each branch below builds — see pruneSkillFirstSeen.
+  pruneSkillFirstSeen([...skills.map((sk) => sk.slug), ...inKit])
   // Everything synced lives in a kit, so anything loose is local to this device.
   let loose = skills.filter((s) => !inKit.has(s.slug))
   if (opts.sort === 'recency') {
