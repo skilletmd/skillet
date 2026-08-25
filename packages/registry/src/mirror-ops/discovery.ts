@@ -20,6 +20,7 @@ import { newId } from '../db/index.js';
 import { screenCandidate, parseOwnerRepo, normalizeRepoKey } from '../lib/mirror-screen.js';
 import { assessCandidateQuality, type QualityResult } from '../lib/mirror-quality.js';
 import { recordCandidateContext } from '../lib/mirror-candidate-context.js';
+import { buildOverlapIndex, loadPublicCatalogPrisma, type OverlapIndex } from '../lib/mirror-overlap.js';
 // Single source of truth for the in-flight states (mirrors the in-flight
 // unique index on mirror_review_queue); imported, not re-declared, so the
 // index and every query site cannot drift apart.
@@ -219,6 +220,8 @@ export async function discoverMirrorCandidates(opts: DiscoverOptions): Promise<D
     const seenInflight = await inflightKeys(prisma);
     const mirrors = await existingMirrorKeys(prisma);
     const seenThisRun = new Set<string>();
+    // Built lazily: a sweep that enqueues nothing should not pay for it.
+    let overlapIndex: OverlapIndex | undefined;
     const denylist = opts.denylist ?? loadDenylist();
     const minScore = opts.minQualityScore ?? 0;
 
@@ -327,6 +330,8 @@ export async function discoverMirrorCandidates(opts: DiscoverOptions): Promise<D
             // be reviewed: a rejected_screen row is nobody's decision to make,
             // and capture is one GitHub request per skill.
             if (status === 'pending_review' && quality) {
+                // One catalog read for the whole sweep, not one per candidate.
+                overlapIndex ??= buildOverlapIndex(await loadPublicCatalogPrisma(prisma));
                 await recordCandidateContext(prisma, id, {
                     owner: parsed.owner,
                     repo: parsed.repo,
@@ -334,7 +339,7 @@ export async function discoverMirrorCandidates(opts: DiscoverOptions): Promise<D
                     dirs: quality.skillDirs,
                     ...(token ? { token } : {}),
                     ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
-                });
+                }, overlapIndex);
             }
             result.enqueued.push({ repo: repoFull, handle: screen.derivedHandle, status });
         }

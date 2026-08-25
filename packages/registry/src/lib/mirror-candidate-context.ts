@@ -17,6 +17,12 @@ import type { PrismaClient } from '@prisma/client'
 import { parseFrontmatter } from '../sync/sync-repo.js'
 import { fetchSkillMd, type QualityInput } from './mirror-quality.js'
 import { guessCategory } from '../classify/heuristic.js'
+import {
+  bestOverlap,
+  buildOverlapIndex,
+  loadPublicCatalogPrisma,
+  type OverlapIndex,
+} from './mirror-overlap.js'
 
 export interface CapturedSkill {
   /** Skill directory path inside the repo; '' for a single-skill repo root. */
@@ -31,6 +37,9 @@ export interface CapturedSkill {
    * enough.
    */
   category: string | null
+  /** "author/slug" of the closest public skill the catalog already has. */
+  overlapRef?: string | null
+  overlapScore?: number | null
 }
 
 /**
@@ -112,6 +121,8 @@ export async function writeCandidateSkills(
         name: s.name,
         description: s.description,
         category: s.category,
+        overlap_ref: s.overlapRef ?? null,
+        overlap_score: s.overlapScore ?? null,
       })),
     })
   }
@@ -149,11 +160,23 @@ export async function recordCandidateContext(
   prisma: PrismaClient,
   queueId: string,
   input: QualityInput & { ref: string | null; dirs: string[] },
+  /**
+   * Prebuilt catalog index. A sweep passes one built once for the whole run;
+   * without it each candidate would re-read 1,365 rows to answer the same
+   * question. The URL submit omits it: one candidate, a human waiting.
+   */
+  overlapIndex?: OverlapIndex,
 ): Promise<CapturedSkill[] | null> {
   if (!input.ref || input.dirs.length === 0) return null
   try {
     const skills = await captureCandidateSkills({ ...input, ref: input.ref })
     if (!skills) return null
+    const index = overlapIndex ?? buildOverlapIndex(await loadPublicCatalogPrisma(prisma))
+    for (const skill of skills) {
+      const hit = bestOverlap(index, skill)
+      skill.overlapRef = hit?.ref ?? null
+      skill.overlapScore = hit?.score ?? null
+    }
     await writeCandidateSkills(prisma, queueId, skills)
     return skills
   } catch (err) {
