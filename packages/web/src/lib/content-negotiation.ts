@@ -113,6 +113,43 @@ export function isNotAcceptable(header: string | null | undefined): boolean {
   return Boolean(header && header.trim()) && preferredType(header) === null
 }
 
+/** Extensions that name one concrete artifact, never an HTML/Markdown document. */
+const SINGLE_REPRESENTATION_EXTENSIONS = [
+  '.json',
+  '.txt',
+  '.xml',
+  '.ico',
+  '.svg',
+  '.png',
+  '.webmanifest',
+]
+
+/** Route prefixes that serve installers/manifests rather than documents. */
+const SINGLE_REPRESENTATION_PREFIXES = ['/desktop', '/download']
+
+/**
+ * True for a path that has exactly ONE representation, so content negotiation
+ * must not run over it.
+ *
+ * These routes produce a concrete artifact (the updater manifest, llms.txt, the
+ * sitemap, an installer redirect) and have no Markdown twin, so negotiating can
+ * only reject a caller that asked for the very type the route returns. That is
+ * not hypothetical: `tauri-plugin-updater` requests its manifest with
+ * `Accept: application/json`, which matches neither entry in PRODUCES, so
+ * `/desktop/latest.json` answered 406 to every installed desktop app and
+ * auto-update never ran once for anybody.
+ *
+ * `.md` is deliberately excluded — it IS a negotiated representation and is
+ * handled by the explicit `.md` branch in agentSurfaceResponse.
+ */
+export function isSingleRepresentationPath(pathname: string): boolean {
+  if (pathname.endsWith('.md')) return false
+  if (SINGLE_REPRESENTATION_EXTENSIONS.some((ext) => pathname.endsWith(ext))) return true
+  return SINGLE_REPRESENTATION_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  )
+}
+
 /**
  * Add `Accept` to an existing `Vary` without disturbing what is already there.
  *

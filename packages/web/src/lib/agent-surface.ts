@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import {
   appendVaryAccept,
   isNotAcceptable,
+  isSingleRepresentationPath,
   MARKDOWN_CONTENT_TYPE,
   NOT_ACCEPTABLE_BODY,
   wantsMarkdown,
@@ -262,6 +263,11 @@ export async function agentSurfaceResponse(
       return res
     }
   }
+
+  // Single-representation endpoints never negotiate. See
+  // isSingleRepresentationPath — this guard is what keeps the desktop updater's
+  // `Accept: application/json` from 406ing before its route can answer.
+  if (isSingleRepresentationPath(pathname)) return null
 
   if (isNotAcceptable(accept)) return notAcceptableResponse()
 

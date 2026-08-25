@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  isSingleRepresentationPath,
   appendVaryAccept,
   fullRequested,
   isNotAcceptable,
@@ -146,3 +147,45 @@ describe('fullRequested', () => {
   })
 })
 
+
+describe('isSingleRepresentationPath', () => {
+  // The regression this exists for: tauri-plugin-updater fetches its manifest
+  // with `Accept: application/json`. PRODUCES lists only text/html and
+  // text/markdown, so isNotAcceptable(accept) was true and the proxy returned
+  // 406 before the route ran. Every installed desktop app got a 406 on every
+  // check, the client swallowed it, and auto-update never worked for anyone.
+  it('exempts the desktop updater manifest', () => {
+    expect(isSingleRepresentationPath('/desktop/latest.json')).toBe(true)
+  })
+
+  it('exempts installer redirects and the machine-readable statics', () => {
+    for (const p of [
+      '/download',
+      '/download/mac',
+      '/download/windows',
+      '/desktop',
+      '/llms.txt',
+      '/sitemap.xml',
+      '/robots.txt',
+      '/favicon.ico',
+      '/site.webmanifest',
+    ]) {
+      expect(isSingleRepresentationPath(p), p).toBe(true)
+    }
+  })
+
+  it('leaves real document routes negotiating', () => {
+    for (const p of ['/', '/docs', '/docs/install', '/@taylor', '/@taylor/some-skill', '/updates']) {
+      expect(isSingleRepresentationPath(p), p).toBe(false)
+    }
+  })
+
+  it('never claims a .md path — that IS a negotiated representation', () => {
+    expect(isSingleRepresentationPath('/docs/install.md')).toBe(false)
+  })
+
+  it('does not swallow a route that merely starts with the same letters', () => {
+    expect(isSingleRepresentationPath('/downloads-page')).toBe(false)
+    expect(isSingleRepresentationPath('/desktop-app')).toBe(false)
+  })
+})
