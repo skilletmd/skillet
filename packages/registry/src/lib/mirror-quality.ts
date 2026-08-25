@@ -43,6 +43,14 @@ export interface QualityResult {
   /** One line per scored component, for the review queue's screen_notes. */
   notes: string[]
   skillCount: number
+  /**
+   * The listing this assessment read, handed forward so the capture pass
+   * (lib/mirror-candidate-context.ts) does not re-fetch the repo metadata and
+   * the tree to learn the same two things. Sampling decides what gets SCORED;
+   * these are every skill directory in the repo.
+   */
+  skillDirs: string[]
+  defaultBranch: string | null
 }
 
 async function ghGet(url: string, input: QualityInput): Promise<Response | null> {
@@ -107,7 +115,7 @@ async function fetchSkillDirs(input: QualityInput, ref: string): Promise<string[
   return [...new Set(dirs)]
 }
 
-async function fetchSkillMd(input: QualityInput, ref: string, dir: string): Promise<string | null> {
+export async function fetchSkillMd(input: QualityInput, ref: string, dir: string): Promise<string | null> {
   const path = dir ? `${dir}/SKILL.md` : 'SKILL.md'
   const res = await ghGet(
     `https://raw.githubusercontent.com/${input.owner}/${input.repo}/${encodeURIComponent(ref)}/${path
@@ -187,11 +195,11 @@ export async function assessCandidateQuality(input: QualityInput): Promise<Quali
   const notes: string[] = []
   const signals = await fetchRepoSignals(input)
   if (!signals) {
-    return { score: 0, hardFail: 'could not fetch repo metadata for quality assessment', notes, skillCount: 0 }
+    return { score: 0, hardFail: 'could not fetch repo metadata for quality assessment', notes, skillCount: 0, skillDirs: [], defaultBranch: null }
   }
   const dirs = await fetchSkillDirs(input, signals.defaultBranch)
   if (!dirs) {
-    return { score: 0, hardFail: 'could not read the repo tree for quality assessment', notes, skillCount: 0 }
+    return { score: 0, hardFail: 'could not read the repo tree for quality assessment', notes, skillCount: 0, skillDirs: [], defaultBranch: signals.defaultBranch }
   }
   if (dirs.length > MAX_PLAUSIBLE_SKILLS) {
     return {
@@ -199,6 +207,8 @@ export async function assessCandidateQuality(input: QualityInput): Promise<Quali
       hardFail: `${dirs.length} skill dirs exceeds the plausible cap for an authored library`,
       notes,
       skillCount: dirs.length,
+      skillDirs: dirs,
+      defaultBranch: signals.defaultBranch,
     }
   }
 
@@ -216,7 +226,7 @@ export async function assessCandidateQuality(input: QualityInput): Promise<Quali
     .map(lintSkillMarkdown)
 
   if (lints.length === 0) {
-    return { score: 0, hardFail: 'no SKILL.md could be read for quality assessment', notes, skillCount: dirs.length }
+    return { score: 0, hardFail: 'no SKILL.md could be read for quality assessment', notes, skillCount: dirs.length, skillDirs: dirs, defaultBranch: signals.defaultBranch }
   }
   const frac = (pick: (l: (typeof lints)[number]) => boolean) =>
     lints.filter(pick).length / lints.length
@@ -228,6 +238,8 @@ export async function assessCandidateQuality(input: QualityInput): Promise<Quali
       hardFail: 'no sampled SKILL.md has valid frontmatter (name + description)',
       notes,
       skillCount: dirs.length,
+      skillDirs: dirs,
+      defaultBranch: signals.defaultBranch,
     }
   }
 
@@ -242,6 +254,8 @@ export async function assessCandidateQuality(input: QualityInput): Promise<Quali
       hardFail: `skills are not in English (${Math.round((1 - englishRatio) * 100)}% of sampled SKILL.md)`,
       notes,
       skillCount: dirs.length,
+      skillDirs: dirs,
+      defaultBranch: signals.defaultBranch,
     }
   }
 
@@ -271,5 +285,5 @@ export async function assessCandidateQuality(input: QualityInput): Promise<Quali
 
   award(signals.stars >= 20 ? 5 : 0, 5, `stars ${signals.stars}`)
 
-  return { score, hardFail: null, notes, skillCount: dirs.length }
+  return { score, hardFail: null, notes, skillCount: dirs.length, skillDirs: dirs, defaultBranch: signals.defaultBranch }
 }

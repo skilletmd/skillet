@@ -470,7 +470,37 @@ model mirror_review_queue {
   decided_at          Int?
   created_at          Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
 
+  // Structured screening output, in columns rather than encoded into
+  // screen_notes. screen_notes stays the human-readable rubric breakdown; a
+  // prose format change must not be able to take the decision context with it.
+  skills_captured_at  Int?
+  category_summary    Json?
+
+  mirror_candidate_skills mirror_candidate_skills[]
+
   @@index([status], map: "idx_mirror_review_queue_status")
+}
+
+/// One row per skill found in a candidate repo, captured at screen time so an
+/// admin can see WHAT they are approving without opening GitHub. Every column
+/// but the key is nullable: rows predating this table render without it.
+model mirror_candidate_skills {
+  queue_id      String
+  /// Skill directory path inside the repo ('' for a single-skill repo root).
+  slug          String  @db.VarChar(255)
+  name          String? @db.Text
+  description   String? @db.Text
+  /// Heuristic pre-decision guess (classify/heuristic.ts). Never the stored
+  /// category: the AI classifier still decides that after approval.
+  category      String? @db.VarChar(64)
+  /// Best catalog match for this skill, as "author/slug", plus its score.
+  overlap_ref   String? @db.VarChar(255)
+  overlap_score Float?
+
+  mirror_review_queue mirror_review_queue @relation(fields: [queue_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([queue_id, slug])
+  @@index([queue_id], map: "idx_mirror_candidate_skills_queue")
 }
 
 model oauth_states {

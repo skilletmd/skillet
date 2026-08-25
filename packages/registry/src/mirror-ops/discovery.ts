@@ -18,7 +18,8 @@ import { Prisma } from '@prisma/client';
 import { dedupeMirrorsBy } from '@skillet/protocol';
 import { newId } from '../db/index.js';
 import { screenCandidate, parseOwnerRepo, normalizeRepoKey } from '../lib/mirror-screen.js';
-import { assessCandidateQuality } from '../lib/mirror-quality.js';
+import { assessCandidateQuality, type QualityResult } from '../lib/mirror-quality.js';
+import { recordCandidateContext } from '../lib/mirror-candidate-context.js';
 // Single source of truth for the in-flight states (mirrors the in-flight
 // unique index on mirror_review_queue); imported, not re-declared, so the
 // index and every query site cannot drift apart.
@@ -274,8 +275,9 @@ export async function discoverMirrorCandidates(opts: DiscoverOptions): Promise<D
         // Quality gate: legality passed, now is it plausibly good? Below the
         // bar → rejected_screen with the scored notes; above it → the score
         // travels into screen_notes so the admin queue can rank candidates.
+        let quality: QualityResult | null = null;
         if (screen.pass && minScore > 0) {
-            const quality = await assessCandidateQuality({
+            quality = await assessCandidateQuality({
                 owner: parsed.owner,
                 repo: parsed.repo,
                 ...(token ? { token } : {}),
@@ -301,9 +303,10 @@ export async function discoverMirrorCandidates(opts: DiscoverOptions): Promise<D
         }
 
         try {
+            const id = newId();
             await prisma.mirror_review_queue.create({
                 data: {
-                    id: newId(),
+                    id,
                     source_repo: repoFull,
                     normalized_repo_key: key,
                     source_owner_login: screen.ownerLogin,
@@ -319,6 +322,20 @@ export async function discoverMirrorCandidates(opts: DiscoverOptions): Promise<D
             // Reserve the in-flight slot for the rest of this run.
             if (status !== 'rejected_screen')
                 seenInflight.add(key);
+            // Capture what the candidate actually contains, so the admin queue
+            // can show the skills instead of a count. Only for rows that will
+            // be reviewed: a rejected_screen row is nobody's decision to make,
+            // and capture is one GitHub request per skill.
+            if (status === 'pending_review' && quality) {
+                await recordCandidateContext(prisma, id, {
+                    owner: parsed.owner,
+                    repo: parsed.repo,
+                    ref: quality.defaultBranch,
+                    dirs: quality.skillDirs,
+                    ...(token ? { token } : {}),
+                    ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
+                });
+            }
             result.enqueued.push({ repo: repoFull, handle: screen.derivedHandle, status });
         }
         catch (err) {

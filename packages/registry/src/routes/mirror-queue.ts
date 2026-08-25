@@ -29,7 +29,8 @@ import { ensureOrgAuthorRowPrisma } from '../lib/org-access.js';
 import { RealAuthorCollisionError, upsertMirrorAuthorPrisma } from '../lib/mirror-authors.js';
 import { guessCategory } from '../classify/heuristic.js';
 import { screenCandidate, parseOwnerRepo } from '../lib/mirror-screen.js';
-import { assessCandidateQuality } from '../lib/mirror-quality.js';
+import { assessCandidateQuality, type QualityResult } from '../lib/mirror-quality.js';
+import { recordCandidateContext } from '../lib/mirror-candidate-context.js';
 import { normalizeRepoKey } from '../lib/mirror-screen.js';
 import { syncRepoSkillsPrisma } from '../sync/sync-repo.js';
 import type { BlobStore } from '../blob-store/types.js';
@@ -206,8 +207,9 @@ export function registerMirrorQueueRoutes(
 
             let status = screen.pass ? 'pending_review' : 'rejected_screen';
             let notes = screen.notes;
+            let quality: QualityResult | null = null;
             if (screen.pass) {
-                const quality = await assessCandidateQuality({ owner: parsed.owner, repo: parsed.repo });
+                quality = await assessCandidateQuality({ owner: parsed.owner, repo: parsed.repo });
                 const summary = `quality ${quality.score}/100 across ${quality.skillCount} skills — ${quality.notes.join('; ')}`;
                 if (quality.hardFail) {
                     status = 'rejected_screen';
@@ -242,6 +244,17 @@ export function registerMirrorQueueRoutes(
                     screen_notes: notes,
                 },
             });
+            // Same context a discovered candidate gets (R7). A pasted row that
+            // showed a count where a swept row showed names would make the
+            // submit form the worse way to add a mirror.
+            if (status === 'pending_review' && quality) {
+                await recordCandidateContext(prisma, id, {
+                    owner: parsed.owner,
+                    repo: parsed.repo,
+                    ref: quality.defaultBranch,
+                    dirs: quality.skillDirs,
+                });
+            }
             return reply.code(201).send({ id, repo: repoFull, status, notes });
         },
     );
