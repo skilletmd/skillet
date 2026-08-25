@@ -8,8 +8,8 @@
 <h1 align="center">Skillet</h1>
 
 <p align="center">
-  Don't pick a skill. Pick a person.<br>
-  Tag anyone's handle mid-task and your agent pulls whichever of their skills fits.
+  A registry and sync system for agent skills.<br>
+  Publish a skill once, run it in every agent runtime.
 </p>
 
 <p align="center">
@@ -26,57 +26,44 @@
 
 ---
 
-## Why
+## What it is
 
 A skill is a folder with a `SKILL.md` in it, in the open
-[agentskills.io](https://agentskills.io) format. You can copy one off GitHub
-today. That only helps if you already knew the skill existed, knew which one you
-wanted, and remembered it at the moment you needed it.
+[agentskills.io](https://agentskills.io) format. Skillet keeps one canonical
+copy of each skill, versions and signs it, and materializes it into each
+runtime's native format.
 
-Skillet drops that to one thing: name someone you rate. The unit of choice is a
-person, and the choosing happens mid-task inside the agent, not on a browsing
-trip beforehand. What you keep stays current, stays signed, and lands in every
-runtime you use.
+## Features
 
-## Start where you want to stop
+### Summon a handle's skills, nothing installed
 
-Five rungs. Each costs more than the one above it, and each is a fine place to
-stay.
-
-### 1. Borrow — nothing installed
-
-Paste a line naming a handle and a task. The agent fetches their public skills,
-matches your task against the descriptions, and applies the one that fits.
+Paste a line naming a handle and a task. The agent fetches that handle's public
+skills, matches the task against the descriptions, and applies the one that
+fits.
 
 ```
 Read skillet.md/@mattpocock/summon and use their best skill to review my PR
 ```
 
-No account, no CLI, nothing on disk. Any agent that can fetch a URL works. Narrow
-it to one kit with `skillet.md/@handle/kit/slug/summon`.
+No account, no CLI, nothing on disk. Any agent that can fetch a URL works.
+Narrow it to one kit with `skillet.md/@handle/kit/slug/summon`.
 See [Summon a kit](https://skillet.md/docs/summon).
 
-### 2. Keep — follow people
-
-Follow someone and their new skills show up in your feed, one click to add.
-Skillet ranks by the people you follow, not by install count. Browse the catalog
-at [skillet.md/browse](https://skillet.md/browse).
-
-### 3. Sync — install once
+### Sync across runtimes
 
 ```bash
 npx skilletmd
 ```
 
-Sign in passwordless, one pair code links a machine. From then on Skillet keeps
-one canonical copy of each skill and writes it into every runtime you connect,
-each in that runtime's native format. Edit once, every runtime gets it.
+Passwordless sign-in; one pair code links a machine. Skillet then writes each
+skill into every runtime you connect, in that runtime's native format. Edit
+once, every runtime gets it.
 
-`/skillet <task>` routes across your own kit. `/skillet @handle <task>` is
-borrowing, four words instead of a URL.
+`/skillet <task>` routes across your own kit. `/skillet @handle <task>` summons
+someone else's.
 
-**Desktop app** — a tray app that syncs in the background, so a skill you publish
-on one machine is on the others without you running anything.
+A tray app syncs in the background, so a skill published on one machine reaches
+the others without running anything.
 
 | Platform | Requirements | |
 | --- | --- | --- |
@@ -86,34 +73,38 @@ on one machine is on the others without you running anything.
 Both are code-signed and auto-update. Installers are also attached to every
 [release](https://github.com/skilletmd/skillet/releases).
 
-### 4. Publish — one canonical version
+### Publish
 
-Publish from your editor or a linked GitHub repo. The registry is the source of
-truth: one versioned, signed artifact per skill, shareable as a link, and current
-for everyone who follows you.
+Publish from your editor or a linked GitHub repo. One versioned, signed
+artifact per skill, shareable as a link.
 See [Publish a skill](https://skillet.md/docs/publish).
 
-### 5. Team — one private kit
+### Follow people
 
-A shared kit holds skills that never touch the public catalog: your review
-checklist, your runbook, your house voice. Every member and every machine runs
-the same approved version. A headless CI runner gets a **kit-key**, a scoped and
-revocable credential that pulls exactly one kit and nothing more.
+Follow an author and their new skills appear in your feed, one click to add.
+The feed ranks by who you follow, not by install count. Browse the catalog at
+[skillet.md/browse](https://skillet.md/browse).
+
+### Private kits for teams
+
+A shared kit holds skills that never reach the public catalog. Every member and
+every machine runs the same approved version. A headless CI runner gets a
+**kit-key**: a scoped, revocable credential that pulls exactly one kit.
 See [Teams and shared kits](docs/private-kits.md).
 
-## Two things that are always true
+## Updates and scanning
 
-**Nothing lands without your say-so.** When an author ships a new version of a
-skill you use, it waits in [Updates](https://skillet.md/updates) until you
-approve that specific version. Approval is per version, not a standing grant, and
-the web is the only place it happens.
+**Updates wait for approval.** When an author ships a new version of a skill you
+use, it waits in [Updates](https://skillet.md/updates) until you approve that
+specific version. Approval is per version, not a standing grant, and the web is
+the only place it happens.
 
-**Everything published is scanned.** Skills are instructions an agent will act
-on, so every version is scanned before it is served and quarantined content is
-never downloadable. Verdicts are public, so you can check any version before you
-run it. [What the scanner catches, and what it cannot](https://skillet.md/docs/safety).
+**Every published version is scanned.** Skills are instructions an agent will
+act on, so each version is scanned before it is served, and quarantined content
+is never downloadable. Verdicts are public.
+[What the scanner catches, and what it cannot](https://skillet.md/docs/safety).
 
-## Runs where you already work
+## Runtimes
 
 One skill materializes into each runtime's native format:
 
