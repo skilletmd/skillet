@@ -81,52 +81,84 @@ describe('the closing ladder', () => {
     const html = await renderHome()
 
     const catalogAt = html.indexOf('surface-grid')
-    const ladderAt = html.indexOf('Keep your team in sync')
+    const ladderAt = html.indexOf('Try anyone, install nothing')
 
-    // Three equal boxes above the catalog inverted the funnel. Below it they
-    // answer a question the visitor has actually formed.
+    // Equal boxes above the catalog inverted the funnel. Below it they answer a
+    // question the visitor has actually formed.
     expect(ladderAt).toBeGreaterThan(-1)
     expect(catalogAt).toBeLessThan(ladderAt)
   })
 
-  it('leads with reach, then follow, then team', async () => {
+  it('runs the five rungs in ascending order of commitment', async () => {
     const html = await renderHome()
 
-    const reachAt = html.indexOf('One kit, every agent')
-    const feedAt = html.indexOf('New skills from people you trust')
-    const teamAt = html.indexOf('Keep your team in sync')
+    // The same spine the docs and the README carry: borrow, keep, sync,
+    // publish, team. The ORDER is the load-bearing part. Each rung has to cost
+    // the reader more than the one before it, or the row is five claims rather
+    // than a ladder, which is what it was when it ran sync, keep, team.
+    const rungs = [
+      'Try anyone, install nothing',
+      'Follow people you trust',
+      'One kit, every agent',
+      'Publish your own',
+      'Your team, one private kit',
+    ].map((title) => ({ title, at: html.indexOf(title) }))
 
-    expect(reachAt).toBeGreaterThan(-1)
-    expect(reachAt).toBeLessThan(feedAt)
-    expect(feedAt).toBeLessThan(teamAt)
+    for (const rung of rungs) expect(rung.at, rung.title).toBeGreaterThan(-1)
+    for (let i = 1; i < rungs.length; i++) {
+      expect(rungs[i - 1].at, `${rungs[i - 1].title} before ${rungs[i].title}`).toBeLessThan(
+        rungs[i].at,
+      )
+    }
   })
 
-  it('does not argue with the hero it sits under', async () => {
+  it('gives every rung the same shape', async () => {
     const html = await renderHome()
 
-    // The hero asks for an install. A "borrow with nothing installed" rung
-    // directly beneath it contradicted that, which is the same problem the
-    // hero itself had before install moved into it.
-    expect(html).not.toContain('Borrow with nothing installed')
+    // Title, body, button, five times. One rung carrying a command block
+    // instead of a button made the row read as two things, and its wrapped
+    // URL broke mid-handle.
+    expect(html).toContain('How summoning works')
+    expect(html).toContain('See the feed')
+    expect(html).toContain('See the runtimes')
+    expect(html).toContain('Start publishing')
+    expect(html).toContain('Set up teams')
+  })
+
+  it('scrolls rather than shrinking to fit five rungs', async () => {
+    const html = await renderHome()
+
+    // Five equal columns in a 1120px band is ~224px each, against copy written
+    // for a ~370px measure. The rail keeps the card width and moves the
+    // overflow into its own scroll container, so the page never scrolls
+    // sideways. `rail-scroll` is the class that hides the native bar.
+    expect(html).toContain('rail-scroll')
+    expect(html).toContain('overflow-x-auto')
   })
 
   it('does not repeat the hero install CTA', async () => {
     const html = await renderHome()
 
     // The lead rung was "Get app", which duplicates the Mac app door up top.
-    // The borrow story took its place.
     expect(html).not.toContain('Bring your skills everywhere')
     expect(html).not.toContain('Get app')
   })
+})
 
-  it('gives all three rungs the same shape', async () => {
+describe('the teams band', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('does not exist, because rung 5 already is it', async () => {
     const html = await renderHome()
 
-    // Title, body, button, three times. One rung carrying a command block
-    // instead of a button made the row read as two things, and its wrapped
-    // URL broke mid-handle.
-    expect(html).toContain('See the runtimes')
-    expect(html).toContain('See feed')
-    expect(html).toContain('Set up teams')
+    // A teams strip ran under the ladder so a team lead would not have to press
+    // an arrow to reach rung 5. Scrolled to the end it sat directly under the
+    // teams card restating it. The rung is the slot; a second copy of a rung is
+    // not more reach, it is the same words twice.
+    expect(html).toContain('Your team, one private kit')
+    expect(html).not.toContain('Running Skillet with a team?')
+    expect(html).not.toContain('Share skills your team cannot publish')
   })
 })

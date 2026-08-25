@@ -8,7 +8,10 @@ import { SummonDemo } from '@/components/home/install-steps'
 import { InstallActions } from '@/components/install/install-picker'
 import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/ui/avatar'
+import { LockIcon } from '@/components/visibility-badge'
+import { LadderCarousel, LadderCard } from '@/components/home/ladder-carousel'
 import { CoverArt } from '@/components/cover/cover'
+import type { CategoryKey } from '@skillet/protocol/covers'
 import { CatalogShelvesSkeleton } from '@/components/home/shelf-skeleton'
 import { PAGE_CONTAINER_CLASS } from '@/lib/page-layout'
 import { ogMeta, OG } from '@/lib/og'
@@ -130,13 +133,69 @@ function Hero() {
   )
 }
 
-// The agent-logo cluster: "every AI tool", in the product's own visual
-// language. Its two siblings (kit covers for the feed, a facepile for teams)
-// went with the ladder cards they belonged to.
+// The closing ladder: the five rungs, read after the catalog rather than before
+// it.
+//
+// It ran as a three-column band above the catalog once and was cut, because
+// three equal buttons is not a sequence and the order inverted the funnel. Down
+// here that objection is gone: the visitor has already seen who is on Skillet,
+// so these are answers to a question they have actually formed rather than
+// doors fired at a stranger.
+//
+// The five rungs are the same spine the docs and the README are built on:
+// borrow, keep, sync, publish, team. They run in that order because each one
+// has to cost the reader more than the one before it. That ascent is the whole
+// reason it reads as a ladder instead of five claims, and it is why the rungs
+// are worth carrying identically across every surface.
+//
+// Five equal columns do not fit a 1120px band (~224px each against copy written
+// for a ~370px measure), so the row scrolls three-up instead of shrinking. See
+// `LadderCarousel`.
+//
+// Rung 5 is a card like the rest, and only a card. A teams strip ran under this
+// row for exactly that "the last rung is two arrow presses away" reason, and it
+// was wrong twice over: scrolled to the end it sat directly beneath the teams
+// card saying the same thing, and the fix for a rung being far away is not a
+// second copy of it. If teams needs more reach than rung 5 gives it, that is a
+// nav or landing-page job, not another band here.
+//
+// Motifs are named for what they draw, not for the card they sit on. They were
+// named the other way and drifted: the agent logos were called PublishMotif
+// while sitting on the sync card, and the kit covers were called SyncMotif
+// while sitting on the follow card.
 const FRAME =
   'flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden ring-2 ring-(--bg)'
 
-function PublishMotif() {
+// Rung 1, borrow: the literal keystroke, since the whole pitch of this rung is
+// that there is nothing to install and the line IS the product.
+function SummonMotif() {
+  return (
+    <span className="inline-flex h-10 items-center rounded-full border border-(--line) bg-(--surface) px-3.5 font-mono text-sm text-(--ink)">
+      /skillet @
+    </span>
+  )
+}
+
+// Rung 2, keep: a facepile, because the unit you choose is a person.
+function PeopleMotif() {
+  const people = ['ada', 'lin', 'jo']
+  return (
+    <div className="flex -space-x-2.5">
+      {people.map((k) => (
+        <Avatar
+          key={k}
+          name={k}
+          colorKey={k}
+          size="md"
+          className="border border-(--line) ring-2 ring-(--bg)"
+        />
+      ))}
+    </div>
+  )
+}
+
+// Rung 3, sync: "every AI tool", in the product's own visual language.
+function AgentsMotif() {
   const agents = [
     { name: 'Claude', Logo: ClaudeLogo },
     { name: 'ChatGPT', Logo: OpenAiLogo },
@@ -156,52 +215,44 @@ function PublishMotif() {
   )
 }
 
-// The closing ladder: three boxes, read after the catalog rather than before it.
-//
-// It ran as a three-column band above the catalog once and was cut, because
-// three equal buttons is not a sequence and the order inverted the funnel. Down
-// here that objection is gone: the visitor has already seen who is on Skillet,
-// so these are answers to a question they have actually formed rather than
-// three doors fired at a stranger.
-//
-// The lead rung used to be "Get app", which now duplicates the Mac app door in
-// the hero. It answers what installing BUYS instead: one kit in every agent.
-// A "borrow with nothing installed" rung sat here briefly and argued with the
-// hero directly above it, which now asks for an install; that is the same
-// contradiction the hero itself had last night, moved down a screen.
-function SyncMotif() {
-  const kits = ['frontend', 'design', 'marketing']
+// `CategoryKey`, not `string`: CoverArt takes raw strings and quietly falls
+// back to the blank ground for a key it does not know, so a typo renders an
+// empty tile instead of failing. Teams shipped as `engineering` (not a
+// category) and drew nothing.
+function KitCover({ cat }: { cat: CategoryKey }) {
+  return (
+    <span className={`${FRAME} relative rounded-xl border border-(--line) ring-[3px]`}>
+      <CoverArt seed={`ladder-kit-${cat}`} categories={[cat]} className="h-full w-full" />
+      {/* subtle dark inner edge so the art reads as framed on any color,
+          without the heavy white halo a light ring gives on saturated art */}
+      <span className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-black/10" />
+    </span>
+  )
+}
+
+// Rung 4, publish: cover art, which is what your own work looks like once it is
+// on a profile and in other people's feeds.
+function CoversMotif() {
   return (
     <div className="flex -space-x-2.5">
-      {kits.map((cat) => (
-        <span
-          key={cat}
-          className={`${FRAME} relative rounded-xl border border-(--line) ring-[3px]`}
-        >
-          <CoverArt seed={`ladder-kit-${cat}`} categories={[cat]} className="h-full w-full" />
-          {/* subtle dark inner edge so the art reads as framed on any color,
-              without the heavy white halo a light ring gives on saturated art */}
-          <span className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-black/10" />
-        </span>
+      {(['frontend', 'design', 'marketing'] as const).map((cat) => (
+        <KitCover key={cat} cat={cat} />
       ))}
     </div>
   )
 }
 
-function TeamsMotif() {
-  const team = ['ada', 'lin', 'jo']
+// Rung 5, team: one cover, locked. Deliberately NOT the facepile from rung 2.
+// Teams is about a kit that stays private, not about the people in it, and
+// reusing the avatars there made the two rungs read as the same idea twice.
+function PrivateKitMotif() {
   return (
-    <div className="flex -space-x-2.5">
-      {team.map((k) => (
-        <Avatar
-          key={k}
-          name={k}
-          colorKey={k}
-          size="md"
-          className="border border-(--line) ring-2 ring-(--bg)"
-        />
-      ))}
-    </div>
+    <span className="relative inline-flex">
+      <KitCover cat="quality" />
+      <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-(--line) bg-(--surface) text-xs text-(--ink)">
+        <LockIcon />
+      </span>
+    </span>
   )
 }
 
@@ -213,35 +264,54 @@ const LADDER: ReadonlyArray<{
   Motif: ComponentType
 }> = [
   {
+    title: 'Try anyone, install nothing',
+    body: 'Paste one line naming a handle. Your agent fetches their skills and picks the one that fits the task.',
+    href: '/docs/summon',
+    cta: 'How summoning works',
+    Motif: SummonMotif,
+  },
+  {
+    title: 'Follow people you trust',
+    body: 'Their new skills land in your feed. One click adds one to your kit.',
+    href: '/feed',
+    cta: 'See the feed',
+    Motif: PeopleMotif,
+  },
+  {
     title: 'One kit, every agent',
     body: 'Claude Code, Cursor, Codex, ChatGPT and six more. Add a skill once and it is there in all of them, on every machine.',
     href: '/docs/runtimes',
     cta: 'See the runtimes',
-    Motif: PublishMotif,
+    Motif: AgentsMotif,
   },
   {
-    title: 'New skills from people you trust',
-    body: 'Follow experts and friends. Their latest skills show up in your feed, one click to add.',
-    href: '/feed',
-    cta: 'See feed',
-    Motif: SyncMotif,
+    title: 'Publish your own',
+    body: 'Ship a skill once and everyone who follows you gets it, current everywhere.',
+    href: '/docs/publish',
+    cta: 'Start publishing',
+    Motif: CoversMotif,
   },
   {
-    title: 'Keep your team in sync',
-    body: 'One shared set of skills, with approval and versioning on every change.',
-    href: '/settings/teams',
+    title: 'Your team, one private kit',
+    body: 'Skills that never touch the public catalog. Every member and every CI runner on the same approved version.',
+    href: '/docs/teams',
     cta: 'Set up teams',
-    Motif: TeamsMotif,
+    Motif: PrivateKitMotif,
   },
 ]
 
 function HomeLadder() {
   return (
     <section className="border-t border-(--line)">
+      {/* No vertical padding at all. The card dividers need a rule to land on at
+          each end: this section's own `border-t` closes the top, and the site
+          footer's full-bleed `border-t` closes the bottom. Padding here would
+          strand the dividers again, which is what an arrow row underneath used
+          to require. The arrows moved onto the rail's edges instead. */}
       <div className="mx-auto max-w-[1120px] px-[clamp(16px,4vw,32px)]">
-        <div className="grid divide-y divide-(--line) border-x border-(--line) sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <LadderCarousel label="How people use Skillet">
           {LADDER.map((r) => (
-            <div key={r.title} className="flex flex-col items-start py-8 sm:px-8">
+            <LadderCard key={r.title}>
               <div className="flex h-11 items-center">
                 <r.Motif />
               </div>
@@ -258,9 +328,9 @@ function HomeLadder() {
                   &rarr;
                 </span>
               </Button>
-            </div>
+            </LadderCard>
           ))}
-        </div>
+        </LadderCarousel>
       </div>
     </section>
   )

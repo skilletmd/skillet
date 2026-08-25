@@ -14,7 +14,7 @@ function GlobeIcon() {
   )
 }
 
-function LockIcon() {
+export function LockIcon() {
   return (
     <svg width="1em" height="1em" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <rect x="3.5" y="7" width="9" height="6.3" rx="1.3" stroke="currentColor" strokeWidth="1.3" />

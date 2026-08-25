@@ -3678,3 +3678,18 @@ html {
     animation: none;
   }
 }
+
+/* Horizontal rails (the homepage ladder). The scrollbar is hidden because the
+   arrow buttons are the affordance and a native bar under a hairline-divided
+   row reads as a rendering artifact. Scrolling itself stays native, so trackpad,
+   touch, and keyboard all still work with the arrows removed.
+   `overscroll-behavior-inline: contain` stops a horizontal flick at the end of
+   the rail from triggering the browser's back-navigation gesture. */
+.rail-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior-inline: contain;
+}
+.rail-scroll::-webkit-scrollbar {
+  display: none;
+}
