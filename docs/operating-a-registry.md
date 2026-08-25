@@ -116,8 +116,30 @@ hypothetical: the job crashed on startup at 06:00 every day from 2026-07-16 to
 ### Every deploy: run migrations
 
 Schema changes ship as Prisma migrations and apply with
-`prisma migrate deploy` — automatic on container boot, manual otherwise.
-Never edit an applied migration; add a new one.
+`prisma migrate deploy` — automatic on container boot. Never edit an applied
+migration; add a new one.
+
+**A PM2 deploy has to run it explicitly**, between the build and the reload:
+
+```bash
+pnpm build
+pnpm --filter @skillet/registry exec prisma migrate deploy
+pnpm exec pm2 startOrReload ecosystem.config.cjs --update-env
+```
+
+Before the reload, not after. A deploy that reloads first ships code that
+queries a table the database does not have yet, and the health check will not
+catch it: `/api/hc` touches no feature table, so a deploy against a stale schema
+reports healthy while the affected page returns 500. That is exactly how the
+mirror-queue admin page broke on 2026-08-25.
+
+Under `set -e` a failed migration aborts before the reload, leaving the old code
+running against the old schema — the right way to fail.
+
+This ordering runs the OLD code against the NEW schema for a few seconds. That
+is safe for an additive migration (a new nullable column or table is invisible
+to code that does not know about it) and unsafe for a destructive one, which
+needs an expand/contract sequence regardless of deploy order.
 
 ### Blob storage and the R2 cutover
 
