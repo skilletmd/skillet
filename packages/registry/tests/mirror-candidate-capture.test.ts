@@ -11,6 +11,7 @@ import type { PrismaClient } from '@prisma/client'
 import { newId } from '../src/db/index.js'
 import {
   captureCandidateSkills,
+  summarizeCategories,
   writeCandidateSkills,
 } from '../src/lib/mirror-candidate-context.js'
 import { ensureMysqlMigrated, freshMysqlPrisma, mysqlTestsEnabled } from './mysql-test-env.js'
@@ -155,6 +156,52 @@ describe('capturing a candidate repo', () => {
   })
 })
 
+describe('classifying a candidate before the decision', () => {
+  const cap = (dirs: string[], files: Record<string, string>) =>
+    captureCandidateSkills({ owner: 'o', repo: 'r', ref: 'main', dirs, fetchImpl: repoFetch(files) })
+
+  it('places a pull-request reviewer without calling a model', async () => {
+    // The case KTD4 exists for: guessCategory is synchronous and free, and the
+    // AI classifier still decides the stored category after approval.
+    const got = await cap(['skills/pr-reviewer'], {
+      'skills/pr-reviewer': skillMd('pr-reviewer', 'Reviews pull requests for correctness'),
+    })
+    assert.ok(got)
+    assert.ok(
+      got[0]!.category === 'quality' || got[0]!.category === 'agents',
+      `expected quality or agents, got ${got[0]!.category}`,
+    )
+  })
+
+  it('summarises a repo spanning three categories as three keys', async () => {
+    const files = {
+      'skills/a': skillMd('pr-reviewer', 'Reviews pull requests and flags regressions'),
+      'skills/b': skillMd('invoice-sync', 'Reconciles invoices against the accounting ledger'),
+      'skills/c': skillMd('deployer', 'Deploys containers to kubernetes'),
+    }
+    const got = await cap(Object.keys(files), files)
+    assert.ok(got)
+    const summary = summarizeCategories(got)
+    assert.equal(Object.keys(summary).length, 3, JSON.stringify(summary))
+  })
+
+  it('counts skills, not directories: two in one category read as 2', async () => {
+    const summary = summarizeCategories([
+      { slug: 'a', name: null, description: null, category: 'quality' },
+      { slug: 'b', name: null, description: null, category: 'quality' },
+      { slug: 'c', name: null, description: null, category: 'devops' },
+    ])
+    assert.deepEqual(summary, { quality: 2, devops: 1 })
+  })
+
+  it('omits an unplaceable skill rather than counting a category named null', async () => {
+    const got = await cap(['skills/x'], { 'skills/x': skillMd('zzz', 'qqq wwww') })
+    assert.ok(got)
+    assert.equal(got[0]!.category, null)
+    assert.deepEqual(summarizeCategories(got), {})
+  })
+})
+
 describe('storing captured context', { skip: !mysqlTestsEnabled() }, () => {
   let prisma: PrismaClient
 
@@ -194,8 +241,8 @@ describe('storing captured context', { skip: !mysqlTestsEnabled() }, () => {
   it('writes one row per skill and stamps the queue row', async () => {
     const id = await queueRow()
     await writeCandidateSkills(prisma, id, [
-      { slug: 'skills/a', name: 'alpha', description: 'One' },
-      { slug: 'skills/b', name: 'beta', description: null },
+      { slug: 'skills/a', name: 'alpha', description: 'One', category: 'quality' },
+      { slug: 'skills/b', name: 'beta', description: null, category: null },
     ])
     const skills = await prisma.mirror_candidate_skills.findMany({
       where: { queue_id: id },
@@ -206,16 +253,19 @@ describe('storing captured context', { skip: !mysqlTestsEnabled() }, () => {
     assert.equal(skills[1]!.description, null)
     const row = await prisma.mirror_review_queue.findUnique({ where: { id } })
     assert.ok(row?.skills_captured_at)
+    // The rollup rides along on the same write, so a row can never carry
+    // skills whose summary was never computed.
+    assert.deepEqual(row.category_summary, { quality: 1 })
   })
 
   it('replaces on re-screen rather than accumulating duplicates', async () => {
     const id = await queueRow()
     await writeCandidateSkills(prisma, id, [
-      { slug: 'skills/a', name: 'alpha', description: 'One' },
-      { slug: 'skills/old', name: 'gone', description: 'Deleted upstream' },
+      { slug: 'skills/a', name: 'alpha', description: 'One', category: 'quality' },
+      { slug: 'skills/old', name: 'gone', description: 'Deleted upstream', category: null },
     ])
     await writeCandidateSkills(prisma, id, [
-      { slug: 'skills/a', name: 'alpha v2', description: 'One, renamed' },
+      { slug: 'skills/a', name: 'alpha v2', description: 'One, renamed', category: 'quality' },
     ])
     const skills = await prisma.mirror_candidate_skills.findMany({ where: { queue_id: id } })
     assert.equal(skills.length, 1)
@@ -224,7 +274,9 @@ describe('storing captured context', { skip: !mysqlTestsEnabled() }, () => {
 
   it('drops captured skills when the queue row is deleted', async () => {
     const id = await queueRow()
-    await writeCandidateSkills(prisma, id, [{ slug: 'skills/a', name: 'alpha', description: 'One' }])
+    await writeCandidateSkills(prisma, id, [
+      { slug: 'skills/a', name: 'alpha', description: 'One', category: null },
+    ])
     await prisma.mirror_review_queue.delete({ where: { id } })
     const skills = await prisma.mirror_candidate_skills.findMany({ where: { queue_id: id } })
     assert.equal(skills.length, 0)

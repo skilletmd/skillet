@@ -16,12 +16,21 @@
 import type { PrismaClient } from '@prisma/client'
 import { parseFrontmatter } from '../sync/sync-repo.js'
 import { fetchSkillMd, type QualityInput } from './mirror-quality.js'
+import { guessCategory } from '../classify/heuristic.js'
 
 export interface CapturedSkill {
   /** Skill directory path inside the repo; '' for a single-skill repo root. */
   slug: string
   name: string | null
   description: string | null
+  /**
+   * Pre-decision guess only. The AI classifier still decides the STORED
+   * category after approval, exactly where it does today — this runs before the
+   * decision because running a model over every skill of every candidate in a
+   * 64-row queue costs real money to inform a call the heuristic informs well
+   * enough.
+   */
+  category: string | null
 }
 
 /**
@@ -65,10 +74,17 @@ export async function captureCandidateSkills(
       const md = mds[n]
       if (typeof md === 'string') readable += 1
       const fm = typeof md === 'string' ? parseFrontmatter(md) : {}
+      const name = fm.name?.trim() || null
+      const description = fm.description?.trim() || null
       out.push({
         slug,
-        name: fm.name?.trim() || null,
-        description: fm.description?.trim() || null,
+        name,
+        description,
+        // The leaf, not the path: a nested `skills/pr-reviewer` would otherwise
+        // feed the classifier the word "skills", which is not evidence of
+        // anything. `name` goes in as the title because it is the strongest
+        // text we have and we already captured it.
+        category: guessCategory({ slug: slugLeaf(slug), title: name, description }),
       })
     })
   }
@@ -95,13 +111,32 @@ export async function writeCandidateSkills(
         slug: s.slug.slice(0, 255),
         name: s.name,
         description: s.description,
+        category: s.category,
       })),
     })
   }
   await prisma.mirror_review_queue.update({
     where: { id: queueId },
-    data: { skills_captured_at: Math.floor(Date.now() / 1000) },
+    data: {
+      skills_captured_at: Math.floor(Date.now() / 1000),
+      category_summary: summarizeCategories(skills),
+    },
   })
+}
+
+/**
+ * Category key to skill count, for the queue row. Counts SKILLS, not
+ * directories, and omits the unplaceable rather than counting them under a
+ * category named "null" — an admin reading "null: 4" learns nothing, and a
+ * summary that adds up to fewer than the skill count is the honest shape.
+ */
+export function summarizeCategories(skills: CapturedSkill[]): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const s of skills) {
+    if (!s.category) continue
+    out[s.category] = (out[s.category] ?? 0) + 1
+  }
+  return out
 }
 
 /**
