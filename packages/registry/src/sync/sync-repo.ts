@@ -447,6 +447,31 @@ export async function writeSkillPrisma(prisma: PrismaClient, ctx: SyncContext, d
     // Put-before-txn matches publish: BlobStore owns bytes + meta rows; the
     // transaction only links skill_version_files to those hashes.
     await putFileBlobs(ctx.blobStore, files);
+
+    // Scan BEFORE the transaction, not inside it.
+    //
+    // The invariant is unchanged and in fact stronger: nothing may be published
+    // unscanned. A scan that throws here means the transaction never opens, so
+    // there is no partial state to roll back and the skill is retried next run.
+    //
+    // It moved because `scanBothFresh` walks the whole bundle on the CPU, and
+    // running that inside an interactive transaction blew Prisma's 5s ceiling on
+    // larger repos: `Transaction already closed ... 6344ms passed`. The upsert
+    // that tripped it was the last write, so the skill was dropped from the run
+    // entirely and silently went unscanned — the exact outcome the in-transaction
+    // placement was meant to prevent. It also held row locks on skills and
+    // skill_versions for the length of a scan.
+    //
+    // The cache write inside resolveScanCachedPrisma is now outside the
+    // transaction too. That is fine: the cache is keyed by content hash, so an
+    // entry surviving a failed publish is correct rather than stale.
+    const resolved = await resolveScanCachedPrisma(prisma, bundle);
+    const scanResult = resolved.result;
+    // U7 — sync can't 422 (it's automated), so it HOLDS. A synced version that
+    // scans as a secret or quarantined never becomes the installable pointer.
+    const secretHit = secretsBlockingScan(bundle);
+    const blocked = Boolean(secretHit) || scanResult.status === 'quarantined';
+
     await runPrismaTransaction(prisma, async (tx) => {
         await tx.skills.upsert({
             where: { id: skillId },
@@ -529,22 +554,15 @@ export async function writeSkillPrisma(prisma: PrismaClient, ctx: SyncContext, d
                 synced_at: now,
             },
         });
-        // Harm-scan in the same transaction: a scan failure rolls the skill back so
-        // it's retried next run rather than left published-but-unscanned. This goes
-        // through the SAME cache-aware resolve publish uses, so a synced version
-        // lands with its capability manifest as well as its threat findings. Passing
-        // a null manifest here (as this path once did) left every mirrored skill
-        // reading "not yet scanned" on its skill and kit pages forever, since the
-        // trust panel keys that state off a missing capability report.
-        const resolved = await resolveScanCachedPrisma(tx, bundle);
-        const scanResult = resolved.result;
+        // The scan is resolved above; this writes it. Same cache-aware resolve
+        // publish uses, so a synced version lands with its capability manifest as
+        // well as its threat findings. Passing a null manifest here (as this path
+        // once did) left every mirrored skill reading "not yet scanned" on its
+        // skill and kit pages forever, since the trust panel keys that state off a
+        // missing capability report.
         await persistVersionScanPrisma(tx, skillId, versionHash, scanResult.status, resolved.findingsJson, resolved.capabilitiesJson);
-        // U7 — sync can't 422 (it's automated), so it HOLDS. A synced version
-        // that scans as a secret or quarantined never becomes the installable
-        // pointer: latest_hash falls back to the last clean version and blocked_hash
-        // remembers what we held so the skill page can show a banner.
-        const secretHit = secretsBlockingScan(bundle);
-        const blocked = Boolean(secretHit) || scanResult.status === 'quarantined';
+        // A held version's latest_hash falls back to the last clean version, and
+        // blocked_hash remembers what we held so the skill page can show a banner.
         if (blocked) {
             if (secretHit && scanResult.status !== 'quarantined') {
                 await tx.skill_version_scans.update({
