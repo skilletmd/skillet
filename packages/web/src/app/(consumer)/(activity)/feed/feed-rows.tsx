@@ -42,6 +42,10 @@ function SkillEventRow({ event, isAuthed }: { event: FeedSkillEvent; isAuthed: b
             description={event.skill.description}
             category={event.skill.category}
             installCount={event.skill.installs}
+            // The row already carries the actor's avatar; on a publish/update
+            // the actor is the author, so the card byline can reuse it instead
+            // of falling back to the drawn default face.
+            makerAvatarUrl={event.actor === event.skill.author ? event.actorAvatarUrl : null}
           />
         </div>
       </div>
