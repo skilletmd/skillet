@@ -68,6 +68,22 @@ jobs:
             exit 1
           fi
           echo "version=$tag" >> "$GITHUB_OUTPUT"
+      - name: Desktop version sources must agree
+        run: |
+          # Three files carry the desktop version and each is read by something
+          # different: tauri.conf.json builds the app (and is what the updater
+          # compares), Cargo.toml feeds CARGO_PKG_VERSION, package.json feeds the
+          # tray footer via __APP_VERSION__. Releases used to bump only
+          # tauri.conf.json, so the other two silently froze at 0.1.0 and the
+          # client under-reported its own version to the min-version gate.
+          conf=$(node -p "require('./packages/desktop/src-tauri/tauri.conf.json').version")
+          pkg=$(node -p "require('./packages/desktop/package.json').version")
+          cargo=$(sed -n 's/^version = "\(.*\)"/\1/p' packages/desktop/src-tauri/Cargo.toml | head -1)
+          echo "conf=$conf pkg=$pkg cargo=$cargo"
+          if [ "$conf" != "$pkg" ] || [ "$conf" != "$cargo" ]; then
+            echo "::error::Desktop version mismatch — tauri.conf.json=$conf package.json=$pkg Cargo.toml=$cargo. Bump all three."
+            exit 1
+          fi
       - name: Signing placeholders must be replaced
         run: |
           # The dev updater pubkey and the Windows cert-profile placeholder are
