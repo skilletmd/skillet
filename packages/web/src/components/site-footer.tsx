@@ -1,5 +1,5 @@
-import Image from 'next/image'
 import Link from 'next/link'
+import { FooterMascot } from '@/components/footer-mascot'
 import { FooterTagline } from '@/components/footer-tagline'
 import { GetAppOsIcon } from '@/components/get-app-os-icon'
 import { GithubStarBadge } from '@/components/github-star-badge'
@@ -9,16 +9,7 @@ export function SiteFooter() {
     <footer className="relative z-10 border-t border-(--line) bg-(--bg)">
       <div className="mx-auto flex max-w-[1120px] flex-wrap items-center justify-between gap-x-6 gap-y-3 px-[clamp(16px,4vw,32px)] py-8 text-sm text-(--ink-2)">
         <span className="flex items-center gap-2">
-          <Image
-            src="/brand/skillet-cooking.png"
-            alt="Skillet"
-            width={480}
-            height={389}
-            // -my-2 lets the mark overflow into the footer padding instead of
-            // growing the row, so it stays visible without a taller footer.
-            className="footer-mascot -my-2 h-9 w-auto"
-            priority={false}
-          />
+          <FooterMascot />
           <FooterTagline />
         </span>
         <nav className="flex flex-wrap items-center gap-x-5 gap-y-2">
