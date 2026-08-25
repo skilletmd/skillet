@@ -12,7 +12,6 @@ import { kitCardMenu } from '@/lib/kit-card-menu'
 import {
   CHART_SIZE,
   ChartsRow,
-  FromTheBlog,
   BlogRail,
   KITS_GRID_CLASS,
   Shelf,
@@ -171,10 +170,6 @@ export async function HomeCatalogShelves({
   return shelves
 }
 
-/** Blog shelf — full-width 3-up at the bottom of the homepage main column. */
-export function HomeBlogShelf() {
-  return <FromTheBlog posts={getAllPosts().slice(0, 3)} />
-}
 
 /** The same three posts, sized for the right rail rather than the main column. */
 export function HomeBlogRail() {

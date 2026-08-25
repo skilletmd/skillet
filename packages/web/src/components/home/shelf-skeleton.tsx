@@ -119,21 +119,6 @@ export function FreshShelfSkeleton() {
   )
 }
 
-export function BlogShelfSkeleton() {
-  return (
-    <section className="mt-12" aria-busy="true" aria-label="Loading blog">
-      <ShelfHeaderSkeleton titleWidth="w-32" blurbWidth="w-72" />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div
-            key={i}
-            className="h-[196px] animate-pulse rounded-2xl border border-(--line) bg-(--surface)"
-          />
-        ))}
-      </div>
-    </section>
-  )
-}
 
 export function WhoToFollowSkeleton() {
   return (
@@ -152,23 +137,3 @@ export function WhoToFollowSkeleton() {
   )
 }
 
-export function HomeLoadingShell() {
-  return (
-    <main
-      className={`marketing-home consumer-theme ${PAGE_CONTAINER_CLASS}`}
-      aria-busy="true"
-      aria-label="Loading home"
-    >
-      <div className="surface-grid">
-        <div className="surface-main">
-          <CatalogShelvesSkeleton kitCount={3} chartSize={5} />
-          <FreshShelfSkeleton />
-          <BlogShelfSkeleton />
-        </div>
-        <aside className="surface-aside">
-          <WhoToFollowSkeleton />
-        </aside>
-      </div>
-    </main>
-  )
-}

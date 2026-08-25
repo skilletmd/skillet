@@ -18,7 +18,7 @@ import { THEME_STORAGE_KEY } from '@/lib/events'
 // One title and one description, reused across page metadata, Open Graph, and
 // Twitter. They used to be three near-identical sync lines that drifted apart;
 // sharing the consts is what keeps a shared link saying one thing.
-const SITE_TITLE = "Summon anyone's genius · Skillet"
+const SITE_TITLE = "Genius on tap · Skillet"
 const SITE_DESCRIPTION =
   "Type a name and borrow their brain. Run anyone's public skills in your agent, and keep your own current everywhere."
 

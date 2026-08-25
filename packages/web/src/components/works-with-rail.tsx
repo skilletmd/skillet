@@ -20,42 +20,12 @@ function RuntimeDot({
 }
 
 /** The overlapped row of runtime logo dots, at a legible size. */
-export function RuntimeFacepile() {
-  return (
-    <span className="flex -space-x-1.5">
-      <RuntimeDot size="h-5 w-5">
-        <ClaudeLogo className="h-2.5 w-2.5" />
-      </RuntimeDot>
-      <RuntimeDot size="h-5 w-5">
-        <OpenAiLogo className="h-2.5 w-2.5" />
-      </RuntimeDot>
-      <RuntimeDot size="h-5 w-5">
-        <CursorLogo className="h-2.5 w-2.5" />
-      </RuntimeDot>
-      <RuntimeDot size="h-5 w-5">
-        <HermesLogo className="h-2.5 w-2.5" />
-      </RuntimeDot>
-    </span>
-  )
-}
 
 /**
  * Compact inline variant — the same "runs anywhere" reminder as a single quiet
  * line (icons + label), sized to sit under a detail-page action button, aligned
  * with the header's meta line. No eyebrow; it's a brand note, not a section.
  */
-export function WorksWithInline({ text = 'Works everywhere' }: { text?: string }) {
-  return (
-    <Link
-      href="/docs/runtimes"
-      title="Skills run in any agent"
-      className="inline-flex items-center gap-2 text-sm text-(--ink-2) transition-colors hover:text-(--ink)"
-    >
-      <RuntimeFacepile />
-      {text && <span>{text}</span>}
-    </Link>
-  )
-}
 
 /**
  * Sidebar section listing the runtimes a catalog object runs on. Shared by the

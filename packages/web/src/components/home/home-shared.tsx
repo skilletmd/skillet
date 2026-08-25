@@ -422,10 +422,6 @@ export function ChartsRow({
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-function postCategory(tags: string[]): string {
-  return tags.find((t) => t !== 'skills') ?? tags[0] ?? 'blog'
-}
-
 function postDate(iso: string | null): string {
   if (!iso) return ''
   // Accept a bare date (YYYY-MM-DD) or a full ISO datetime; take the date part.
@@ -437,11 +433,10 @@ function postDate(iso: string | null): string {
 /**
  * The blog, sized for the right rail.
  *
- * `FromTheBlog` is a three-column grid of cards with descriptions, which is a
- * main-column shape: dropped into a ~300px rail its cards become one narrow
- * column of tall boxes. This is the same three posts as a list, matching the
- * activity rail above it, so the two read as one stack rather than as a rail
- * and a transplanted shelf.
+ * A list, not cards: the card-grid version this replaced was a main-column
+ * shape, and in a ~300px rail its columns collapse into one stack of tall
+ * boxes. Rows here match the activity rail above, so the two read as one
+ * stack rather than as a rail with a shelf transplanted into it.
  */
 export function BlogRail({ posts }: { posts: Post[] }) {
   if (posts.length === 0) return null
@@ -486,40 +481,3 @@ export function BlogRail({ posts }: { posts: Post[] }) {
   )
 }
 
-export function FromTheBlog({ posts }: { posts: Post[] }) {
-  if (posts.length === 0) return null
-  return (
-    <Shelf
-      title="From the blog"
-      blurb="Field notes and guides on building with skills."
-      seeAllHref="/blog"
-    >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {posts.map((post) => (
-          <Link
-            key={post.slug}
-            href={`/blog/${post.slug}`}
-            className="group flex flex-col surface-card p-5 transition-shadow duration-[180ms] ease-[var(--ease)] hover:shadow-[0_4px_24px_rgba(0,0,0,0.07)]"
-          >
-            <span className="font-mono text-xs uppercase tracking-[0.08em] text-(--accent)">
-              {postCategory(post.tags)}
-            </span>
-            <h3 className="mt-2 text-lg font-semibold leading-[1.2] tracking-[-0.02em] group-hover:underline">
-              {post.title}
-            </h3>
-            <p className="mt-2 text-sm leading-[1.55] text-(--ink-2)">{post.description}</p>
-            <div className="mt-auto flex flex-wrap items-center gap-x-1.5 pt-4 text-xs text-(--ink-2)/65">
-              {post.publishedAt && <span>{postDate(post.publishedAt)}</span>}
-              {post.readTime && (
-                <>
-                  <span aria-hidden>·</span>
-                  <span>{post.readTime} min read</span>
-                </>
-              )}
-            </div>
-          </Link>
-        ))}
-      </div>
-    </Shelf>
-  )
-}

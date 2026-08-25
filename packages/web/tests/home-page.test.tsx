@@ -104,14 +104,4 @@ describe('shelf skeleton', () => {
     expect(html).toContain('aria-busy="true"')
   })
 
-  it('renders catalog shelves before fresh in the loading shell', async () => {
-    const { HomeLoadingShell } = await import('@/components/home/shelf-skeleton')
-    const html = renderToStaticMarkup(<HomeLoadingShell />)
-    const catalogIdx = html.indexOf('Loading catalog')
-    const freshIdx = html.indexOf('Loading your feed')
-    const blogIdx = html.indexOf('Loading blog')
-    expect(catalogIdx).toBeGreaterThan(-1)
-    expect(freshIdx).toBeGreaterThan(catalogIdx)
-    expect(blogIdx).toBeGreaterThan(freshIdx)
-  })
 })
