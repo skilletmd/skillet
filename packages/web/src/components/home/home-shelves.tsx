@@ -105,20 +105,19 @@ export async function HomeCatalogShelves({
   const creators = withViewerFollows(people.items, followed)
 
   const featuredKits = kits.items.slice(0, kitCount)
+  // Byline avatars: the people catalog covers the top-N creators only, so
+  // fill the rest in from the feed's own actor avatars before falling back
+  // to the drawn default face.
   const avatarByHandle = avatarMapFromPeople(people.items)
+  for (const e of discover?.events ?? []) {
+    if (e.actorAvatarUrl && !avatarByHandle.get(e.actor)) {
+      avatarByHandle.set(e.actor, e.actorAvatarUrl)
+    }
+  }
   const newlyPublished = recentSkills(discover, 4)
 
   const shelves = (
     <>
-      <ChartsRow
-        skills={popular.skills}
-        kits={kits.items}
-        creators={creators}
-        viewerHandle={viewerHandle}
-        chartSize={chartSize}
-        seeAll={seeAll}
-      />
-
       {featuredKits.length > 0 && (
         // On /browse (seeAll=false) the page's own "Featured" h1 already labels
         // this, so the shelf title would double up — drop it there.
@@ -141,7 +140,7 @@ export async function HomeCatalogShelves({
                 skillRefs={kit.skillRefs ?? []}
                 skillCategories={kit.skillCategories ?? []}
                 category={kit.category}
-                makerAvatarUrl={avatarByHandle.get(kit.owner) ?? null}
+                makerAvatarUrl={kit.ownerAvatarUrl ?? avatarByHandle.get(kit.owner) ?? null}
                 menu={
                   <KitCardMenu
                     {...kitCardMenu({ kitId: kit.id, owner: kit.owner, viewerHandle })}
@@ -153,7 +152,14 @@ export async function HomeCatalogShelves({
         </Shelf>
       )}
 
-
+      <ChartsRow
+        skills={popular.skills}
+        kits={kits.items}
+        creators={creators}
+        viewerHandle={viewerHandle}
+        chartSize={chartSize}
+        seeAll={seeAll}
+      />
 
       {showNewlyPublished && newlyPublished.length > 0 && (
         <Shelf
