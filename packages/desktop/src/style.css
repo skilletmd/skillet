@@ -235,12 +235,26 @@ button.link { appearance: none; -webkit-appearance: none; background: none; bord
 .row .nm { font-size: 13px; }
 .row.action { padding: 7px 16px; border: none; background: none; cursor: default; text-align: left; font-family: inherit; color: var(--ink); }
 .row.action:hover { background: var(--card-soft); }
-.row.action .bcol { display: flex; flex-direction: column; gap: 1px; }
+.row.action .bcol { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .row.action .bcol b { font-size: 12.5px; font-weight: 500; }
 .row.action .bcol span { font-size: 11px; color: var(--ink-2); }
 /* reconcile note — neutral card; the work already happened, this is just FYI */
 .row.action.syncissue { width: calc(100% - 24px); margin: 0 12px 6px; padding: 9px 12px; border-radius: 8px; background: var(--card-soft); }
 .row.action.syncissue:hover { background: var(--card-soft); }
+/* The failure list is unbounded (one sync can fail hundreds of skills) and the
+   panel is overflow:hidden, so an uncapped detail line clipped the row's Retry
+   and Dismiss right out of the window. Cap it and let it scroll in place. */
+/* Updater wedged: same shape as the "relaunch to update" bar, but this one is a
+   dead end for the running build, so it routes to a manual download. */
+.update-ready-bar.update-stuck-bar { color: var(--ink-2); }
+
+.row.action.syncissue { align-items: flex-start; }
+.row.action.syncissue .bcol { flex: 1 1 auto; }
+.row.action.syncissue .bcol span {
+  max-height: 52px; overflow-y: auto; overscroll-behavior: contain;
+  overflow-wrap: anywhere; user-select: text; -webkit-user-select: text;
+}
+.row.action.syncissue .link { margin-top: 1px; }
 
 /* quiet "customized" row flag — you're running your own copy (R9 honesty) */
 

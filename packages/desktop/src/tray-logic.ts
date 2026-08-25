@@ -398,6 +398,15 @@ export function humanizeSyncReason(reason: string | undefined | null): string {
   if (/^quarantin/i.test(r)) return 'it was held by a security scan'
   if (/^materialize_failed/.test(r)) return "it couldn't be written to an agent"
   if (/^edit_unreadable/.test(r)) return 'a local copy could not be read'
+  // Pin mismatch: the author rotated their signing key, so every skill of
+  // theirs refuses at once. The raw reason is two 64-char hashes — useless in a
+  // 360px tray — and the recovery is a single command, so say that instead.
+  if (/key_id_mismatch|author_key_changed/.test(r)) {
+    const handle = /handle (\S+) pinned to/.exec(r)?.[1]
+    return handle
+      ? `the signing key for @${handle} changed. Run skillet pin accept ${handle} to trust the new one`
+      : "the author's signing key changed"
+  }
   // Drop a leading `code: ` prefix so the raw fallback still reads cleanly.
   const stripped = r.replace(/^[a-z_]+:\s*/i, '').trim()
   return stripped || 'it could not be synced'
@@ -415,6 +424,30 @@ export function collectSyncIssues(raw: {
     }
   }
   return [...byId.values()]
+}
+
+/**
+ * Title + detail for the tray's sync-failure note.
+ *
+ * One sync can fail hundreds of skills at once (an author rotating their
+ * signing key fails every skill of theirs in one go), and listing every slug
+ * both buried the reason and grew the row past the panel. When the failures
+ * share one reason, that reason IS the message; the slug list is the fallback
+ * for a genuinely mixed batch.
+ */
+export function syncIssueNote(issues: SyncIssue[]): { title: string; detail: string } {
+  const bare = (s: string): string => s.split('/').pop() ?? s
+  const n = issues.length
+  if (n === 1) return { title: `Couldn't sync ${bare(issues[0]!.slug)}`, detail: issues[0]!.reason }
+  const owners = new Set(
+    issues.map((i) => (i.slug.startsWith('@') ? i.slug.split('/')[0]! : '')).filter(Boolean),
+  )
+  const from = owners.size === 1 ? ` from ${[...owners][0]}` : ''
+  const reasons = new Set(issues.map((i) => i.reason))
+  return {
+    title: `${n} skills${from} couldn't sync`,
+    detail: reasons.size === 1 ? [...reasons][0]! : issues.map((i) => bare(i.slug)).join(', '),
+  }
 }
 
 export type HeroCardState = 'synced' | 'syncing' | 'offline' | 'not-connected'

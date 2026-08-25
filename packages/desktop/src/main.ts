@@ -35,6 +35,7 @@ import {
   editedSlugSet,
   syncReachedRegistry,
   collectSyncIssues,
+  syncIssueNote,
   type SyncIssue,
   checkSyncAction,
   classifySyncFailure,
@@ -826,6 +827,11 @@ let trayView: TrayView = 'home'
 // Silent auto-update: an update that's been downloaded in the background and is
 // waiting to be applied on a user-initiated relaunch. Never forced mid-session.
 let pendingUpdate: TauriUpdate | null = null
+// Consecutive failed update checks, and the version we know we can't reach.
+// One failure is noise; a streak means this install can't update itself.
+let updateFailStreak = 0
+let updateStuckVersion: string | null = null
+const UPDATE_FAIL_STREAK_BEFORE_NUDGE = 2
 let updateReadyVersion: string | null = null
 // Preview-only: deep-link a sub-view with `?nav=skills|settings`.
 if (previewInBrowser()) {
@@ -1244,21 +1250,40 @@ function wireLibrary(repaint: () => void): void {
 let trayAvatarDataUri: string | null = null
 let trayAvatarTint: string | null = null // pastel backing for transparent default faces
 let trayAvatarFetched = false
+let trayAvatarInFlight = false
+let trayAvatarNextTry = 0
+/** Min gap between avatar retries, so a signed-out session doesn't spawn the
+ *  sidecar on every focus repaint. */
+const AVATAR_RETRY_MIN_GAP_MS = 30 * 1000
 async function ensureTrayAvatar(repaint: () => void): Promise<void> {
-  if (trayAvatarFetched || !(await usingCli())) return
-  trayAvatarFetched = true
+  // Latch on SUCCESS, not on attempt. This used to set `fetched = true` before
+  // the invoke, so a single transient miss (cold start, a sidecar busy under a
+  // long sync) pinned the rail to the monogram until the app was restarted.
+  if (trayAvatarFetched || trayAvatarInFlight || !(await usingCli())) return
+  if (Date.now() < trayAvatarNextTry) return
+  trayAvatarInFlight = true
   try {
     const parsed = JSON.parse(await invoke<string>('avatar_data_uri')) as {
       data_uri?: string | null
       tint?: string | null
     }
-    if (parsed.data_uri && parsed.data_uri !== trayAvatarDataUri) {
-      trayAvatarDataUri = parsed.data_uri
-      trayAvatarTint = parsed.tint ?? null
-      repaint()
+    if (parsed.data_uri) {
+      trayAvatarFetched = true
+      if (parsed.data_uri !== trayAvatarDataUri) {
+        trayAvatarDataUri = parsed.data_uri
+        trayAvatarTint = parsed.tint ?? null
+        repaint()
+      }
+    } else {
+      // `null` is the signed-out answer. Keep the monogram, and let a later
+      // render try again once this machine is connected.
+      trayAvatarNextTry = Date.now() + AVATAR_RETRY_MIN_GAP_MS
     }
   } catch {
-    /* keep the monogram fallback */
+    // Keep the monogram, but stay retryable — the next render picks it up.
+    trayAvatarNextTry = Date.now() + AVATAR_RETRY_MIN_GAP_MS
+  } finally {
+    trayAvatarInFlight = false
   }
 }
 
@@ -1375,6 +1400,7 @@ async function signOutFromTray(): Promise<void> {
   trayAvatarDataUri = null
   trayAvatarTint = null
   trayAvatarFetched = false
+  trayAvatarNextTry = 0
   trayAuth = null
   trayKit = null
   traySyncKits = null
@@ -1810,14 +1836,7 @@ function renderParkedNote(notice: ParkedNotice): string {
 // the reason (and a Retry) instead of a blank "Offline" — the registry was
 // reachable, one or more skills just failed.
 function renderSyncIssuesNote(): string {
-  const n = traySyncIssues.length
-  const bare = (s: string): string => s.split('/').pop() ?? s
-  const title =
-    n === 1 ? `Couldn't sync ${bare(traySyncIssues[0]!.slug)}` : `${n} skills couldn't sync`
-  const detail =
-    n === 1
-      ? traySyncIssues[0]!.reason
-      : traySyncIssues.map((i) => bare(i.slug)).join(', ')
+  const { title, detail } = syncIssueNote(traySyncIssues)
   return `<div class="row action syncissue"><div class="bcol"><b>${escapeHtml(title)}</b><span>${escapeHtml(detail)}</span></div><span class="spacer"></span><button class="link" id="retrysyncissue">Retry</button><button class="link" id="dismisssyncissue">Dismiss</button></div>`
 }
 
@@ -2607,7 +2626,9 @@ function paintSettings() {
       ${
         updateReadyVersion
           ? `<button type="button" class="update-ready-bar" id="update-relaunch"><span class="update-ready-dot"></span>${updateReadyVersion ? `Version ${escapeHtml(updateReadyVersion)} ready` : 'Update ready'}. Relaunch to install</button>`
-          : ''
+          : updateStuckVersion !== null
+            ? `<button type="button" class="update-ready-bar update-stuck-bar" id="update-stuck"><span class="update-ready-dot"></span>${updateStuckVersion ? `Version ${escapeHtml(updateStuckVersion)} could not install` : "This copy can't update itself"}. Download it instead</button>`
+            : ''
       }
       <div class="set-foot">
         <span class="set-version" id="set-version">${appVersion ? `v${escapeHtml(appVersion)}` : ''}</span>
@@ -2616,6 +2637,9 @@ function paintSettings() {
   )
   wireRail()
   document.getElementById('update-relaunch')?.addEventListener('click', () => void applyUpdateAndRelaunch())
+  document.getElementById('update-stuck')?.addEventListener('click', () =>
+    invoke('open_web', { path: '/install' }),
+  )
   document.getElementById('settingslogout')?.addEventListener('click', () => void signOutFromTray())
   document.getElementById('setweb')?.addEventListener('click', () => invoke('open_web'))
   const openDeviceRename = () => {
@@ -2738,10 +2762,17 @@ function startShortcutRebind(after: () => void): void {
 async function maybeCheckForUpdate(): Promise<void> {
   if (pendingUpdate) return // already downloaded, waiting for relaunch
   if (!(await usingCli())) return // no native updater in the browser preview
+  // Held outside the try so the catch can name the version we failed to reach:
+  // `check()` usually succeeds and it's `download()` (signature verification)
+  // that throws, so the version IS known even on the failure path.
+  let offered: TauriUpdate | null = null
   try {
     const update = await check()
     if (!update?.available) return
+    offered = update
     await update.download() // background download; do NOT install yet
+    updateStuckVersion = null
+    updateFailStreak = 0
     pendingUpdate = update
     updateReadyVersion = update.version
     // Light the passive cue live, from whatever rail-bearing view is open —
@@ -2752,7 +2783,17 @@ async function maybeCheckForUpdate(): Promise<void> {
     // screen either.
     if (!trayUpgradeRequired && trayView !== 'signin') paintTray(lastSkills, lastGranted)
   } catch {
-    // Offline, no published release, or a dev endpoint 404 — stay silent.
+    // A transient miss (offline, no published release, a dev endpoint 404) must
+    // stay silent. A PERSISTENT one must not: a build whose updater pubkey no
+    // longer matches the key signing releases fails verification on every run,
+    // re-downloads the whole bundle every 6h, and — swallowed here — looked
+    // exactly like being up to date. Surface a manual-install route once the
+    // failure has repeated, since no future auto-update can fix that build.
+    updateFailStreak += 1
+    if (updateFailStreak >= UPDATE_FAIL_STREAK_BEFORE_NUDGE) {
+      updateStuckVersion = offered?.version ?? updateStuckVersion ?? ''
+      if (!trayUpgradeRequired && trayView !== 'signin') paintTray(lastSkills, lastGranted)
+    }
   }
 }
 

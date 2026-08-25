@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -44,7 +45,14 @@ fn hidden_command(program: impl AsRef<OsStr>) -> Command {
     // Report the desktop APP version to the registry (what the min-version gate +
     // updater key off), NOT the bundled CLI's own package version — the two drift.
     // cli-context.ts only sets SKILLET_CLIENT_VERSION when it's unset, so this wins.
-    cmd.env("SKILLET_CLIENT_VERSION", env!("CARGO_PKG_VERSION"));
+    //
+    // Read from PackageInfo, NOT env!("CARGO_PKG_VERSION"). Releases bump only
+    // `tauri.conf.json` (see release.yml's tag guard), and that field is what
+    // becomes the built app's version — Cargo.toml is never touched. Keying off
+    // CARGO_PKG_VERSION froze every client's self-reported version at the
+    // Cargo.toml value, so the min-version gate read a number that stopped
+    // moving after 0.1.0.
+    cmd.env("SKILLET_CLIENT_VERSION", app_version());
     // The sidecar IS the CLI binary; without this its authed traffic would
     // self-report as `cli` and the devices list would grow a false CLI icon.
     cmd.env("SKILLET_CLIENT_KIND", "desktop");
@@ -176,6 +184,18 @@ fn dev_skillet_node_cli() -> Option<(String, Vec<String>)> {
         node.to_string_lossy().into_owned(),
         vec![cli_js.to_string_lossy().into_owned()],
     ))
+}
+
+/// The running app's version, as Tauri resolved it (`tauri.conf.json` wins over
+/// Cargo.toml). Set once at setup; falls back to the compile-time Cargo version
+/// for the unit tests, which never build a Tauri app.
+static APP_VERSION: OnceLock<String> = OnceLock::new();
+
+fn app_version() -> String {
+    APP_VERSION
+        .get()
+        .cloned()
+        .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string())
 }
 
 fn skillet_command() -> Option<(String, Vec<String>)> {
@@ -390,7 +410,12 @@ fn classify_rename_output(stdout: &str, stderr: &str) -> Result<String, String> 
         return Ok(stdout.to_string());
     }
     if trimmed.is_empty() && !stderr.trim().is_empty() {
-        let first = stderr.trim().lines().next().unwrap_or("Rename failed").trim();
+        let first = stderr
+            .trim()
+            .lines()
+            .next()
+            .unwrap_or("Rename failed")
+            .trim();
         if first.starts_with("Usage:") || first.starts_with("error: unknown command") {
             return Err("CLI out of date — update Skillet".into());
         }
@@ -629,7 +654,6 @@ fn valid_edit_target(skill: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '@' | '/'))
 }
 
-
 /// Read-only diff for the "See diff" card action (`skillet edits diff <skill>
 /// --json`). Returns `{files:[{path,status}]}` on stdout on both exit paths, so
 /// a not-found skill still surfaces its JSON rather than being dropped.
@@ -807,8 +831,7 @@ fn toggle_tray_from_icon(app: &tauri::AppHandle, cursor: PhysicalPosition<f64>) 
     // what makes closing take two clicks (and reads as a click that did
     // nothing). Swallow it; the next click opens normally.
     if !visible
-        && now_ms().saturating_sub(TRAY_HIDDEN_AT_MS.load(Ordering::Relaxed))
-            < TRAY_REOPEN_GUARD_MS
+        && now_ms().saturating_sub(TRAY_HIDDEN_AT_MS.load(Ordering::Relaxed)) < TRAY_REOPEN_GUARD_MS
     {
         return;
     }
@@ -935,7 +958,6 @@ fn show_tray_under(app: &tauri::AppHandle, cursor: PhysicalPosition<f64>) {
 fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
-
 
 /// Open the markdown viewer window (`?view=viewer`) for a customized skill —
 /// the tray's "See changes" action (U7/R14). The viewer is the only surface
@@ -1135,7 +1157,6 @@ fn open_folder(path: String) {
     #[cfg(target_os = "linux")]
     let _ = Command::new("xdg-open").arg(canon.as_os_str()).spawn();
 }
-
 
 /// Text file extensions the viewer renders inline. Anything else is treated as
 /// binary — surfaced in the sidebar as a size note, never streamed into the DOM.
@@ -1484,6 +1505,10 @@ pub fn run() {
             finish_onboarding
         ])
         .setup(|app| {
+            // Pin the real app version before anything can shell out to the
+            // sidecar — every `run_skillet*` call stamps it onto the request.
+            let _ = APP_VERSION.set(app.package_info().version.to_string());
+
             // Accessory (menubar-only) once onboarded; Regular during first run so
             // the onboarding window can take focus over whatever app is in front.
             #[cfg(target_os = "macos")]
@@ -1578,7 +1603,6 @@ pub fn run() {
                 }
             }
 
-
             // First run: greet, sync, ask for the one permission. Otherwise close
             // the onboarding webview so its timers never run in the background.
             if let Some(win) = app.get_webview_window("onboarding") {
@@ -1633,7 +1657,8 @@ mod tests {
     fn search_dirs_drops_empty_entries() {
         // A trailing separator yields an empty entry, which would otherwise
         // resolve as the process's current directory.
-        let joined = std::env::join_paths([PathBuf::from("/a"), PathBuf::from("")]).expect("joinable");
+        let joined =
+            std::env::join_paths([PathBuf::from("/a"), PathBuf::from("")]).expect("joinable");
         assert_eq!(search_dirs(Some(joined), &[]), vec![PathBuf::from("/a")]);
     }
 
@@ -1726,7 +1751,10 @@ mod tests {
 
     #[test]
     fn parse_compare_ref_rejects_wrong_host_and_scheme() {
-        assert_eq!(compare_ref("skillet://open/openclaudia/serp-analyzer"), None);
+        assert_eq!(
+            compare_ref("skillet://open/openclaudia/serp-analyzer"),
+            None
+        );
         assert_eq!(compare_ref("https://compare/a/b"), None);
     }
 

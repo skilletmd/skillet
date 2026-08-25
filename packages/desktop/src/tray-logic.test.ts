@@ -10,6 +10,7 @@ import {
   syncReachedRegistry,
   collectSyncIssues,
   humanizeSyncReason,
+  syncIssueNote,
   checkSyncAction,
   classifySyncFailure,
   cleanCliError,
@@ -407,6 +408,42 @@ describe('sync resilience: reachable vs offline + issue surfacing', () => {
     expect(humanizeSyncReason('scan_pending: not done')).toBe("the author's security scan hasn't finished")
     expect(humanizeSyncReason('weird_code: something broke')).toBe('something broke')
     expect(humanizeSyncReason(undefined)).toBe('it could not be synced')
+  })
+
+  it('humanizeSyncReason names the pin-recovery command for a rotated author key', () => {
+    expect(
+      humanizeSyncReason(
+        'key_id_mismatch: key_id_mismatch: author_key_changed: handle wshobson pinned to 1f7859e6, registry served 440566bd',
+      ),
+    ).toBe('the signing key for @wshobson changed. Run skillet pin accept wshobson to trust the new one')
+    expect(humanizeSyncReason('key_id_mismatch: no handle here')).toBe(
+      "the author's signing key changed",
+    )
+  })
+
+  it('syncIssueNote leads with the shared reason instead of listing every slug', () => {
+    const reason = 'the signing key for @wshobson changed'
+    const issues = Array.from({ length: 167 }, (_, i) => ({
+      slug: `@wshobson/skill-${i}`,
+      reason,
+    }))
+    expect(syncIssueNote(issues)).toEqual({
+      title: "167 skills from @wshobson couldn't sync",
+      detail: reason,
+    })
+  })
+
+  it('syncIssueNote falls back to slugs for a mixed batch, and stays singular for one', () => {
+    expect(
+      syncIssueNote([
+        { slug: '@a/one', reason: 'r1' },
+        { slug: '@b/two', reason: 'r2' },
+      ]),
+    ).toEqual({ title: "2 skills couldn't sync", detail: 'one, two' })
+    expect(syncIssueNote([{ slug: '@a/one', reason: 'r1' }])).toEqual({
+      title: "Couldn't sync one",
+      detail: 'r1',
+    })
   })
 })
 
