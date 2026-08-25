@@ -60,9 +60,17 @@ function screenSummary(notes: string | null): {
     const ratio = got / max
     if (ratio < worstRatio) {
       worstRatio = ratio
-      // Drop the parenthetical: "provenance (User, 237d old, pushed 0d ago)"
-      // wrapped to three lines and the detail is in the title attribute anyway.
-      weakest = `${m[1].trim().replace(/\s*\([^)]*\)/, '')} ${got}/${max}`
+      // Strip the value the label carries, or the line reads as two numbers
+      // with no separator: the note says "stars 5: 0/5", meaning 5 stars scoring
+      // 0 of 5 points, which rendered as "stars 5 0/5". The parenthetical goes
+      // for the same reason ("provenance (User, 237d old, pushed 0d ago)" wrapped
+      // to three lines). Both values are already on the row or in the full
+      // breakdown on hover; this line only needs to name the component and its score.
+      const label = m[1]
+          .trim()
+          .replace(/\s*\([^)]*\)/, '')
+          .replace(/\s+[\d,]+$/, '')
+      weakest = `${label} ${got}/${max}`
     }
   }
   return {

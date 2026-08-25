@@ -63,6 +63,22 @@ describe('parsing the note discovery wrote', () => {
     expect(worst).toBeCloseTo(0.2)
   })
 
+  it('strips the value a label carries, so the line is not two numbers', () => {
+    // The note says "stars 5: 0/5" — 5 stars scoring 0 of 5 points. Rendered
+    // raw that was "weakest: stars 5 0/5", which reads as gibberish, and the
+    // star count is already shown beside the repo.
+    const clean = (raw: string) => {
+      const m = /([^;—]+?):\s*(\d+)\/(\d+)/.exec(raw)!
+      const label = m[1].trim().replace(/\s*\([^)]*\)/, '').replace(/\s+[\d,]+$/, '')
+      return `${label} ${m[2]}/${m[3]}`
+    }
+    expect(clean('stars 5: 0/5')).toBe('stars 0/5')
+    expect(clean('stars 10,950: 5/5')).toBe('stars 5/5')
+    expect(clean('provenance (User, 237d old, pushed 0d ago): 10/20')).toBe('provenance 10/20')
+    // A label with no embedded value keeps every word.
+    expect(clean('bodies structured (sections + substance): 15/15')).toBe('bodies structured 15/15')
+  })
+
   it('degrades to nulls rather than throwing on an unscored row', () => {
     expect(/^quality (\d+)\/100/.exec('')).toBeNull()
     expect(/^quality (\d+)\/100/.exec('submitted by hand')).toBeNull()
