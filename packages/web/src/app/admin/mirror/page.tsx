@@ -60,7 +60,9 @@ function screenSummary(notes: string | null): {
     const ratio = got / max
     if (ratio < worstRatio) {
       worstRatio = ratio
-      weakest = `${m[1].trim()} ${got}/${max}`
+      // Drop the parenthetical: "provenance (User, 237d old, pushed 0d ago)"
+      // wrapped to three lines and the detail is in the title attribute anyway.
+      weakest = `${m[1].trim().replace(/\s*\([^)]*\)/, '')} ${got}/${max}`
     }
   }
   return {
@@ -219,8 +221,6 @@ async function MirrorQueueContent() {
               <th className="pb-2 font-medium">Handle</th>
               <th className="pb-2 font-medium">Source</th>
               <th className="pb-2 font-medium">Skills</th>
-              <th className="pb-2 font-medium">Type</th>
-              <th className="pb-2 font-medium">License</th>
               <th className="pb-2 font-medium">Actions</th>
             </tr>
           </thead>
@@ -232,8 +232,14 @@ async function MirrorQueueContent() {
                 <td className="py-3 pr-4" title={c.screen_notes ?? undefined}>
                   <ScoreBadge score={s.score} />
                 </td>
+                {/* Type under the handle, license beside the stars: both are
+                    one short fact per row, and a column each cost more width
+                    than they earned. */}
                 <td className="py-3 pr-4 font-medium">
                   @{c.derived_handle ?? '—'}
+                  <span className="mt-0.5 block text-xs font-normal text-(--ink-2)">
+                    {c.owner_type ?? '—'}
+                  </span>
                   {/* The lowest component of the screen, so the reason to look
                       closer travels with the row instead of living in a tooltip
                       nobody hovers. */}
@@ -245,13 +251,13 @@ async function MirrorQueueContent() {
                 </td>
                 <td className="py-3 pr-4 text-(--ink-2)">
                   <GithubSource repo={c.source_repo} />
-                  {s.stars != null && (
-                    <span className="mt-0.5 block text-xs">{s.stars.toLocaleString()} stars</span>
-                  )}
+                  <span className="mt-0.5 block text-xs">
+                    {[s.stars != null ? `${s.stars.toLocaleString()} stars` : null, c.license]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
                 </td>
                 <td className="py-3 pr-4 text-(--ink-2)">{s.skills ?? '—'}</td>
-                <td className="py-3 pr-4 text-(--ink-2)">{c.owner_type ?? '—'}</td>
-                <td className="py-3 pr-4 text-(--ink-2)">{c.license ?? '—'}</td>
                 <td className="py-3">
                   <div className="flex items-center gap-3">
                     <form action={decide.bind(null, c.id, 'approve')}>
