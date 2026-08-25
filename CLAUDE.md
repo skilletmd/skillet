@@ -116,6 +116,22 @@ Package `test` scripts build their workspace deps first, so a bare
   `proxy.ts` cannot be the last word; `scripts/web-origin-proxy.js` merges
   `Accept` into the outgoing `Vary` for HTML documents. Route handlers keep the
   value `proxy.ts` sets.
+- **Content negotiation is for DOCUMENTS only.** `agentSurfaceResponse` runs in
+  `proxy.ts` over everything the matcher covers, and `PRODUCES` is just
+  `text/html` + `text/markdown` — so any client asking for a third type got a
+  406 *before its route ever ran*. That silently broke desktop auto-update for
+  every install since the feature shipped: `tauri-plugin-updater` fetches its
+  manifest with `Accept: application/json`, and `/desktop/latest.json` answered
+  406 forever. `/llms.txt`, `/sitemap.xml`, `/robots.txt`, and the `/download/*`
+  installer redirects were 406ing the same way. A route that serves ONE concrete
+  artifact has no Markdown twin, so negotiating over it can only reject a caller
+  that asked for exactly what the route returns. **Adding a route that emits
+  anything other than HTML/Markdown means adding it to
+  `isSingleRepresentationPath`** (`src/lib/content-negotiation.ts`), by extension
+  or by prefix. `tests/content-negotiation.test.ts` pins the updater manifest
+  specifically. Corollary: a client that swallows its own errors turns this into
+  an invisible outage, so never diagnose "it isn't updating" from the client
+  alone — curl the endpoint with the client's real `Accept` header.
 - **`@skillet/protocol` imports:** client code (web, desktop webview) must
   import node-free subpaths (`@skillet/protocol/covers`, …), never the barrel —
   it pulls `node:crypto` and blank-pages the app. Lint-enforced.
