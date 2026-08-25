@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Suspense } from 'react'
+import { Fragment, Suspense } from 'react'
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { requireSession } from '@/lib/require-session'
@@ -7,6 +7,12 @@ import { readSessionCookie } from '@/lib/session-cookie'
 import { REGISTRY_API } from '@/lib/registry-prefix'
 import { markDynamicRoute } from '@/lib/mark-dynamic-route'
 import { AddMirrorForm } from './add-mirror-form'
+import {
+  CandidateSkills,
+  CategorySummary,
+  thinCategories,
+  type CandidateSkill,
+} from './candidate-detail'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/page-header'
 import { SettingsSection } from '@/components/ui/setting-section'
@@ -27,6 +33,12 @@ interface Candidate {
   screen_notes: string | null
   decided_at: number | null
   created_at: number
+  // Decision context, captured at screen time. Null on every row queued before
+  // it existed; those still render and stay decidable.
+  skills_captured_at?: number | null
+  category_summary?: Record<string, number> | null
+  overlap_count?: number
+  skills?: CandidateSkill[]
 }
 
 /**
@@ -104,7 +116,13 @@ function registryUrl(): string {
 }
 
 type QueueResult =
-  | { ok: true; pending: Candidate[]; recent: Candidate[] }
+  | {
+      ok: true
+      pending: Candidate[]
+      recent: Candidate[]
+      categoryCounts: Record<string, number>
+      overlapThreshold: number
+    }
   | { ok: false; status: number }
 
 async function fetchQueue(sessionToken: string): Promise<QueueResult> {
@@ -118,8 +136,16 @@ async function fetchQueue(sessionToken: string): Promise<QueueResult> {
   const body = (await res.json().catch(() => null)) as {
     pending?: Candidate[]
     recent?: Candidate[]
+    category_counts?: Record<string, number>
+    overlap_threshold?: number
   } | null
-  return { ok: true, pending: body?.pending ?? [], recent: body?.recent ?? [] }
+  return {
+    ok: true,
+    pending: body?.pending ?? [],
+    recent: body?.recent ?? [],
+    categoryCounts: body?.category_counts ?? {},
+    overlapThreshold: body?.overlap_threshold ?? 1,
+  }
 }
 
 /** Forward an admin decision to the registry, then refresh the view. */
@@ -230,7 +256,8 @@ async function MirrorQueueContent() {
     )
   }
 
-  const { pending: unsorted, recent } = result
+  const { pending: unsorted, recent, categoryCounts, overlapThreshold } = result
+  const thin = thinCategories(categoryCounts)
   // Best first. 64 rows that all read "User, MIT" is a list you scroll past;
   // ranked by the screen discovery already ran, the top of the list is the work
   // and the bottom is the pile you can leave. Unscored rows sort last rather
@@ -276,8 +303,12 @@ async function MirrorQueueContent() {
           <tbody>
             {pending.map((c) => {
               const s = screenSummary(c.screen_notes)
+              // The detail row carries the rule when it is present, so a
+              // candidate and its own skill list do not read as two rows.
+              const expandable = Boolean(c.skills && c.skills.length > 0)
               return (
-              <tr key={c.id} className="border-b border-(--line) align-top">
+              <Fragment key={c.id}>
+              <tr className={`align-top ${expandable ? '' : 'border-b border-(--line)'}`}>
                 <td className="py-3 pr-4" title={c.screen_notes ?? undefined}>
                   <ScoreBadge score={s.score} />
                 </td>
@@ -306,7 +337,18 @@ async function MirrorQueueContent() {
                       .join(' · ')}
                   </span>
                 </td>
-                <td className="py-3 pr-4 text-(--ink-2)">{s.skills ?? '—'}</td>
+                {/* The candidate's own answer to "do we need this": how many
+                    skills, which lanes, how thin those lanes are, and how much
+                    of it we already have. None of it gates the buttons. */}
+                <td className="py-3 pr-4 text-(--ink-2)">
+                  {c.skills?.length ?? s.skills ?? '—'}
+                  <CategorySummary summary={c.category_summary ?? null} thin={thin} />
+                  {c.overlap_count != null && c.overlap_count > 0 && (
+                    <span className="mt-0.5 block text-xs">
+                      {c.overlap_count} already in the catalog
+                    </span>
+                  )}
+                </td>
                 <td className="py-3">
                   <div className="flex items-center gap-3">
                     <form action={decide.bind(null, c.id, 'approve')}>
@@ -322,6 +364,20 @@ async function MirrorQueueContent() {
                   </div>
                 </td>
               </tr>
+              {/* Full width, below the row: 57 names cannot live in a cell, and
+                  the collapsed row has to stay scannable. */}
+              {expandable && (
+                <tr className="border-b border-(--line)">
+                  <td colSpan={5} className="pb-3">
+                    <CandidateSkills
+                      skills={c.skills ?? []}
+                      thin={thin}
+                      threshold={overlapThreshold}
+                    />
+                  </td>
+                </tr>
+              )}
+              </Fragment>
               )
             })}
           </tbody>

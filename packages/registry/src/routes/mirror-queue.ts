@@ -31,6 +31,7 @@ import { guessCategory } from '../classify/heuristic.js';
 import { screenCandidate, parseOwnerRepo } from '../lib/mirror-screen.js';
 import { assessCandidateQuality, type QualityResult } from '../lib/mirror-quality.js';
 import { recordCandidateContext } from '../lib/mirror-candidate-context.js';
+import { OVERLAP_THRESHOLD } from '../lib/mirror-overlap.js';
 import { normalizeRepoKey } from '../lib/mirror-screen.js';
 import { syncRepoSkillsPrisma } from '../sync/sync-repo.js';
 import type { BlobStore } from '../blob-store/types.js';
@@ -99,6 +100,46 @@ function toQueueRow(r: {
         created_at: r.created_at,
     };
 }
+interface CandidateSkillRow {
+    slug: string;
+    name: string | null;
+    description: string | null;
+    category: string | null;
+    overlap_ref: string | null;
+    overlap_score: number | null;
+}
+
+/**
+ * The decision context captured at screen time: what the skills are, where they
+ * land, and what the catalog already has.
+ *
+ * `overlap_count` is DERIVED here rather than stored. The threshold is
+ * calibrated against a catalog that keeps growing, and a stored count would
+ * silently misrepresent every existing row the moment it moves.
+ */
+export function candidateContext(r: {
+    skills_captured_at: number | null;
+    category_summary: unknown;
+    mirror_candidate_skills?: CandidateSkillRow[];
+}): Record<string, unknown> {
+    const skills = r.mirror_candidate_skills ?? [];
+    return {
+        skills_captured_at: r.skills_captured_at,
+        category_summary: r.category_summary ?? null,
+        overlap_count: skills.filter(
+            (s) => s.overlap_score != null && s.overlap_score >= OVERLAP_THRESHOLD,
+        ).length,
+        skills: skills.map((s) => ({
+            slug: s.slug,
+            name: s.name,
+            description: s.description,
+            category: s.category,
+            overlap_ref: s.overlap_ref,
+            overlap_score: s.overlap_score,
+        })),
+    };
+}
+
 function requirePrisma(prisma: PrismaClient | undefined): PrismaClient {
   if (!prisma) {
     throw new Error('sqlite registry store removed; use Prisma / DATABASE_URL')
@@ -127,20 +168,40 @@ export function registerMirrorQueueRoutes(
     //             the screen_notes reason) instead of a row silently vanishing.
     // --------------------------------------------------------------------------
     app.get('/api/v1/admin/mirror-queue', { preHandler: requireAdmin() }, async (_req, reply) => {
-        const [pending, recent] = await Promise.all([
+        const [pending, recent, categoryRows] = await Promise.all([
             prisma.mirror_review_queue.findMany({
                 where: { status: 'pending_review' },
                 orderBy: { created_at: 'asc' },
+                include: { mirror_candidate_skills: { orderBy: { slug: 'asc' } } },
             }),
             prisma.mirror_review_queue.findMany({
                 where: { status: { not: 'pending_review' } },
                 orderBy: [{ decided_at: 'desc' }, { created_at: 'desc' }],
                 take: 50,
             }),
+            // How thin the catalog is, per category. Sent ONCE for the page, not
+            // per row: it is a fact about the catalog, and 64 rows each carrying
+            // their own copy would be the same 17 numbers 64 times. Read at
+            // render, not stored at screen time, because the catalog moves under
+            // a candidate that sits in the queue for a week.
+            prisma.skills.groupBy({
+                by: ['category'],
+                where: { visibility: 'public', category: { not: null } },
+                _count: { _all: true },
+            }),
         ]);
+        const categoryCounts: Record<string, number> = {};
+        for (const row of categoryRows) {
+            if (row.category) categoryCounts[row.category] = row._count._all;
+        }
         return reply.code(200).send({
-            pending: pending.map((r) => publicRow(toQueueRow(r))),
+            pending: pending.map((r) => ({
+                ...publicRow(toQueueRow(r)),
+                ...candidateContext(r),
+            })),
             recent: recent.map((r) => publicRow(toQueueRow(r))),
+            category_counts: categoryCounts,
+            overlap_threshold: OVERLAP_THRESHOLD,
         });
     });
     // --------------------------------------------------------------------------
