@@ -1,7 +1,7 @@
 ---
 title: Safety
 description: How Skillet keeps you in control of other people's skills. You approve every change, and every skill is signed and scanned.
-order: 4
+order: 5
 section: Using Skillet
 image: /docs/trust-and-safety.png
 ---

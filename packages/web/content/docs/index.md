@@ -13,6 +13,7 @@ A **skill** is a short set of instructions you give an AI: how you like things w
 | Try someone's skills right now, nothing installed | [Summon a kit](/docs/summon) |
 | Run skills from people I trust | [Add skills](/docs/add-skills) |
 | Keep my skills current across tools and machines | [Install](/docs/install) |
+| Share what I have written | [Publish a skill](/docs/publish) |
 | Share one kit with my team | [Teams](/docs/teams) |
 
 ## Find skills worth running

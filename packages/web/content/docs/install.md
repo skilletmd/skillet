@@ -1,7 +1,7 @@
 ---
 title: Install
 description: Get skills onto your machine. Install the app (recommended) or the CLI; both run the same sync.
-order: 3
+order: 4
 section: Get started
 image: /docs/install.png
 ---

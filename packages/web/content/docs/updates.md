@@ -1,7 +1,7 @@
 ---
 title: Keeping skills updated
 description: How updates work in Skillet. Nothing on your machine changes until you approve it.
-order: 2
+order: 4
 section: Using Skillet
 image: /docs/updates.png
 ---

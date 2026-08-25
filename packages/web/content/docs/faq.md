@@ -1,7 +1,7 @@
 ---
 title: FAQ
 description: Quick answers to the questions that don't fit anywhere else.
-order: 6
+order: 7
 section: Using Skillet
 image: /docs/faq.png
 ---

@@ -1,7 +1,7 @@
 ---
 title: Privacy
 description: What Skillet knows about you, and what stays on your machine. Your skills are private by default, and skill stats count only which skill ran, never your prompt.
-order: 5
+order: 6
 section: Using Skillet
 ---
 

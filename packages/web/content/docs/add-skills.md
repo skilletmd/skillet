@@ -1,7 +1,7 @@
 ---
 title: Add skills
 description: Follow the people whose taste you trust, add their best skills, and run them in every tool you use.
-order: 4
+order: 3
 section: Get started
 image: /docs/follow-and-subscribe.png
 ---
