@@ -29,6 +29,8 @@ import { ensureOrgAuthorRowPrisma } from '../lib/org-access.js';
 import { RealAuthorCollisionError, upsertMirrorAuthorPrisma } from '../lib/mirror-authors.js';
 import { guessCategory } from '../classify/heuristic.js';
 import { screenCandidate, parseOwnerRepo } from '../lib/mirror-screen.js';
+import { assessCandidateQuality } from '../lib/mirror-quality.js';
+import { normalizeRepoKey } from '../lib/mirror-screen.js';
 import { syncRepoSkillsPrisma } from '../sync/sync-repo.js';
 import type { BlobStore } from '../blob-store/types.js';
 /** States that occupy the in-flight unique-index slot for a normalized key. */
@@ -143,6 +145,107 @@ export function registerMirrorQueueRoutes(
     // --------------------------------------------------------------------------
     // POST /api/v1/admin/mirror-queue/:id/decide
     // --------------------------------------------------------------------------
+    // Submit a repo by URL, straight from /admin/mirror.
+    //
+    // Adding a mirror otherwise meant hand-editing a 76-entry JSON file with up
+    // to 11 fields, committing, deploying, and waiting for the nightly. Every
+    // field except the bio is already answerable from the GitHub API, which is
+    // what the screen reads anyway.
+    //
+    // It runs the SAME legality screen and quality assessment discovery runs, so
+    // a pasted row is indistinguishable from a discovered one: it ranks in the
+    // same list, carries the same screen_notes, and goes through the same
+    // approve (which re-screens against live GitHub before syncing). Submitting
+    // is not approving.
+    app.post<{ Body: { url?: string } }>(
+        '/api/v1/admin/mirror-queue',
+        { preHandler: requireAdmin() },
+        async (req, reply) => {
+            const raw = (req.body?.url ?? '').trim();
+            if (!raw) {
+                return reply.code(400).send({ error: 'missing_url', message: 'Provide a GitHub repo URL.' });
+            }
+            const parsed = parseOwnerRepo(raw);
+            if (!parsed) {
+                return reply.code(400).send({
+                    error: 'unparseable_url',
+                    message: `Could not read an owner/repo out of "${raw}".`,
+                });
+            }
+            const repoFull = `${parsed.owner}/${parsed.repo}`;
+            const key = normalizeRepoKey(repoFull);
+            if (!key) {
+                return reply.code(400).send({ error: 'unparseable_url', message: `Could not normalize "${repoFull}".` });
+            }
+
+            // Already known? Say which state, rather than creating a duplicate
+            // the unique in-flight index would reject with a raw 500.
+            const existing = await prisma.mirror_review_queue.findFirst({
+                where: { normalized_repo_key: key },
+                orderBy: { created_at: 'desc' },
+                select: { id: true, status: true },
+            });
+            if (existing) {
+                return reply.code(409).send({
+                    error: 'already_queued',
+                    message: `${repoFull} is already in the queue as '${existing.status}'.`,
+                    id: existing.id,
+                    status: existing.status,
+                });
+            }
+
+            const screen = await screenCandidate({ db, prisma, owner: parsed.owner, repo: parsed.repo });
+            // A screen that could not reach a verdict is not a verdict — the same
+            // rule discovery follows. Record nothing and let them retry.
+            if (screen.transient) {
+                return reply.code(503).send({
+                    error: 'screen_unavailable',
+                    message: 'GitHub could not be reached to screen this repo. Try again shortly.',
+                });
+            }
+
+            let status = screen.pass ? 'pending_review' : 'rejected_screen';
+            let notes = screen.notes;
+            if (screen.pass) {
+                const quality = await assessCandidateQuality({ owner: parsed.owner, repo: parsed.repo });
+                const summary = `quality ${quality.score}/100 across ${quality.skillCount} skills — ${quality.notes.join('; ')}`;
+                if (quality.hardFail) {
+                    status = 'rejected_screen';
+                    notes = `quality: ${quality.hardFail}`;
+                }
+                else {
+                    // No minimum bar here, unlike discovery's sweep: a human went
+                    // and found this one, so the score informs the decision rather
+                    // than making it. It still lands with its notes, so a weak
+                    // candidate sorts to the bottom and reads as weak.
+                    notes = summary;
+                }
+            }
+
+            const principal = req.principal as Principal;
+            const submitter = principal.class === 'session' || principal.class === 'device'
+                ? principal.user_id
+                : 'admin';
+            const id = newId();
+            await prisma.mirror_review_queue.create({
+                data: {
+                    id,
+                    source_repo: repoFull,
+                    normalized_repo_key: key,
+                    source_owner_login: screen.ownerLogin,
+                    source_owner_id: screen.ownerId,
+                    derived_handle: screen.derivedHandle,
+                    owner_type: screen.ownerType,
+                    license: screen.license,
+                    status,
+                    submitted_by: submitter,
+                    screen_notes: notes,
+                },
+            });
+            return reply.code(201).send({ id, repo: repoFull, status, notes });
+        },
+    );
+
     app.post<{
         Params: {
             id: string;

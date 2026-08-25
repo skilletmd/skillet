@@ -6,6 +6,7 @@ import { requireSession } from '@/lib/require-session'
 import { readSessionCookie } from '@/lib/session-cookie'
 import { REGISTRY_API } from '@/lib/registry-prefix'
 import { markDynamicRoute } from '@/lib/mark-dynamic-route'
+import { AddMirrorForm } from './add-mirror-form'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/page-header'
 import { SettingsSection } from '@/components/ui/setting-section'
@@ -122,6 +123,39 @@ async function fetchQueue(sessionToken: string): Promise<QueueResult> {
 }
 
 /** Forward an admin decision to the registry, then refresh the view. */
+/**
+ * Queue a repo by URL.
+ *
+ * The alternative was editing mirror-sources.json (up to 11 fields, most of
+ * them answerable from the GitHub API), committing, deploying, and waiting for
+ * the nightly. This runs the same screen discovery runs, so the row lands in
+ * the same list with the same notes and still needs an explicit approve.
+ *
+ * Errors come back as text rather than a thrown 500: "already queued as live"
+ * and "no permissive license" are answers, not faults.
+ */
+async function submitUrl(_prev: string | null, form: FormData): Promise<string | null> {
+  'use server'
+  const url = String(form.get('url') ?? '').trim()
+  if (!url) return null
+  const jar = await cookies()
+  const sessionToken = readSessionCookie(jar)
+  if (!sessionToken) return 'Not signed in.'
+  const res = await fetch(`${registryUrl()}${REGISTRY_API}/admin/mirror-queue`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${sessionToken}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ url }),
+  })
+  const body = (await res.json().catch(() => null)) as
+    | { repo?: string; status?: string; message?: string }
+    | null
+  if (!res.ok) return body?.message ?? `Could not add it (registry responded ${res.status}).`
+  revalidatePath('/admin/mirror')
+  return body?.status === 'rejected_screen'
+    ? `${body?.repo} failed the screen and was recorded as rejected.`
+    : `${body?.repo} added, awaiting review below.`
+}
+
 async function decide(id: string, decision: 'approve' | 'reject'): Promise<void> {
   'use server'
   const jar = await cookies()
@@ -213,6 +247,13 @@ async function MirrorQueueContent() {
       />
 
       <div className="space-y-10">
+        <SettingsSection
+          title="Add a source"
+          description="Paste a GitHub repo URL. It runs the same screen discovery runs and lands in the queue below."
+        >
+          <AddMirrorForm action={submitUrl} />
+        </SettingsSection>
+
         <SettingsSection
           title="Pending"
           description={`${pending.length} awaiting review.`}
