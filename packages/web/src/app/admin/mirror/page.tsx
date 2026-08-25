@@ -28,6 +28,66 @@ interface Candidate {
   created_at: number
 }
 
+/**
+ * Pull the numbers out of the screening note discovery already wrote.
+ *
+ * The note is machine-generated with a stable prefix
+ * ("quality 84/100 across 24 skills — ..."), so parsing it is safe enough to
+ * sort and rank by. It was being rendered only in Recent decisions, which meant
+ * the page showed its reasoning AFTER a decision and hid it on Pending, where
+ * every row read "User, MIT" and there was nothing to choose on.
+ *
+ * Returns nulls rather than throwing: a hand-submitted row, or a note whose
+ * shape changes later, still lists — it just sorts last.
+ */
+function screenSummary(notes: string | null): {
+  score: number | null
+  skills: number | null
+  stars: number | null
+  weakest: string | null
+} {
+  if (!notes) return { score: null, skills: null, stars: null, weakest: null }
+  const head = /^quality (\d+)\/100 across (\d+) skills/.exec(notes)
+  const stars = /stars ([\d,]+):/.exec(notes)
+  // The lowest-scoring component is the reason to look closer, so surface that
+  // one rather than making the reviewer read six clauses.
+  let weakest: string | null = null
+  let worstRatio = 1.1
+  for (const m of notes.matchAll(/([^;—]+?):\s*(\d+)\/(\d+)/g)) {
+    const got = Number(m[2])
+    const max = Number(m[3])
+    if (!max) continue
+    const ratio = got / max
+    if (ratio < worstRatio) {
+      worstRatio = ratio
+      weakest = `${m[1].trim()} ${got}/${max}`
+    }
+  }
+  return {
+    score: head ? Number(head[1]) : null,
+    skills: head ? Number(head[2]) : null,
+    stars: stars ? Number(stars[1].replace(/,/g, '')) : null,
+    weakest: worstRatio < 0.75 ? weakest : null,
+  }
+}
+
+function ScoreBadge({ score }: { score: number | null }) {
+  if (score == null) return <span className="text-(--ink-2)">—</span>
+  // Bands, not a gradient: the number is a screen, not a verdict, and three
+  // buckets is all a reviewer acts on.
+  const cls =
+    score >= 85
+      ? 'bg-(--success-bg) text-(--success)'
+      : score >= 70
+        ? 'bg-(--accent-bg) text-(--ink)'
+        : 'bg-(--line) text-(--ink-2)'
+  return (
+    <span className={`inline-flex rounded-md px-1.5 py-0.5 font-mono text-xs font-semibold ${cls}`}>
+      {score}
+    </span>
+  )
+}
+
 function registryUrl(): string {
   return process.env.REGISTRY_URL ?? process.env.NEXT_PUBLIC_REGISTRY_URL ?? 'http://127.0.0.1:3481'
 }
@@ -126,7 +186,14 @@ async function MirrorQueueContent() {
     )
   }
 
-  const { pending, recent } = result
+  const { pending: unsorted, recent } = result
+  // Best first. 64 rows that all read "User, MIT" is a list you scroll past;
+  // ranked by the screen discovery already ran, the top of the list is the work
+  // and the bottom is the pile you can leave. Unscored rows sort last rather
+  // than jumping the queue on a missing value.
+  const pending = [...unsorted].sort(
+    (a, b) => (screenSummary(b.screen_notes).score ?? -1) - (screenSummary(a.screen_notes).score ?? -1),
+  )
 
   return (
     <div>
@@ -148,20 +215,41 @@ async function MirrorQueueContent() {
             <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-(--line) text-left text-(--ink-2)">
+              <th className="pb-2 font-medium">Quality</th>
               <th className="pb-2 font-medium">Handle</th>
               <th className="pb-2 font-medium">Source</th>
+              <th className="pb-2 font-medium">Skills</th>
               <th className="pb-2 font-medium">Type</th>
               <th className="pb-2 font-medium">License</th>
               <th className="pb-2 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {pending.map((c) => (
-              <tr key={c.id} className="border-b border-(--line)">
-                <td className="py-3 pr-4 font-medium">@{c.derived_handle ?? '—'}</td>
+            {pending.map((c) => {
+              const s = screenSummary(c.screen_notes)
+              return (
+              <tr key={c.id} className="border-b border-(--line) align-top">
+                <td className="py-3 pr-4" title={c.screen_notes ?? undefined}>
+                  <ScoreBadge score={s.score} />
+                </td>
+                <td className="py-3 pr-4 font-medium">
+                  @{c.derived_handle ?? '—'}
+                  {/* The lowest component of the screen, so the reason to look
+                      closer travels with the row instead of living in a tooltip
+                      nobody hovers. */}
+                  {s.weakest && (
+                    <span className="mt-0.5 block text-xs font-normal text-(--ink-2)">
+                      weakest: {s.weakest}
+                    </span>
+                  )}
+                </td>
                 <td className="py-3 pr-4 text-(--ink-2)">
                   <GithubSource repo={c.source_repo} />
+                  {s.stars != null && (
+                    <span className="mt-0.5 block text-xs">{s.stars.toLocaleString()} stars</span>
+                  )}
                 </td>
+                <td className="py-3 pr-4 text-(--ink-2)">{s.skills ?? '—'}</td>
                 <td className="py-3 pr-4 text-(--ink-2)">{c.owner_type ?? '—'}</td>
                 <td className="py-3 pr-4 text-(--ink-2)">{c.license ?? '—'}</td>
                 <td className="py-3">
@@ -179,7 +267,8 @@ async function MirrorQueueContent() {
                   </div>
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
             </div>
