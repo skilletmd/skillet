@@ -65,9 +65,26 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
 
 export default async function SkillPage({ params }: { params: Promise<Params> }) {
   const { author, skill: slug } = await params
+
+  // Started before `getSkill` is awaited, not after. These three need nothing
+  // but the route params, so waiting on the skill lookup put a whole extra
+  // round trip in front of every skill page for no reason: one ~150ms hop, then
+  // a second ~170ms hop, when they could overlap. Only the bundle's
+  // `withSession` flag actually depends on the skill, so only it stays behind
+  // the await.
+  const kitsPromise = getKitsForSkill(author, slug)
+  const authorPromise = getAuthorProfile(author).catch(() => null)
+  // Discovery fallback for the rail; cheap + cached, ignored unless the rail
+  // would otherwise be empty.
+  const popularPromise = getSkillCatalog({ limit: 8 }).catch(() => null)
+
   const skill = await getSkill(author, slug)
 
   if (!skill) {
+    // This path abandons the three above. Settle them so an in-flight rejection
+    // cannot surface later as an unhandled rejection on a page that already
+    // returned.
+    void Promise.allSettled([kitsPromise, authorPromise, popularPromise])
     return (
       <Suspense fallback={<SkillPageSkeleton />}>
         <SkillAuthenticatedResolve author={author} slug={slug} />
@@ -82,11 +99,9 @@ export default async function SkillPage({ params }: { params: Promise<Params> })
     // pages stay statically CDN-cacheable. Mirrors the evidence-fetch flag in
     // skill-page-view (withSession: visibility === 'private').
     getSkillBundleSummary(author, slug, { withSession: skill.visibility === 'private' }),
-    getKitsForSkill(author, slug),
-    getAuthorProfile(author).catch(() => null),
-    // Discovery fallback for the rail; cheap + cached, ignored unless the rail
-    // would otherwise be empty.
-    getSkillCatalog({ limit: 8 }).catch(() => null),
+    kitsPromise,
+    authorPromise,
+    popularPromise,
   ])
 
   return await SkillPageView({
