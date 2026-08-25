@@ -4,13 +4,12 @@ import { Suspense } from 'react'
 import { getRegistryStats } from '@/lib/registry'
 import type { RegistryStats } from '@/lib/registry'
 import { safe } from '@/components/home/home-shared'
-import { StatSection, type Stat } from '@/components/stats/stat-grid'
-import { GrowthChart } from '@/components/stats/growth-chart'
+import { StatGrid, type Stat } from '@/components/stats/stat-grid'
 import { CategoryBars } from '@/components/stats/category-bars'
 import { Panel } from '@/components/ui/panel'
 import { buttonClasses } from '@/components/ui/button'
 import { PAGE_CONTAINER_CLASS } from '@/lib/page-layout'
-import { PageIntro } from '@/components/page-intro'
+import { PageHeader } from '@/components/page-header'
 import { ogMeta, OG } from '@/lib/og'
 
 export const metadata: Metadata = {
@@ -28,6 +27,7 @@ const EMPTY_STATS: RegistryStats = {
     networkSkills: 0,
     kits: 0,
     installs: 0,
+    saves: 0,
     versions: 0,
     subscriptions: 0,
     follows: 0,
@@ -41,6 +41,7 @@ const EMPTY_STATS: RegistryStats = {
     networkSkills: [],
     kits: [],
     installs: [],
+    saves: [],
     versions: [],
     subscriptions: [],
     follows: [],
@@ -50,6 +51,8 @@ const EMPTY_STATS: RegistryStats = {
     invocations: 0,
     picks: 0,
     summons: 0,
+    routed: 0,
+    routedSeries: [],
     topPickedSkills: [],
     invocationsByRuntime: [],
   },
@@ -57,52 +60,24 @@ const EMPTY_STATS: RegistryStats = {
 
 const numberFormat = new Intl.NumberFormat('en-US')
 
-// Two stories, in order: momentum (the rates that compound) then network depth
-// (the supply + graph that make it defensible). Each card carries its own
-// sparkline + MoM delta, so the group reads as a trend, not a tally.
-function momentumCards(stats: RegistryStats): Stat[] {
+// One grid, six numbers, in two rows the reader can follow: what is on the
+// network (skills, kits, creators), then what people do with it (installs,
+// routes, members). Each card carries its own sparkline + MoM delta and opens
+// its full chart.
+//
+// Deliberately absent: versions published (publishing churn, not a signal a
+// reader can use), trust-graph edges, and subscriptions (a weaker restatement
+// of the adoption the first two usage cards already carry). Six real numbers
+// beat eight with filler.
+function statCards(stats: RegistryStats): Stat[] {
   const { totals: t, series } = stats
   return [
-    {
-      id: 'installs',
-      label: 'Installs',
-      value: t.installs,
-      hint: 'skills run across every agent',
-      series: series.installs,
-    },
     {
       id: 'skills',
       label: 'Public skills',
       value: t.skills,
       hint: 'published and shareable',
       series: series.skills,
-    },
-    {
-      id: 'subscriptions',
-      label: 'Subscriptions',
-      value: t.subscriptions,
-      hint: 'standing follows of kits + creators',
-      series: series.subscriptions,
-    },
-    {
-      id: 'members',
-      label: 'Members',
-      value: t.users,
-      hint: 'with a claimed handle',
-      series: series.users,
-    },
-  ]
-}
-
-function networkCards(stats: RegistryStats): Stat[] {
-  const { totals: t, series } = stats
-  return [
-    {
-      id: 'creators',
-      label: 'Creators',
-      value: t.creators,
-      hint: 'shipping public skills',
-      series: series.creators,
     },
     {
       id: 'kits',
@@ -112,43 +87,40 @@ function networkCards(stats: RegistryStats): Stat[] {
       series: series.kits,
     },
     {
-      id: 'versions',
-      label: 'Versions published',
-      value: t.versions,
-      hint: 'total publishes, all time',
-      series: series.versions,
+      id: 'creators',
+      label: 'Creators',
+      value: t.creators,
+      hint: 'shipping public skills',
+      series: series.creators,
     },
     {
-      id: 'connections',
-      label: 'Connections',
-      value: t.follows,
-      hint: 'edges in the trust graph',
-      series: series.follows,
-    },
-  ]
-}
-
-function routeCards(stats: RegistryStats): Stat[] {
-  return [
-    {
-      id: 'route-invocations',
-      label: '/skillet invocations',
-      value: stats.routes.invocations,
-      hint: 'times the command was invoked',
+      // The person, counted once per skill: saved into one of their kits, or
+      // brought in by a kit or author subscription. `totals.installs` is
+      // deliberately not shown - it counts a ping per machine that materializes
+      // the skill, so syncing to four laptops reads as four, which is a device
+      // number wearing a demand number's label.
+      id: 'saves',
+      label: 'Saves',
+      value: t.saves,
+      hint: 'skills saved by users',
+      series: series.saves,
     },
     {
-      id: 'route-picks',
-      label: 'Skills picked',
-      value: stats.routes.picks,
-      hint: 'successful route selections',
+      // Routing's one public number: picks plus summons. The three cards this
+      // replaced described the plumbing, not the outcome; the detail panels
+      // further down the page still carry it.
+      id: 'routed',
+      label: 'Skills routed',
+      value: stats.routes.routed,
+      hint: 'used through /skillet',
+      series: stats.routes.routedSeries,
     },
     {
-      // Summons are the no-install path, so they are counted server-side
-      // rather than from CLI events like the two cards above.
-      id: 'route-summons',
-      label: 'Summons',
-      value: stats.routes.summons,
-      hint: "someone's kit run without installing it",
+      id: 'members',
+      label: 'Members',
+      value: t.users,
+      hint: 'with a claimed handle',
+      series: series.users,
     },
   ]
 }
@@ -222,13 +194,7 @@ async function StatsContent() {
 
   return (
     <div className="flex flex-col gap-12">
-      <GrowthChart growth={stats.growth} />
-
-      <StatSection label="Activity" stats={momentumCards(stats)} />
-
-      <StatSection label="Community" stats={networkCards(stats)} />
-
-      <StatSection label="Routing" stats={routeCards(stats)} />
+      <StatGrid stats={statCards(stats)} months={stats.months} />
 
       <TopPickedSkills stats={stats} />
 
@@ -242,9 +208,8 @@ async function StatsContent() {
 function StatsSkeleton() {
   return (
     <div className="flex flex-col gap-12" aria-hidden>
-      <Panel padding="none" className="h-72 animate-pulse" />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {Array.from({ length: 8 }).map((_, i) => (
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
           <Panel key={i} padding="none" className="h-30 animate-pulse" />
         ))}
       </div>
@@ -255,15 +220,12 @@ function StatsSkeleton() {
 export default function StatsPage() {
   return (
     <main className={PAGE_CONTAINER_CLASS}>
-      <header>
-        <PageIntro
-          eyebrow="Open data"
-          title="Skillet by the numbers"
-          lede="Live counts from the registry: skills, kits, installs, and the people behind them. Updated continuously."
-        />
-      </header>
+      <PageHeader
+        title="Skillet by the numbers"
+        lede="Live counts from the registry, updated continuously."
+      />
 
-      <div className="mt-10">
+      <div className="mt-8">
         <Suspense fallback={<StatsSkeleton />}>
           <StatsContent />
         </Suspense>

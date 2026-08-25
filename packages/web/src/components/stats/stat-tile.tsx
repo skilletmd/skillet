@@ -54,7 +54,7 @@ export function StatTile({
   return (
     <Panel
       padding="none"
-      className="relative overflow-hidden p-5 transition-shadow hover:shadow-(--shadow-sm)"
+      className="relative h-full overflow-hidden p-5 transition-shadow hover:shadow-(--shadow-sm)"
     >
       {background}
       <div className="relative">
