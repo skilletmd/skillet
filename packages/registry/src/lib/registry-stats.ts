@@ -11,6 +11,13 @@ export interface RegistryStatsPayload {
     networkSkills: number
     kits: number
     installs: number
+    /**
+     * Skills saved by users: distinct (user, skill) pairs, counting a save
+     * however it happened (added to one of their kits, or brought in by a kit
+     * or author subscription, sized at subscribe time). Unlike `installs` this
+     * counts the person once, not once per machine that materializes the skill.
+     */
+    saves: number
     versions: number
     subscriptions: number
     follows: number
@@ -22,6 +29,7 @@ export interface RegistryStatsPayload {
     kits: number[]
     creators: number[]
     installs: number[]
+    saves: number[]
     users: number[]
     versions: number[]
     subscriptions: number[]
@@ -38,6 +46,16 @@ export interface RegistryStatsPayload {
      * with nothing installed, so there is no CLI to emit an event.
      */
     summons: number
+    /**
+     * The public headline: picks + summons, i.e. every time a skill was routed
+     * to an agent whether or not it was installed. The two inputs are counted
+     * on different paths (see `summons`), so an MCP summon, which writes both a
+     * `skill.route` event and a summon tally, is counted twice. There is no user
+     * on the summon side to dedupe against.
+     */
+    routed: number
+    /** `routed`, cumulative by month, aligned index-for-index to `months`. */
+    routedSeries: number[]
     topPickedSkills: Array<{ skillRef: string; picks: number }>
     invocationsByRuntime: Array<{ runtime: string; count: number }>
   }
@@ -69,6 +87,18 @@ function networkSkillWhere(suspended: string[]) {
 function byMonth(rows: MonthRow[]): Map<string, number> {
   return new Map(rows.map((r) => [r.m, Number(r.n)]))
 }
+
+/** Several month tallies added together, for a metric whose parts live in
+ *  different tables (routing: route events + summon counters). */
+function sumByMonth(...parts: MonthRow[][]): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const part of parts) {
+    for (const [month, n] of byMonth(part)) out.set(month, (out.get(month) ?? 0) + n)
+  }
+  return out
+}
+
+const routedByMonth = (picks: MonthRow[], summons: MonthRow[]) => sumByMonth(picks, summons)
 
 function cumulative(months: string[], map: Map<string, number>): number[] {
   let run = 0
@@ -128,7 +158,11 @@ export async function buildRegistryStatsPrisma(prisma: PrismaDb): Promise<Regist
     suspended.length > 0
       ? `AND s.author_id NOT IN (${suspended.map((h) => `'${h.replace(/'/g, "''")}'`).join(',')})`
       : ''
-  const publicPred = `s.visibility = 'public' AND s.latest_hash IS NOT NULL AND s.moderation_status != 'unlisted' ${suspendedSql}`
+  // The public-skill predicate, per table alias: the adds queries below join
+  // `skills` under three different aliases in one statement.
+  const pubPred = (a: string) =>
+    `${a}.visibility = 'public' AND ${a}.latest_hash IS NOT NULL AND ${a}.moderation_status != 'unlisted' ${suspendedSql.replaceAll('s.author_id', `${a}.author_id`)}`
+  const publicPred = pubPred('s')
   const networkPred = `s.latest_hash IS NOT NULL AND s.moderation_status != 'unlisted' ${suspendedSql}`
 
   const [
@@ -141,6 +175,9 @@ export async function buildRegistryStatsPrisma(prisma: PrismaDb): Promise<Regist
     versionsMonths,
     subsMonths,
     followsMonths,
+    picksMonths,
+    summonsMonths,
+    savesMonths,
   ] = await Promise.all([
     prisma.$queryRawUnsafe<MonthRow[]>(
       `SELECT DATE_FORMAT(FROM_UNIXTIME(s.created_at), '%Y-%m') AS m, COUNT(*) AS n
@@ -184,6 +221,59 @@ export async function buildRegistryStatsPrisma(prisma: PrismaDb): Promise<Regist
       `SELECT DATE_FORMAT(FROM_UNIXTIME(created_at), '%Y-%m') AS m, COUNT(*) AS n
          FROM follows GROUP BY m`,
     ),
+    prisma.$queryRawUnsafe<MonthRow[]>(
+      `SELECT DATE_FORMAT(FROM_UNIXTIME(ts), '%Y-%m') AS m, COUNT(*) AS n
+         FROM events WHERE name = 'skill.route' GROUP BY m`,
+    ),
+    // `day` is a unix day number, not a timestamp.
+    prisma.$queryRawUnsafe<MonthRow[]>(
+      `SELECT DATE_FORMAT(FROM_UNIXTIME(day * 86400), '%Y-%m') AS m, SUM(count) AS n
+         FROM skill_summon_counts GROUP BY m`,
+    ),
+    // Saves: one row per (user, skill) the user put in their library, dated at
+    // the FIRST time they did it. Three ways a save happens, unioned then
+    // deduped, so Bob saving a skill into two of his own kits is one save and
+    // Bob + Mary saving the same skill is two.
+    //   1. a skill added to a kit the user owns (the auto "Saved" kit included).
+    //      `source_type = 'owned'` excludes repo-linked kits, whose membership
+    //      the mirror pipeline writes, not a person.
+    //   2. subscribing to a kit saves every skill it held AT THAT MOMENT
+    //      (`added_at <= created_at`), so a past month never drifts upward when
+    //      the curator adds an 11th skill.
+    //   3. an author kit is sized the same way, off what that author had
+    //      published then.
+    // A user's own skills never count: authorship is not adoption. Accounts
+    // without a claimed handle key on their id so they can't collapse together.
+    prisma.$queryRawUnsafe<MonthRow[]>(
+      `SELECT DATE_FORMAT(FROM_UNIXTIME(first_at), '%Y-%m') AS m, COUNT(*) AS n FROM (
+         SELECT saver, skill_id, MIN(ts) AS first_at FROM (
+           SELECT k.owner_id AS saver, ks.skill_id AS skill_id, ks.added_at AS ts
+             FROM kit_skills ks
+             JOIN kits k ON k.id = ks.kit_id
+             JOIN skills s ON s.id = ks.skill_id
+            WHERE k.source_type = 'owned' AND k.owner_id <> s.author_id AND ${publicPred}
+           UNION ALL
+           SELECT COALESCE(u.handle, CONCAT('#', u.id)) AS saver, ks2.skill_id, sub.created_at AS ts
+             FROM kit_subscriptions sub
+             JOIN users u ON u.id = sub.user_id
+             JOIN kit_skills ks2 ON ks2.kit_id = sub.kit_id AND ks2.added_at <= sub.created_at
+             JOIN skills s2 ON s2.id = ks2.skill_id
+            WHERE sub.kind = 'kit'
+              AND ${pubPred('s2')}
+              AND COALESCE(u.handle, '') <> s2.author_id
+           UNION ALL
+           SELECT COALESCE(u.handle, CONCAT('#', u.id)) AS saver, s3.id AS skill_id, sub.created_at AS ts
+             FROM kit_subscriptions sub
+             JOIN users u ON u.id = sub.user_id
+             JOIN skills s3 ON s3.author_id = sub.author_id AND s3.created_at <= sub.created_at
+            WHERE sub.kind = 'author'
+              AND ${pubPred('s3')}
+              AND COALESCE(u.handle, '') <> s3.author_id
+         ) every_save
+         GROUP BY saver, skill_id
+       ) first_save
+       GROUP BY m`,
+    ),
   ])
 
   const monthled = {
@@ -196,6 +286,8 @@ export async function buildRegistryStatsPrisma(prisma: PrismaDb): Promise<Regist
     versions: byMonth(versionsMonths),
     subscriptions: byMonth(subsMonths),
     follows: byMonth(followsMonths),
+    routed: routedByMonth(picksMonths, summonsMonths),
+    saves: byMonth(savesMonths),
   }
 
   const months = [...new Set(Object.values(monthled).flatMap((map) => [...map.keys()]))].sort()
@@ -209,7 +301,12 @@ export async function buildRegistryStatsPrisma(prisma: PrismaDb): Promise<Regist
     versions: cumulative(months, monthled.versions),
     subscriptions: cumulative(months, monthled.subscriptions),
     follows: cumulative(months, monthled.follows),
+    saves: cumulative(months, monthled.saves),
   }
+  // All-time saves: the last point of the cumulative series (0 before any month
+  // has data), so the card and its chart can never disagree.
+  const savesTotal = series.saves.at(-1) ?? 0
+  const routedSeries = cumulative(months, monthled.routed)
 
   const growth = months.map((month, i) => ({
     month,
@@ -270,7 +367,7 @@ export async function buildRegistryStatsPrisma(prisma: PrismaDb): Promise<Regist
   ])
 
   return {
-    totals,
+    totals: { ...totals, saves: savesTotal },
     growth,
     series,
     months,
@@ -279,6 +376,8 @@ export async function buildRegistryStatsPrisma(prisma: PrismaDb): Promise<Regist
       invocations: routeInvocations,
       picks: routePicks,
       summons: summonAgg._sum.count ?? 0,
+      routed: routePicks + (summonAgg._sum.count ?? 0),
+      routedSeries,
       topPickedSkills: topPicked.map((row) => ({
         skillRef: row.skill_ref,
         picks: Number(row.picks),
