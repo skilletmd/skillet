@@ -68,7 +68,7 @@ export async function authorClaimedPrisma(prisma: PrismaClient, handle: string):
 export interface SourceSyncOutcome {
     handle: string;
     repo: string;
-    status: 'ok' | 'failed' | 'denylisted' | 'not-attempted';
+    status: 'ok' | 'failed' | 'gone' | 'denylisted' | 'not-attempted';
     error?: string;
 }
 

@@ -22,7 +22,7 @@
 // (candidate screening burns the same core quota) and the run exits non-zero.
 import type { PrismaClient } from '@prisma/client';
 import { createPrismaClient, requireDatabaseUrl } from '../db/prisma-client.js';
-import { syncRepoSkillsPrisma, GitHubRateLimitError } from '../sync/sync-repo.js';
+import { syncRepoSkillsPrisma, GitHubRateLimitError, GitHubRepoGoneError } from '../sync/sync-repo.js';
 import { normalizeRepoKey } from '../lib/mirror-screen.js';
 import { loadSources, syncAllSourcesPrisma, type MirrorSource, type SyncAllResult, type SourceSyncOutcome } from './sync-sources.js';
 import { discoverMirrorCandidates, DISCOVERY_TOKEN_ENV, DEFAULT_MIN_QUALITY_SCORE, type DiscoverResult } from './discovery.js';
@@ -50,6 +50,9 @@ function isoDaysAgo(days: number): string {
 export interface Phase2Result {
     synced: number;
     failed: number;
+    /** Repos that 404 and were retired. Deliberately NOT counted in `failed`:
+     *  the retry can never succeed, so it must not hold the exit code red. */
+    gone: number;
     notAttempted: number;
     rateLimited: boolean;
     sources: SourceSyncOutcome[];
@@ -106,7 +109,7 @@ async function syncDiscoveredMirrors(prisma: PrismaClient, opts: {
     fetchImpl?: typeof fetch;
     blobStore: BlobStore;
 }): Promise<Phase2Result> {
-    const result: Phase2Result = { synced: 0, failed: 0, notAttempted: 0, rateLimited: false, sources: [] };
+    const result: Phase2Result = { synced: 0, failed: 0, gone: 0, notAttempted: 0, rateLimited: false, sources: [] };
     const seedKeys = new Set(
         opts.seeds.map((s) => normalizeRepoKey(s.repo)).filter((k): k is string => k != null),
     );
@@ -170,6 +173,23 @@ async function syncDiscoveredMirrors(prisma: PrismaClient, opts: {
                 }
                 console.error(`  ! GitHub rate limit reached; ${result.notAttempted} discovered mirrors not attempted`);
                 break;
+            }
+            if (err instanceof GitHubRepoGoneError) {
+                // Retiring it, not counting it as a failure. The repo is gone, so
+                // every future run would fail on it identically and the job's exit
+                // code would stay red for something nobody can fix. Phase 2 only
+                // picks up `live` rows, so this also stops the wasted daily call.
+                result.gone++;
+                result.sources.push({ handle: w.handle, repo: w.repo, status: 'gone', error: err.message });
+                console.error(`  ! @${w.handle} repo is gone (404); retiring it from the queue`);
+                if (!opts.dryRun) {
+                    await prisma.mirror_review_queue
+                        .updateMany({ where: { source_repo: w.repo, status: 'live' }, data: { status: 'gone' } })
+                        .catch((e: unknown) => {
+                            console.error(`    could not retire ${w.repo}: ${(e as Error).message}`);
+                        });
+                }
+                continue;
             }
             console.error(`  ! @${w.handle} failed: ${(err as Error).message}`);
             result.failed++;
@@ -274,7 +294,8 @@ export async function runNightlyMirrorOps(prisma: PrismaClient, opts: NightlyOpt
                     not_attempted: phase1.notAttempted, classified: phase1.classified,
                 },
                 phase2: phase2 ? {
-                    synced: phase2.synced, failed: phase2.failed, not_attempted: phase2.notAttempted,
+                    synced: phase2.synced, failed: phase2.failed, gone: phase2.gone,
+                    not_attempted: phase2.notAttempted,
                 } : null,
                 phase3: phase3 ? {
                     enqueued: phase3.enqueued.length, skipped: phase3.skipped.length,

@@ -9,11 +9,23 @@
  *   ... --force            # run even if one completed within MIN_INTERVAL_HOURS
  *
  * PM2 starts a `cron_restart` app IMMEDIATELY on (re)start as well as on the
- * schedule, so every `pm2 startOrReload` used to kick off a full crawl —
- * ~25 minutes of GitHub API burn for a job that had just run. The min-interval
- * guard below makes an accidental restart cost milliseconds instead. It is a
- * floor on frequency, not a lock: overlap is still handled by the MySQL
- * advisory lock inside runNightlyMirrorOps.
+ * schedule, so every `pm2 startOrReload` kicks off a full crawl — ~25 minutes
+ * of GitHub API burn nobody asked for. Two guards, because the first one alone
+ * had it backwards:
+ *
+ *   1. SCHEDULED HOUR. A deploy at any other hour exits in milliseconds. This
+ *      is the one that actually stops deploy-triggered crawls; keep the hour in
+ *      lockstep with `cron_restart` in ecosystem.config.cjs.
+ *   2. MIN INTERVAL. A floor on frequency, for a double-fire inside the hour.
+ *
+ * The min-interval guard was doing this job alone and could not: on deploy the
+ * stamp is usually stale, so the DEPLOY got the full crawl and the 06:00 cron
+ * then skipped as "too recent". Between 2026-08-22 and 2026-08-25 every single
+ * 06:00 firing skipped and every real run was a deploy. One missed by twelve
+ * minutes (11.8h since the last run, against a 12h floor).
+ *
+ * Neither is a lock: overlap is still handled by the MySQL advisory lock inside
+ * runNightlyMirrorOps.
  *
  * The logic lives in src/mirror-ops/nightly.ts (typechecked, tested):
  * phase 1 seed re-sync, phase 2 discovered-mirror re-sync, phase 3 discovery.
@@ -32,6 +44,9 @@ import { runNightlyMirrorOps } from '../src/mirror-ops/nightly.js';
 /** A completed run inside this window makes the next start a no-op. Half a day:
  *  comfortably under the 24h cron gap, so a real 06:00 firing never trips it. */
 const MIN_INTERVAL_HOURS = 12;
+/** Must match `cron_restart` for mirror-nightly in ecosystem.config.cjs. Local
+ *  hour, because that is what PM2's cron expression is evaluated in. */
+const SCHEDULED_HOUR = Number(process.env.SKILLET_MIRROR_HOUR ?? 6);
 
 /** Where the last completed run is stamped: beside the PM2 logs, so it is not a
  *  tracked file and survives a rebuild. Resolved from this file, not cwd, so a
@@ -68,6 +83,18 @@ async function main(): Promise<void> {
     const dryRun = process.argv.includes('--dry-run');
     const force = process.argv.includes('--force');
 
+    // Guard 1: only at the scheduled hour. PM2 gives the process no way to tell
+    // a cron restart from a deploy restart, so the clock is the signal.
+    const hour = new Date().getHours();
+    if (!force && !dryRun && hour !== SCHEDULED_HOUR) {
+        console.log(
+            `not the scheduled hour (now ${hour}:00, scheduled ${SCHEDULED_HOUR}:00); skipping. ` +
+                `Pass --force to run anyway.`,
+        );
+        return;
+    }
+
+    // Guard 2: and not twice within the window.
     const since = hoursSinceLastRun();
     if (!force && !dryRun && since !== null && since < MIN_INTERVAL_HOURS) {
         console.log(

@@ -140,12 +140,27 @@ function ghHeaders(token?: string): Record<string, string> {
         h.authorization = `Bearer ${token}`;
     return h;
 }
+/**
+ * The repo is not there any more: deleted, renamed, or gone private.
+ *
+ * Distinct from a transient failure because the retry never succeeds. A mirror
+ * we discovered months ago whose repo has since vanished would otherwise fail
+ * on every nightly run forever, and take the whole job's exit code with it.
+ */
+export class GitHubRepoGoneError extends Error {
+    constructor(public readonly url: string) {
+        super(`GitHub ${url} → HTTP 404 (repo gone)`);
+        this.name = 'GitHubRepoGoneError';
+    }
+}
+
 async function ghJson<T>(url: string, ctx: Pick<SyncContext, 'token' | 'fetchImpl'>): Promise<T> {
     const res = await ghFetch(url, { headers: ghHeaders(ctx.token) }, { fetchImpl: ctx.fetchImpl });
     if (!res.ok) {
         if (res.status === 403 && res.headers.get('x-ratelimit-remaining') === '0') {
             throw new GitHubRateLimitError();
         }
+        if (res.status === 404) throw new GitHubRepoGoneError(url);
         throw new Error(`GitHub ${url} → HTTP ${res.status}`);
     }
     return (await res.json()) as T;

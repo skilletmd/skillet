@@ -199,6 +199,10 @@ apps.push({
   exec_mode: "fork",
   interpreter: "node",
   env: registryEnv,
+  // Keep the hour in lockstep with SCHEDULED_HOUR in
+  // scripts/nightly-mirror-ops.ts. PM2 also starts this app on every
+  // `startOrReload`, so the script checks the clock to tell a deploy restart
+  // from a scheduled one and exits immediately on the former.
   cron_restart: "0 6 * * *",
   autorestart: false,
   error_file: path.join(root, "logs/mirror-nightly-error.log"),
