@@ -77,6 +77,10 @@ export interface SubscribeEvent {
     target_kind: 'kit' | 'author';
     name: string;
     owner: string;
+    /** The owner's avatar, so a card rendered for this event draws the real
+     *  identity instead of the default face (the actor's avatar is a different
+     *  person — the subscriber, not the owner). */
+    owner_avatar_url?: string | null;
     href: string;
     skill_count: number;
     /** Kit-only — enable a rich hover preview (id for actions, blurb, reach). */

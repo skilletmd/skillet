@@ -223,19 +223,22 @@ export async function subscribeEventRowsPrisma(
       kit_id: string
       name: string
       owner: string
+      owner_avatar_url: string | null
       description: string | null
       skill_count: number | bigint
       subscriber_count: number | bigint
     }>
   >(
     `SELECT u.handle AS actor, sub.created_at AS at, k.id AS kit_id,
-            k.name AS name, k.owner_id AS owner, k.description AS description,
+            k.name AS name, k.owner_id AS owner, ko.avatar_url AS owner_avatar_url,
+            k.description AS description,
             (SELECT COUNT(*) FROM kit_skills ks WHERE ks.kit_id = k.id) AS skill_count,
             (SELECT COUNT(*) FROM kit_subscriptions ks2
               WHERE ks2.kit_id = k.id AND ks2.kind = 'kit') AS subscriber_count
        FROM kit_subscriptions sub
        JOIN users u ON u.id = sub.user_id
        JOIN kits k ON k.id = sub.kit_id
+       LEFT JOIN authors ko ON ko.id = k.owner_id
        WHERE sub.kind = 'kit' AND k.visibility = 'public' AND u.handle IS NOT NULL
          AND u.suspended_at IS NULL
          AND k.owner_id NOT IN (${SUSPENDED_HANDLES_SUBQUERY}) ${scope}
@@ -250,11 +253,13 @@ export async function subscribeEventRowsPrisma(
       actor: string
       at: number | bigint
       owner: string
+      owner_avatar_url: string | null
       name: string
       skill_count: number | bigint
     }>
   >(
     `SELECT u.handle AS actor, sub.created_at AS at, a.id AS owner, a.name AS name,
+            a.avatar_url AS owner_avatar_url,
             (SELECT COUNT(*) FROM skills s
               WHERE s.author_id = a.id AND s.visibility = 'public' AND s.latest_hash IS NOT NULL) AS skill_count
        FROM kit_subscriptions sub
@@ -298,6 +303,7 @@ export async function subscribeEventRowsPrisma(
         target_kind: 'kit',
         name: r.name,
         owner: r.owner,
+        owner_avatar_url: r.owner_avatar_url,
         href: `/kits/${r.kit_id}`,
         skill_count: Number(r.skill_count),
         kit_id: r.kit_id,
@@ -317,6 +323,7 @@ export async function subscribeEventRowsPrisma(
         target_kind: 'author',
         name: r.name || r.owner,
         owner: r.owner,
+        owner_avatar_url: r.owner_avatar_url,
         href: `/${r.owner}/kit`,
         skill_count: Number(r.skill_count),
       },

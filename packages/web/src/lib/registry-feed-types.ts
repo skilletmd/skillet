@@ -50,6 +50,9 @@ export interface FeedSubscribeEvent {
     kind: 'author' | 'kit'
     name: string
     owner: string
+    /** The owner's avatar. The row's actorAvatarUrl belongs to the subscriber,
+     *  a different person, so the card byline needs its own. */
+    ownerAvatarUrl: string | null
     href: string
     skillCount: number
     /** Kit-only — powers the rich hover preview. */

@@ -69,6 +69,7 @@ function KitDiscoveryCard({
       href={target.href}
       name={target.name}
       owner={target.owner}
+      makerAvatarUrl={target.ownerAvatarUrl}
       skillCount={target.skillCount}
       skillCategories={target.skillCategories ?? []}
       subscriberCount={target.subscriberCount}
@@ -158,6 +159,7 @@ function GroupedSubscribeRow({
                       href={e.target.href}
                       name={e.target.name}
                       owner={e.target.owner}
+                      makerAvatarUrl={e.target.ownerAvatarUrl}
                       skillCount={e.target.skillCount}
                       skillCategories={e.target.skillCategories ?? []}
                     />
@@ -169,6 +171,7 @@ function GroupedSubscribeRow({
                     href={e.target.href}
                     name={e.target.name}
                     owner={e.target.owner}
+                    makerAvatarUrl={e.target.ownerAvatarUrl}
                     skillCount={e.target.skillCount}
                     skillCategories={e.target.skillCategories ?? []}
                   />
@@ -178,7 +181,7 @@ function GroupedSubscribeRow({
                   key={e.target.href}
                   content={
                     <PersonDirectoryCard
-                      person={minimalPerson(e.target.owner, e.target.name, null)}
+                      person={minimalPerson(e.target.owner, e.target.name, e.target.ownerAvatarUrl)}
                       isAuthed={isAuthed}
                     />
                   }
@@ -186,7 +189,7 @@ function GroupedSubscribeRow({
                   <PersonDirectoryCard
                     size="xs"
                     isAuthed={isAuthed}
-                    person={minimalPerson(e.target.owner, e.target.name, null)}
+                    person={minimalPerson(e.target.owner, e.target.name, e.target.ownerAvatarUrl)}
                   />
                 </EntityHoverCard>
               ),

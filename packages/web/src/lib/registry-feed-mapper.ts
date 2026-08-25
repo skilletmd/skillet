@@ -35,6 +35,7 @@ export interface FeedEventResponse {
     target_kind?: string
     name: string
     owner: string
+    owner_avatar_url?: string | null
     href: string
     skill_count?: number
     kit_id?: string
@@ -90,6 +91,7 @@ export function mapDiscoverFeedEvents(raw: FeedEventResponse[] | undefined): Fee
             kind: e.subscribe.target_kind === 'author' ? 'author' : 'kit',
             name: e.subscribe.name,
             owner: e.subscribe.owner,
+            ownerAvatarUrl: e.subscribe.owner_avatar_url ?? null,
             href: e.subscribe.href,
             skillCount: e.subscribe.skill_count ?? 0,
             kitId: e.subscribe.kit_id,
