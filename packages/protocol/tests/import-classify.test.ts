@@ -78,6 +78,24 @@ describe('isCoupledSkillMarkdown', () => {
     assert.equal(isCoupledSkillMarkdown('e.g. path/to/.../thing'), false)
   })
 
+  it('does NOT flag a markdown link to a sibling skill (a citation)', () => {
+    // Jakubantalik/transitions.dev: two standalone skills, each with its own
+    // _root.css, tipped to `unified` by one line of prose. A sibling's SKILL.md
+    // is that skill's entry point, not an asset this one loads.
+    assert.equal(
+      isCoupledSkillMarkdown('An **add-on** to the [`transitions-dev`](../transitions-dev/SKILL.md) skill.'),
+      false,
+    )
+    assert.equal(isCoupledSkillMarkdown('see [polish](../../other/SKILL.md) too'), false)
+  })
+
+  it('still flags a shared asset alongside a sibling citation', () => {
+    assert.equal(
+      isCoupledSkillMarkdown('[a](../sibling/SKILL.md) and tokens in ../shared/_root.css'),
+      true,
+    )
+  })
+
   it('does NOT flag a self-contained skill (SKILL_DIR-relative refs)', () => {
     assert.equal(isCoupledSkillMarkdown('run "$SKILL_DIR/scripts/review.py" and references/personas/*'), false)
   })

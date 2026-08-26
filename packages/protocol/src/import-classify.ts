@@ -76,19 +76,38 @@ export function isExcludedDiscoveryPath(path: string): boolean {
 }
 
 /**
+ * A markdown link whose target is a sibling skill's own SKILL.md, e.g.
+ * ``[`transitions-dev`](../transitions-dev/SKILL.md)``.
+ *
+ * This is a citation, not a dependency. A sibling's SKILL.md is that skill's
+ * entry point, which the runtime supplies when the reader installs it; nothing
+ * here loads it as an asset. Link syntax is the tell: it is written to be
+ * followed by a person reading the docs. A bare instruction to go read the file
+ * (`read ../sibling/SKILL.md`) is deliberately NOT matched, because that one is
+ * telling the agent to open a path that will not exist.
+ */
+const SIBLING_SKILL_LINK = /\]\(\s*(?:\.\.\/)+[^)\s]*SKILL\.md\s*\)/gi;
+
+/**
  * A skill is "coupled" when its SKILL.md references a path outside its own
  * folder (a `../` segment) — it depends on a sibling skill or a shared dir, so
  * it only resolves when imported together with the rest of the repo.
  *
- * The negative lookbehind excludes an ellipsis (`.../`) — a prose/example
- * placeholder like `/tmp/.../<run-id>/`, whose trailing `../` is not a parent
- * reference. Without it, a single illustrative ellipsis anywhere in the markdown
- * mis-flags a self-contained skill as coupled and tips the whole repo to
- * `unified` import (blob), which is exactly what everyinc/compound-engineering's
- * ce-code-review did — its only `../` was `/tmp/.../ce-code-review/<run-id>/`.
+ * Two kinds of `../` are excluded, both because they cost a correct import.
+ * Getting this wrong is expensive in one direction only: a false positive
+ * silently turns a repo of well-named skills into one blob named after the repo.
+ *
+ * 1. An ellipsis (`.../`) — a prose placeholder like `/tmp/.../<run-id>/`, whose
+ *    trailing `../` is not a parent reference. everyinc/compound-engineering's
+ *    ce-code-review tipped its whole repo to `unified` on that alone.
+ * 2. A markdown link to a sibling skill's SKILL.md. Jakubantalik/transitions.dev
+ *    was flagged coupled on one line of prose, "An add-on to the
+ *    [`transitions-dev`](../transitions-dev/SKILL.md) skill", while the repo
+ *    shows the opposite intent: both skills ship their own `_root.css`, with
+ *    different contents, so that each one stands alone.
  */
 export function isCoupledSkillMarkdown(markdown: string): boolean {
-  return /(?<!\.)\.\.\//.test(markdown);
+  return /(?<!\.)\.\.\//.test(markdown.replace(SIBLING_SKILL_LINK, ''));
 }
 
 /** A real `skills/x` dir is more canonical than a `plugins/<tool>/skills/x` mirror. */
