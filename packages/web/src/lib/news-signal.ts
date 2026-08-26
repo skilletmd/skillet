@@ -161,6 +161,7 @@ export function storyFeedEvents(limit?: number): FeedStoryEvent[] {
       kind: 'story' as const,
       id: post.slug,
       storyKind: post.storyKind ?? 'story',
+      subject: post.subject,
       headline: post.title,
       summary: post.description,
       at: post.publishedAt ? Math.floor(new Date(post.publishedAt).getTime() / 1000) || 0 : 0,

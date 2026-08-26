@@ -49,17 +49,17 @@ const DRAFT_ONLY = process.env.STORY_DRAFT_ONLY === '1'
 const MAX_SKILLS = Number(process.env.STORY_MAX_SKILLS ?? 8)
 const MAX_NEWS = Number(process.env.STORY_MAX_NEWS ?? 6)
 /**
- * A runaway guard, not an editorial constraint.
+ * A card is scanned, so it is short.
  *
- * Cards were capped at 280 to stop a body that covered six subjects. That was
- * the wrong lever: the fix was one subject per card, which clustering now
- * handles, and once the writer started reading the repo the good cards were the
- * long ones. A tight cap then began costing finished cards for one character.
- *
- * So length follows the material and this only catches a body that has plainly
- * run away. It should almost never fire.
+ * This number has moved twice and both moves were informative. A hard 280 was
+ * killing finished cards for one character over, so it came off entirely; with
+ * no ceiling at all the writer used the repo to justify six sentences and the
+ * cards stopped being readable. TARGET is what the writer is asked for, MAX is
+ * where one is rejected and rewritten, and the gap between them is what stops a
+ * good card dying over punctuation.
  */
-const MAX_BODY = 900
+const BODY_TARGET = 320
+const MAX_BODY = 420
 
 
 const MODEL = 'claude-opus-5'
@@ -218,6 +218,42 @@ async function classifyPosts(posts) {
  *  the model returns category labels ("Skill authors ship packs..."), which sit
  *  next to these in one feed and read as the filler between the real stories.
  *  Examples move it further than any adjective in the instruction did. */
+/** Mechanics every skill shares. A card that spends its body on these has said
+ *  nothing: "installs with npx skills add X, then runs as a slash command" is
+ *  true of the entire registry. The install line belongs on an install button,
+ *  not in prose the reader has to get past to find out what the thing does. */
+const BOILERPLATE =
+  /npx\s+skills\s+add|skills?\s+add\s+[\w.-]+\/|slash[- ]command|\/[a-z-]+\s+(?:command|invocation)|drop(?:ping|s)?\s+it\s+in|(?:it\s+)?(?:is|ships|comes)\s+(?:as\s+)?a\s+(?:single\s+)?markdown\s+file|add\s+it\s+to\s+your\s+(?:project|repo)/i
+
+/**
+ * The register, taken from what Skillet already publishes.
+ *
+ * Three failures put this here. Without the repo the writer wrote install
+ * mechanics; with the repo it transcribed the spec; fixing that pushed it into
+ * a design-blog register straining for a line. The register was never stated,
+ * so it drifted every time the framing moved.
+ *
+ * The house voice is plainer than any of those attempts. The docs are plain
+ * declarative second person ("Follow to watch. Add to run"), and the
+ * hand-written stories are flatter still: two sentences with a turn and the
+ * verb doing the work. That is trade press. The information carries the
+ * sentence and the writing gets out of the way.
+ */
+const VOICE = [
+  'VOICE. Skillet Daily is a trade brief. Closer to Bloomberg than to a design blog.',
+  '- Plain declarative sentences. The verb does the work: shipped, measured, rejects,',
+  '  cuts, pulls. Never reach for a better-sounding word than the accurate one.',
+  '- Say it the way you would say it out loud to a colleague.',
+  '- NO lyricism. No metaphor for its own sake, no cadence, no lists of three that',
+  '  exist because three sounds good. "black, white and air", "until the product',
+  '  shots carry it" are both banned. If a phrase would please a copywriter, cut it.',
+  '- No adjective doing emotional work: quiet, expensive, beautiful, elegant,',
+  '  powerful, seamless, delightful. Say what it does instead.',
+  '- Numbers exact and attributed. Never rounded up for effect.',
+  '- Never sell. We publish Skillet and we cover everyone, including work that',
+  '  competes with us. Report it; do not rate it.',
+]
+
 const NEWS_HEADLINES = [
   "Shopify's CEO pushed back on Claude Code reading only CLAUDE.md. Anthropic answered the same afternoon.",
   'NVIDIA measured whether security scans predict skill quality. They correlate at p = 0.14.',
@@ -230,104 +266,73 @@ const NEWS_HEADLINES = [
  *  as the one to add to your harness" is the failure this exists to prevent:
  *  every word about the pitch, none about what the thing does. */
 const SKILL_HEADLINES = [
-  'Agent-built pages all look agent-built. /scandinavian-design gives one a point of view.',
-  'Ponytail answers a date-picker request with a native input instead of three dependencies.',
-  'transitions.dev replaces the durations your agent guessed at with 32 tested transitions.',
+  '/scandinavian-design cleans up any site to look as tidy as an IKEA catalogue',
+  'Ponytail makes an agent reach for the platform before a dependency and write the short version',
+  'transitions.dev replaces hand-written CSS animation with 32 ready transitions',
 ]
 
 /**
- * What a skeptical practitioner needs, in order.
+ * The two ways the headline has failed, shown as a pair.
  *
- * The reader is deciding whether to install this, and they have seen a hundred
- * skills. A card that opens on mechanism ("restyles a surface in monochrome")
- * makes them work out the problem it solves for themselves, and most will not
- * bother. Open on the problem they already have.
- *
- * The evidence line is the one that earns trust. Almost no skill ships any, so
- * saying which ones do, and saying plainly when one does not, is the single
- * most useful sentence we can add to a link someone could have found on X.
+ * Both are real output. Spec-transcription came from giving the writer the
+ * repository; the hook came from correcting that too hard. The rule is easy to
+ * see and hard to state, so it ships as examples.
  */
-const CARD_SHAPE = [
-  'SHAPE. Four beats, in this order. One or two sentences each, not labelled.',
-  '  1. THE MOMENT. When would I reach for this? Name the problem I already have,',
-  '     in terms I would recognise from my own work. Never open on mechanism.',
-  '  2. WHAT IT DOES about that, with the one concrete detail that shows the',
-  '     author thought it through rather than prompted it into existence.',
-  '  3. EVIDENCE. Tests, before-and-after, a benchmark with its conditions, real',
-  '     usage. If the repo shows none, say so plainly: most skills ship none, and',
-  '     a reader deciding between two of them needs to know which is which.',
-  '  4. WHO IT IS NOT FOR, or what it decides for you that you may not want',
-  '     decided. Never omit this to be nice.',
-]
-
-/**
- * The register, taken from what Skillet already publishes.
- *
- * Two failures put this here. Without the repo the writer wrote install
- * mechanics; with the repo it transcribed the spec. Fixing the second pushed it
- * into a third: a design-blog register, straining for a line. "strips a page
- * back to black, white and air until the product shots carry it" is a
- * copywriter writing, not a reporter reporting, and it sits in a feed next to
- * "NVIDIA measured whether security scans predict skill quality. They correlate
- * at p = 0.14."
- *
- * The house voice is plainer than any of those attempts. It is trade press: the
- * information carries the sentence, and the writing gets out of the way.
- */
-const VOICE = [
-  'VOICE. Skillet Daily is a trade brief. Closer to Bloomberg than to a design blog.',
-  '- Plain declarative sentences. The verb does the work: shipped, measured, rejects,',
-  '  cuts, pulls. Never reach for a better-sounding word than the accurate one.',
-  '- Two short sentences with a turn beat one long clever one.',
-  '- NO lyricism. No metaphor, no cadence for its own sake, no lists of three that',
-  '  exist because three sounds good. "black, white and air", "until the product',
-  '  shots carry it", "the quiet, expensive look of a Copenhagen studio" are all',
-  '  banned. If a phrase would please a copywriter, cut it.',
-  '- No adjective doing emotional work: quiet, expensive, beautiful, elegant,',
-  '  powerful, seamless, delightful. Say what it does instead.',
-  '- Numbers exact and attributed. Never rounded up for effect.',
-  '- Never sell. We publish Skillet and we cover everyone, including work that',
-  '  competes with us. Report it; do not rate it.',
-]
-
-/** The failure that repo access introduced. Reading the README gave the writer
- *  implementation detail, and it started transcribing the spec instead of
- *  deciding what mattered. Shown as a pair, because the rule is hard to state
- *  and obvious to see. */
-const SPEC_TRANSCRIPTION = [
+const HEADLINE_CALIBRATION = [
   'BAD:  /scandinavian-design rebuilds a surface on black, white and alpha-black',
   '      tones with no gray colour casts',
-  '      "Intermediate shades are built by layering alpha black over white, so',
-  '      nothing picks up a warm or cool tint. Product imagery is left to carry',
-  '      the expression while the interface around it stays quiet."',
-  'WHY:  That is the README in different words. It describes a colour technique.',
-  '      Nobody installs a skill because of how it derives midtones.',
-  'ALSO BAD: /scandinavian-design strips a page back to black, white and air',
-  '      until the product shots carry it',
-  'WHY:  Right subject, wrong register. That is a copywriter reaching for a',
-  '      line. Trade press does not do cadence.',
-  'ALSO BAD: /scandinavian-design restyles a surface in monochrome. It rejects',
-  '      edits argued only on style.',
-  'WHY:  Opens on mechanism. The reader has to work out for themselves what',
-  '      problem this solves, and no evidence is offered either way.',
-  'GOOD: Agent-built pages all look agent-built. /scandinavian-design gives one',
+  'WHY:  The README in different words. Nobody installs a skill because of how',
+  '      it derives midtones.',
+  'BAD:  Agent-built pages all look agent-built. /scandinavian-design gives one',
   '      a point of view.',
-  '      "Ask an agent for a landing page and you get the same soft gradients',
-  '      everyone else got. This one commits: monochrome, heavy spacing, the',
-  '      product shots doing the work, and it will rewrite layout rather than',
-  '      only repaint. It argues back when a change is style for its own sake.',
-  '      Zakariasson ran it against ten live sites and kept the suggestions he',
-  '      rejected in the repo, which is more evidence than most skills ship.',
-  '      All ten are marketing pages, so it has little to say about dense app',
-  '      UI."',
+  'WHY:  A hook. After two sentences the reader still does not know what the',
+  '      skill is or what it works on. Never make them wait for it.',
+  'GOOD: /scandinavian-design cleans up any site to look as tidy as an IKEA',
+  '      catalogue',
+  'WHY:  Says what it is in words someone would use out loud. A reference the',
+  '      reader already holds does more work than an accurate adjective.',
+  '      Reach for one when it fits; never force one that does not.',
+  '',
+  'Body for that headline:',
+  '      "A design skill that takes a page and cuts it back to black, white and',
+  '      heavy spacing, rewriting layout rather than only recolouring.',
+  '      Zakariasson tested it on ten live sites and kept the before-and-after',
+  '      captures plus the suggestions he rejected, which is more than most',
+  '      skills ship. All ten were marketing pages, so it has little to say',
+  '      about dense app UI."',
 ]
 
-/** Mechanics every skill shares. A card that spends its body on these has said
- *  nothing: "installs with npx skills add X, then runs as a slash command" is
- *  true of the entire registry. The install line belongs on an install button,
- *  not in prose the reader has to get past to find out what the thing does. */
-const BOILERPLATE =
-  /npx\s+skills\s+add|skills?\s+add\s+[\w.-]+\/|slash[- ]command|\/[a-z-]+\s+(?:command|invocation)|drop(?:ping|s)?\s+it\s+in|(?:it\s+)?(?:is|ships|comes)\s+(?:as\s+)?a\s+(?:single\s+)?markdown\s+file|add\s+it\s+to\s+your\s+(?:project|repo)/i
+/**
+ * The shape of a skill card.
+ *
+ * Three sentences, because a feed card is scanned. Four beats produced six
+ * sentences and a card nobody finishes; the beats were right and the room they
+ * were given was not.
+ *
+ * The first sentence has to say plainly what the thing is. Two attempts failed
+ * here in opposite directions: "restyles a surface in monochrome" opened on
+ * mechanism and left the reader to work out the point, and "Agent-built pages
+ * all look agent-built" was a hook that never said what the skill was at all.
+ * The reader wants a sentence they could repeat to a colleague.
+ *
+ * The evidence line earns the page. Almost no skill ships any, so naming which
+ * do, and saying plainly when one does not, is the most useful thing we can add
+ * to a link the reader could have found on X themselves.
+ */
+const CARD_SHAPE = [
+  'SHAPE. Three sentences. Not four, not six. Each one does a different job:',
+  '  1. WHAT IT IS and what you get. Plain and complete: name the kind of thing',
+  '     it is, what it works on, and what changes. A reader should be able to',
+  '     repeat this sentence to a colleague and have them understand it.',
+  '     NOT a hook. NOT a scene ("Ask an agent for X and you get Y..."). NOT a',
+  '     riddle the next sentence solves. Say the thing.',
+  '  2. THE ONE DETAIL that decides it, plus what evidence exists. Tests, a',
+  '     benchmark with its conditions, real usage. If the repo shows none, say',
+  '     so: most ship none, and a reader choosing between two needs to know.',
+  '  3. THE CATCH. Who it is not for, or what it decides for you. Never omit',
+  '     this to be nice.',
+  'You will know far more than fits. Choosing what to leave out IS the work.',
+]
 
 function promptFor(posts, isSkill, context = []) {
   const rendered = posts
@@ -358,8 +363,13 @@ function promptFor(posts, isSkill, context = []) {
         `- Write the OUTCOME, not the mechanism. What is different about my ` +
         `project after I use this? Someone chooses a skill for what they get, ` +
         `never for how it works inside.\n` +
+        `- Plain spoken English, the way you would describe it to a colleague. ` +
+        `A comparison the reader already holds ("as tidy as an IKEA catalogue") ` +
+        `beats a precise adjective, when one fits.\n` +
         `- Under 110 chars. Examples of the bar:\n` +
         SKILL_HEADLINES.map((h) => `    ${h}\n`).join('') +
+        `\n` +
+        HEADLINE_CALIBRATION.map((line) => `${line}\n`).join('') +
         `\nNEVER write the mechanics. Every skill installs the same way and every ` +
         `skill runs the same way, so saying it carries no information:\n` +
         `    BANNED: "installs with npx skills add author/name"\n` +
@@ -368,17 +378,16 @@ function promptFor(posts, isSkill, context = []) {
         `The reader gets an install button. Spend the words on the thing itself.\n` +
         `\n` +
         CARD_SHAPE.map((line) => `${line}\n`).join('') +
-        `\n- Write it for someone who has already seen a hundred skills this ` +
-        `month and installs almost none of them. They are not asking what it is. ` +
-        `They are asking whether it is worth their afternoon.\n` +
+        `\n- Write it for someone who has seen a hundred skills this month and ` +
+        `installed almost none. Tell them plainly what it is, then give them ` +
+        `what they need to decide whether it is worth their afternoon.\n` +
         `- You are an editor, not a technical writer. You read the repository to ` +
         `UNDERSTAND the skill. Never translate it back. No class names, token ` +
         `names, config keys, file layouts, mode names or internal vocabulary ` +
         `unless that specific detail is the reason someone would want it.\n` +
         `- A reader should finish the card knowing whether they want this. If ` +
         `every sentence is true but they still cannot tell, it failed.\n\n` +
-        SPEC_TRANSCRIPTION.map((line) => `${line}\n`).join('') +
-        `\n`
+        ``
       : `This is a NEWS post: a lab, model, runtime, company, paper or argument ` +
         `in the field.\n\nHEADLINE:\n` +
         `- Name the actor and what they did. Specific nouns and real numbers ` +
@@ -391,9 +400,8 @@ function promptFor(posts, isSkill, context = []) {
     `- ONE subject. If the material covers several unrelated things, pick the ` +
     `single most newsworthy one and ignore the rest. A body that lists three ` +
     `things is a list, and a reader skips a list.\n` +
-    `- Body: as long as it needs to be and not a sentence longer. Most land in ` +
-    `two to five sentences. Never pad to a length, and never compress a real ` +
-    `detail into shorthand to save room.\n` +
+    `- Body: THREE SENTENCES, around ${BODY_TARGET} characters. This is a card ` +
+    `in a scanned feed. A fourth sentence means you did not choose.\n` +
     `- STRUCTURE. Length is earned by organisation, not tolerated in spite of ` +
     `it. A long block of undifferentiated fact is worse than a short one:\n` +
     `    * The first sentence carries the single most concrete, most surprising ` +
@@ -590,6 +598,22 @@ const sourcesFrom = (posts) =>
     avatarUrl: p.avatarUrl ?? null,
   }))
 
+/**
+ * What the card offers to add.
+ *
+ * The extracted name and the repo can disagree: one post yielded the skill name
+ * "linkedin" beside the repo howaboua-pi-stuff, because the resolver picks up
+ * any slash-command in the text and a post can mention more than one thing.
+ * The repo is the half the import path can actually resolve, so when the two do
+ * not corroborate each other the name is dropped and the repo names the card.
+ */
+function subjectFor(posts, context) {
+  const repo = context[0]?.repo ?? posts.flatMap(reposFor)[0] ?? null
+  const named = posts.find((p) => p.unknownSkill)?.unknownSkill ?? null
+  const corroborated = named && (!repo || repo.toLowerCase().includes(named.toLowerCase()))
+  return { slug: corroborated ? named : null, repo }
+}
+
 async function main() {
   if (!API_KEY && !DRY_RUN) {
     console.warn('ANTHROPIC_API_KEY unset; no stories written.')
@@ -622,12 +646,14 @@ async function main() {
   const today = new Date().toISOString().slice(0, 10)
   const stmt = db.prepare(`
     INSERT INTO posts (slug, title, description, author, published_at, updated_at,
-                       tags_json, status, content, featured, sources_json, story_kind)
-    VALUES (?, ?, ?, 'Skillet Daily', ?, ?, ?, ?, ?, 0, ?, ?)
+                       tags_json, status, content, featured, sources_json, story_kind,
+                       subject_json)
+    VALUES (?, ?, ?, 'Skillet Daily', ?, ?, ?, ?, ?, 0, ?, ?, ?)
     ON CONFLICT(slug) DO UPDATE SET
       title=excluded.title, description=excluded.description,
       updated_at=excluded.updated_at, content=excluded.content,
-      sources_json=excluded.sources_json, story_kind=excluded.story_kind
+      sources_json=excluded.sources_json, story_kind=excluded.story_kind,
+      subject_json=excluded.subject_json
   `)
 
   let written = 0
@@ -638,6 +664,9 @@ async function main() {
     const context = isSkill ? await contextFor(posts) : []
     const story = await writeStory(posts, isSkill, context)
     if (!story) continue
+    // What the card offers to add. Prefer the repo we actually read, since that
+    // is the one the import path can resolve; fall back to the extracted name.
+    story.subject = isSkill ? subjectFor(posts, context) : null
     const sources = sourcesFrom(posts)
     story.headline = normalizeHandles(story.headline, sources)
     story.summary = normalizeHandles(story.summary, sources)
@@ -653,6 +682,7 @@ async function main() {
       story.summary,
       JSON.stringify(sources),
       story.kind,
+      story.subject ? JSON.stringify(story.subject) : null,
     )
     written += 1
     const read = context.length ? `, read ${context.map((c) => c.repo).join(' ')}` : ''

@@ -117,8 +117,10 @@ export interface FeedSignalEvent {
 export interface FeedStoryEvent {
   kind: 'story'
   id: string
-  /** Story type, shown as the kicker: launch, labs, research, debate, trust. */
+  /** Story type, shown as the kicker: skills or news. */
   storyKind: string
+  /** The skill a skills story is about, so the card can offer to add it. */
+  subject?: { slug: string | null; repo: string | null }
   headline: string
   summary: string
   at: number

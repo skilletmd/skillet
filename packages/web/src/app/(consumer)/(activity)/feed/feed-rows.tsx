@@ -281,6 +281,21 @@ function StoryEventRow({ event }: { event: FeedStoryEvent }) {
             <p className="mt-2 text-sm leading-relaxed text-(--ink-2)">{event.summary}</p>
           </Link>
 
+          {/* A skills card that describes a skill and offers no way to get it is
+              a dead end: the reader we just convinced has nowhere to go. Sits
+              above the sources, because adding it is the action and the sources
+              are the footnote. */}
+          {event.subject?.slug || event.subject?.repo ? (
+            <PendingSkillAttachment
+              slug={event.subject.slug ?? event.subject.repo!.split('/')[1]!}
+              // Sources can be 'web', which is not a Network the badge knows.
+              // Where it was spotted is incidental on a story card anyway.
+              network={event.sources[0]?.network === 'web' ? 'x' : (event.sources[0]?.network ?? 'x')}
+              spottedBy={event.sources[0]?.handle ?? ''}
+              repo={event.subject.repo}
+            />
+          ) : null}
+
           <div className="border-t border-(--line)">
             <p className="px-4 pt-3 font-mono text-2xs tracking-[0.08em] uppercase text-(--ink-2)">
               {event.sources.length} {event.sources.length === 1 ? 'source' : 'sources'}

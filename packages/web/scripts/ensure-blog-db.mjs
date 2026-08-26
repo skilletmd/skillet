@@ -40,7 +40,7 @@ db.exec(`
 // Columns added after the table's first release. CREATE TABLE IF NOT EXISTS is a
 // no-op on an existing table, so an already-populated blog.db never grows them.
 // Mirrored by addColumn() in src/lib/blog-db.ts.
-for (const [name, type] of [["seo_title", "TEXT"]]) {
+for (const [name, type] of [["seo_title", "TEXT"], ["subject_json", "TEXT"]]) {
   const cols = db.prepare("SELECT name FROM pragma_table_info('posts')").all();
   if (!cols.some((c) => c.name === name)) {
     db.exec(`ALTER TABLE posts ADD COLUMN ${name} ${type}`);

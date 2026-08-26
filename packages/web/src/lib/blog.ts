@@ -4,6 +4,13 @@ export type PostStatus = 'draft' | 'published'
 
 /** One cited source under a story. Network drives the mark; label says what the
  *  source contributes ("Anthropic's reply"); detail carries reach. */
+/** The skill a story is about. `slug` is the name as written; `repo` is
+ *  owner/name, which is what the import path needs when we do not carry it. */
+export interface StorySubject {
+  slug: string | null
+  repo: string | null
+}
+
 export interface StorySource {
   network: 'x' | 'hn' | 'reddit' | 'web'
   handle: string
@@ -36,6 +43,9 @@ export interface PostFrontmatter {
   /** Present on story posts; empty for ordinary blog posts. */
   sources?: StorySource[]
   storyKind?: string
+  /** What a skill story is ABOUT, so the card can offer to add it. A story
+   *  that describes a skill and gives no way to get it is a dead end. */
+  subject?: StorySubject
 }
 
 export interface Post extends PostFrontmatter {
@@ -61,6 +71,7 @@ interface PostRow {
   content: string
   sources_json: string | null
   story_kind: string | null
+  subject_json: string | null
 }
 
 function calcReadTime(content: string): number {
@@ -95,6 +106,22 @@ function rowToPost(row: PostRow): Post {
     content: row.content,
     sources: parseSources(row.sources_json),
     storyKind: row.story_kind ?? undefined,
+    subject: parseSubject(row.subject_json),
+  }
+}
+
+/** The skill a story is about, when it is about one. Same no-throw contract as
+ *  parseSources: a malformed blob costs an add button, never the feed. */
+function parseSubject(raw: string | null): StorySubject | undefined {
+  if (!raw) return undefined
+  try {
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return undefined
+    const slug = typeof parsed.slug === 'string' ? parsed.slug : null
+    const repo = typeof parsed.repo === 'string' ? parsed.repo : null
+    return slug || repo ? { slug, repo } : undefined
+  } catch {
+    return undefined
   }
 }
 

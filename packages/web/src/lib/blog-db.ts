@@ -64,6 +64,7 @@ export function migrate(db: DatabaseSync): void {
   addColumn(db, 'sources_json', 'TEXT')
   // Story kind, driving the kicker: launch, labs, research, debate, trust.
   addColumn(db, 'story_kind', 'TEXT')
+  addColumn(db, 'subject_json', 'TEXT')
 }
 
 /**
