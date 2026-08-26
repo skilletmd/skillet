@@ -3,6 +3,7 @@
 import { SubscribeAuthorButton } from '@/components/kits/subscribe-author-button'
 import { DeliveryBar, type DeliveryState } from '@/components/install/delivery-bar'
 import { useMyKitsOptional } from '@/components/kits/my-kits-context'
+import { DETAIL_ACTION_FOOTER, DETAIL_ACTION_SLOT } from '@/components/detail-header'
 
 /**
  * The author-kit page's Add button, and the bar that answers it.
@@ -37,25 +38,28 @@ export function AuthorKitActionRow({
 
   const state: DeliveryState = !added ? 'none' : runtimes.length === 0 ? 'install' : 'run'
 
+  // Two pieces on DetailHeader's grid, same as the named kit: button beside the
+  // name, bar full width underneath.
   return (
-    // w-full for the same reason as the kit page: this is a flex child of the
-    // header's action slot, and sized to content the bar measures differently
-    // than the identical bar on a skill page.
-    <div className="w-full">
-      <SubscribeAuthorButton
-        author={author}
-        initialSubscribed={initialSubscribed}
-        viewerHandle={viewerHandle}
-        variant="inline"
-        hero
-      />
-      <DeliveryBar
-        state={state}
-        runtimes={runtimes}
-        mcpUrl={mcpUrl}
-        noun="kit"
-        signedIn={!!viewerHandle}
-      />
-    </div>
+    <>
+      <div className={DETAIL_ACTION_SLOT}>
+        <SubscribeAuthorButton
+          author={author}
+          initialSubscribed={initialSubscribed}
+          viewerHandle={viewerHandle}
+          variant="inline"
+          hero
+        />
+      </div>
+      <div className={DETAIL_ACTION_FOOTER}>
+        <DeliveryBar
+          state={state}
+          runtimes={runtimes}
+          mcpUrl={mcpUrl}
+          noun="kit"
+          signedIn={!!viewerHandle}
+        />
+      </div>
+    </>
   )
 }

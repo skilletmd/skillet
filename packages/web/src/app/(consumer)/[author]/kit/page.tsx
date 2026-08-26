@@ -12,6 +12,7 @@ import { AuthorKitActionRow } from '@/components/kits/author-kit-action-row'
 import { Button } from '@/components/ui/button'
 import { UsedBy } from '@/components/kits/used-by'
 import { KitPageLayout } from '@/components/kits/kit-page-layout'
+import { DETAIL_ACTION_SLOT } from '@/components/detail-header'
 
 interface Params {
   author: string
@@ -102,9 +103,11 @@ export default async function AuthorKitPage({ params }: { params: Promise<Params
       hideByline
       action={
         isOwner ? (
-          <Button href={`/${kit.owner}`} variant="secondary">
-            View profile
-          </Button>
+          <div className={DETAIL_ACTION_SLOT}>
+            <Button href={`/${kit.owner}`} variant="secondary">
+              View profile
+            </Button>
+          </div>
         ) : (
           <AuthorKitActionRow
             author={kit.owner}

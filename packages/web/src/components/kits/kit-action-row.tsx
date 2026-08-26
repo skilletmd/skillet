@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { SubscribeKitButton } from '@/components/kits/subscribe-kit-button'
 import { DeliveryBar, type DeliveryState } from '@/components/install/delivery-bar'
+import { DETAIL_ACTION_FOOTER, DETAIL_ACTION_SLOT } from '@/components/detail-header'
 
 /**
  * The kit page's action row, and the bar that answers it.
@@ -38,23 +39,26 @@ export function KitActionRow({
 
   const state: DeliveryState = !added ? 'none' : runtimes.length === 0 ? 'install' : 'run'
 
+  // Two pieces, placed on DetailHeader's grid rather than stacked: the button
+  // sits beside the kit's name, the bar it opens runs the full width underneath.
+  // They stay in ONE component because `added` is the button's OPTIMISTIC value —
+  // the bar has to track what the button is showing and follow it back if the
+  // request reverts, which the membership context (server-refreshed) cannot do.
   return (
-    // w-full because this is a flex child of DetailHeader's action slot: sized
-    // to its content it shrinks to the widest thing inside the bar, which is why
-    // the same bar measured differently here than on a skill page (where it sits
-    // outside the header and fills the column). Full width of the main column is
-    // what it wants either way, since a narrow card floats unanchored between the
-    // button above it and the full-width list below.
-    <div className="w-full">
-      <SubscribeKitButton
-        kitId={kitId}
-        initialSubscribed={initialSubscribed}
-        viewerHandle={viewerHandle}
-        owner={owner}
-        onSubscribedChange={setAdded}
-        hero
-      />
-      <DeliveryBar state={state} runtimes={runtimes} mcpUrl={mcpUrl} noun="kit" signedIn />
-    </div>
+    <>
+      <div className={DETAIL_ACTION_SLOT}>
+        <SubscribeKitButton
+          kitId={kitId}
+          initialSubscribed={initialSubscribed}
+          viewerHandle={viewerHandle}
+          owner={owner}
+          onSubscribedChange={setAdded}
+          hero
+        />
+      </div>
+      <div className={DETAIL_ACTION_FOOTER}>
+        <DeliveryBar state={state} runtimes={runtimes} mcpUrl={mcpUrl} noun="kit" signedIn />
+      </div>
+    </>
   )
 }

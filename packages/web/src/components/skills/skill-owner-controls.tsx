@@ -37,11 +37,11 @@ export async function SkillOwnerControls({
 
   if (await viewerCanManageSkill(session.handle, author)) {
     // Manage lives in the hero action row (next to Add); nothing in the rail.
-    // size="lg" matches the Add control (AddToKitButton uses lg) so they read as
+    // size="md" matches the Add control (AddToKitButton uses md) so they read as
     // one action row.
     if (placement !== 'hero') return null
     return (
-      <Button href={skillEditHref(author, slug)} variant="secondary" size="lg">
+      <Button href={skillEditHref(author, slug)} variant="secondary" size="md">
         Manage skill
       </Button>
     )

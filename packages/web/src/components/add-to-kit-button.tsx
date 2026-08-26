@@ -37,7 +37,7 @@ export function AddToKitButton({ refName }: { refName: string }) {
       ? addIntentClaimHref(intent)
       : addIntentLoginHref(intent, callbackUrl)
     return (
-      <Button href={href} variant="primary" size="lg">
+      <Button href={href} variant="primary" size="md">
         <Plus className="h-4 w-4" />
         <span>
           Add<span className="hidden sm:inline">&nbsp;skill</span>

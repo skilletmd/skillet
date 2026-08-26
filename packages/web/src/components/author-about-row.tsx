@@ -24,6 +24,7 @@ export function AuthorAboutRow({
   avatarUrl,
   isTeam,
   follow,
+  inline,
 }: {
   handle: string
   displayName?: string | null
@@ -31,12 +32,53 @@ export function AuthorAboutRow({
   isTeam?: boolean
   /** Follow control, rendered inline after the name. Omitted on your own. */
   follow?: ReactNode
+  /**
+   * One-line variant: name, handle, and Follow run in a single wrapping row
+   * with no icon gutter, so a caller can put the object's facts on the same
+   * line after them. The phone kit hero uses it; the desktop rail keeps the
+   * stacked default, where the 20px gutter aligns the avatar with the glyph
+   * column of every row beneath.
+   */
+  inline?: boolean
 }) {
   // With a real name, the link is the name and the handle sits under it. With
   // no name there is nothing to put on two lines, so the link IS the handle,
   // written the way a handle is written.
   const name = displayName?.trim()
   const label = name || `@${handle}`
+
+  if (inline) {
+    return (
+      <span className="flex min-w-0 items-center gap-x-2">
+        {/* The whole identity is the hover target — face, name, and handle are
+            one thing to a reader, and having only the name open the card meant
+            pointing at someone's avatar did nothing. Follow stays OUTSIDE it:
+            it is a control, and a card opening under the cursor on the way to
+            pressing it is in the way. */}
+        <PersonHoverName handle={handle}>
+          <Link
+            href={`/${handle}`}
+            className="flex min-w-0 items-center gap-x-2 transition-colors hover:text-(--accent)"
+          >
+            <Avatar
+              name={label}
+              src={avatarUrl}
+              colorKey={handle}
+              kind={isTeam ? 'team' : 'person'}
+              size="xs"
+              className="h-5 w-5 shrink-0"
+              aria-hidden="true"
+            />
+            <span className="min-w-0 truncate font-medium text-(--ink)">{label}</span>
+            {/* The handle drops a step: the NAME is the identity, and two things
+                at one size read as two equal claims on the line. */}
+            {name && <span className="shrink-0 text-sm text-(--ink-2)">@{handle}</span>}
+          </Link>
+        </PersonHoverName>
+        {follow}
+      </span>
+    )
+  }
 
   return (
     <span className="grid min-w-0 grid-cols-[20px_minmax(0,1fr)] items-start gap-x-2.5">

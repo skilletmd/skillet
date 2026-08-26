@@ -15,6 +15,7 @@ import { viewerOrgRole } from '@/lib/orgs'
 import { HeaderFollowButton } from '@/components/header-follow-button'
 import { AuthorAboutRow } from '@/components/author-about-row'
 import { KitPageLayout } from '@/components/kits/kit-page-layout'
+import { DETAIL_ACTION_SLOT } from '@/components/detail-header'
 import { kitInstallCommand } from '@/lib/cli-install-commands'
 import { Button } from '@/components/ui/button'
 import { Eyebrow } from '@/components/ui/eyebrow'
@@ -178,11 +179,15 @@ export async function KitPageContent({ params }: { params: Promise<Params> }) {
       capabilities={kitCapabilities}
       action={
         isOwner ? (
-          <Button href={kitEditHref(kit.owner, kit.slug)} variant="secondary" size="lg">
-            Manage kit
-          </Button>
+          <div className={DETAIL_ACTION_SLOT}>
+            <Button href={kitEditHref(kit.owner, kit.slug)} variant="secondary" size="md">
+              Manage kit
+            </Button>
+          </div>
         ) : isTeamMember ? (
-          <TeamKitSyncButton kitId={kit.id} initialMuted={mutedKitIds.has(kit.id)} />
+          <div className={DETAIL_ACTION_SLOT}>
+            <TeamKitSyncButton kitId={kit.id} initialMuted={mutedKitIds.has(kit.id)} />
+          </div>
         ) : (
           // One client boundary. The bar under these buttons has to know which
           // one you just pressed, and the server's initial `subscribed` can only
@@ -199,6 +204,7 @@ export async function KitPageContent({ params }: { params: Promise<Params> }) {
       }
       authorRow={
         <AuthorAboutRow
+          inline
           handle={kit.owner}
           displayName={ownerProfile?.displayName}
           avatarUrl={ownerProfile?.avatarUrl ?? null}

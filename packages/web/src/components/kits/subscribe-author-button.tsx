@@ -52,7 +52,7 @@ export function SubscribeAuthorButton({
       return (
         // primary, like the other two detail pages: a signed-out visitor is
         // being asked the page's one question, and secondary read as optional.
-        <Button href={loginHref(`/${author}`)} variant={hero ? 'primary' : 'secondary'} size={hero ? 'lg' : 'md'}>
+        <Button href={loginHref(`/${author}`)} variant={hero ? 'primary' : 'secondary'} size={hero ? 'md' : 'md'}>
           Add
         </Button>
       )
@@ -61,7 +61,7 @@ export function SubscribeAuthorButton({
       <Button
         type="button"
         variant={subscribed ? 'secondary' : 'primary'}
-        size={hero ? 'lg' : 'md'}
+        size={hero ? 'md' : 'md'}
         onClick={toggle}
         disabled={pending}
       >

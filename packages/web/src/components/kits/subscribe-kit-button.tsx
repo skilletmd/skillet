@@ -13,7 +13,7 @@ import { subscribeToKit } from '@/lib/add-intent'
 // One acquisition verb across Skillet: you "Add" a skill OR a kit. A kit just
 // happens to stay in sync afterwards (a property of kits, not a second action),
 // so its button matches the skill's Add control instead of saying "Subscribe".
-// `hero` = the singular CTA on a kit's detail page: the standard `primary` lg
+// `hero` = the singular CTA on a kit's detail page: the standard `primary` md
 // button — the SAME size, color, and shape as the skill page's Add and the
 // profile's Follow, so every detail hero carries one button. Cards keep the
 // quieter `secondary` sm (min-width so it matches the skill "Add" beside it).
@@ -21,7 +21,7 @@ import { subscribeToKit } from '@/lib/add-intent'
 // identical at both sizes.
 const PILL = (added: boolean, hero: boolean) =>
   cn(
-    buttonClasses(hero && !added ? 'primary' : 'secondary', { size: hero ? 'lg' : 'sm' }),
+    buttonClasses(hero && !added ? 'primary' : 'secondary', { size: hero ? 'md' : 'sm' }),
     !hero && 'min-w-[4.75rem]',
     added &&
       'border-transparent bg-(--accent-bg) [color:var(--accent)] hover:border-transparent hover:bg-(--accent-bg)',

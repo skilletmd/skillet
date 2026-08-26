@@ -41,6 +41,30 @@ export default async function ProfileLayout({
   const canManageTeam = isTeam && viewerManagesOrg(myOrgs, author)
   const viewerRole = isTeam ? viewerOrgRole(myOrgs, author) : null
 
+  // The rail's own sections — source/mirror card, then About + Agents.
+  const railSections = (
+    <>
+      {profile.isMirror && (
+        <section className="py-4 first:pt-0">
+          <MirrorProfileCard
+            handle={author}
+            sourceUrl={profile.mirrorSourceUrl}
+            license={profile.mirrorLicense}
+            since={profile.joinedAt}
+          >
+            <ClaimMirrorModal
+              handle={author}
+              sourceUrl={profile.mirrorSourceUrl ?? null}
+              authed={isAuthed}
+              sourceOwnerType={profile.sourceOwnerType ?? null}
+            />
+          </MirrorProfileCard>
+        </section>
+      )}
+      <ProfileRail profile={profile} isSelf={isSelf} isTeam={isTeam} viewerRole={viewerRole} />
+    </>
+  )
+
   return (
     <div className="relative">
       {/* Soft identity-tinted wash behind the hero — keyed to the person's hue. */}
@@ -53,9 +77,17 @@ export default async function ProfileLayout({
         {/* Same shape as skill/kit: avatar leads the left rail, identity + content
             in the main column, no full-width header band. */}
         <div className="mt-3 grid gap-10 lg:grid-cols-[var(--rail-nav)_minmax(0,1fr)] lg:items-start">
-          {/* LEFT rail — avatar, then mirror card + About/Agents. */}
-          <aside className="lg:order-first lg:sticky lg:top-24">
-            <div className="relative mb-6 aspect-square w-full">
+          {/* LEFT rail — avatar, then mirror card + About/Agents.
+              On a phone this column stacks ABOVE the main one, so a full-width
+              photo plus the source card arrived before the reader learned whose
+              profile this was. `order-2` moves the whole rail below the content
+              there (lg:order-first wins from lg, where it is a real column) —
+              REORDERED rather than duplicated, so the bio and the agent list
+              exist once in the DOM and a screen reader hears them once. The
+              avatar is the one piece that does not repeat: the identity carries
+              its own small copy on a phone. */}
+          <aside className="order-2 border-t border-(--line) lg:order-first lg:sticky lg:top-24 lg:border-0">
+            <div className="relative mb-6 hidden aspect-square w-full lg:block">
               <Avatar
                 src={profile.avatarUrl}
                 name={profile.displayName}
@@ -63,36 +95,14 @@ export default async function ProfileLayout({
                 kind={isTeam ? 'team' : 'person'}
                 size="xl"
                 priority
-                // The rail avatar is fluid (full rail width on desktop, the
-                // container width on mobile), so hand next/image a width hint —
-                // the fixed-size srcset alone renders it upscaled.
-                sizes="(min-width: 1024px) 224px, 60vw"
+                // Fluid to the rail's width, and the rail only exists from lg —
+                // hand next/image the hint or the fixed-size srcset renders it
+                // upscaled.
+                sizes="224px"
                 className="absolute inset-0 h-full w-full shadow-sm ring-1 ring-black/10"
               />
             </div>
-            {profile.isMirror && (
-              <section className="py-4 first:pt-0">
-                <MirrorProfileCard
-                  handle={author}
-                  sourceUrl={profile.mirrorSourceUrl}
-                  license={profile.mirrorLicense}
-                  since={profile.joinedAt}
-                >
-                  <ClaimMirrorModal
-                    handle={author}
-                    sourceUrl={profile.mirrorSourceUrl ?? null}
-                    authed={isAuthed}
-                    sourceOwnerType={profile.sourceOwnerType ?? null}
-                  />
-                </MirrorProfileCard>
-              </section>
-            )}
-            <ProfileRail
-              profile={profile}
-              isSelf={isSelf}
-              isTeam={isTeam}
-              viewerRole={viewerRole}
-            />
+            {railSections}
           </aside>
 
           {/* MAIN — identity (no avatar; it leads the rail) then the tabs/content. */}

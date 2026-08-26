@@ -14,7 +14,10 @@ export default function KitLoading() {
       <main className={`relative ${PAGE_CONTAINER_CLASS}`} aria-busy="true" aria-label="Loading kit">
         {/* Hero — 300px cover well beside the identity + actions. */}
         <div className="grid items-center gap-12 lg:grid-cols-[300px_minmax(0,1fr)]">
-          <div className="mx-auto w-full max-w-[300px]">
+          {/* Desktop only, like the real page: on a phone the cover is a 64px
+              square riding the identity block, so a 300px skeleton square here
+              flashed a layout that never resolves. */}
+          <div className="mx-auto hidden w-full max-w-[300px] lg:block">
             <Shimmer className="aspect-square w-full rounded-2xl" />
           </div>
           <div>

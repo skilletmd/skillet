@@ -82,10 +82,14 @@ describe('ProfileLayout', () => {
       'href',
       'https://example.com',
     )
-    expect(screen.getByAltText('Test Author')).toHaveAttribute(
-      'src',
-      'https://example.com/avatar.png',
-    )
+    // Two copies of the photo, one visible at a time: the rail's (from lg) and
+    // the identity's small one (below lg). Both carry the alt text — whichever
+    // is rendered has to name the person.
+    const avatars = screen.getAllByAltText('Test Author')
+    expect(avatars).toHaveLength(2)
+    for (const img of avatars) {
+      expect(img).toHaveAttribute('src', 'https://example.com/avatar.png')
+    }
   })
 
   it('renders public stats and the joined date', async () => {

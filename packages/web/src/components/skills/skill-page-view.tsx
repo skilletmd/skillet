@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { SkillBundleView } from '@/components/skill-bundle-view'
 import { MirrorNotice, ClaimMirrorCta } from '@/components/mirror-notice'
 import { ReportDialog } from '@/components/skills/report-dialog'
-import { DetailHeader } from '@/components/detail-header'
+import { DetailHeader, DETAIL_ACTION_SLOT, DETAIL_MEDIA_SLOT } from '@/components/detail-header'
 import { HeaderFollowButton } from '@/components/header-follow-button'
 import { AuthorAboutRow } from '@/components/author-about-row'
 import { heroWash } from '@/components/cover/hero-wash'
@@ -183,6 +183,22 @@ export async function SkillPageView({
   // install affordance, or the page offers a command that 403s.
   const noServableVersion = skill.hasInstallableVersion === false
   const blocked = quarantined || noServableVersion
+  // One cover node, rendered in two slots: a small square beside the identity on
+  // a phone, the full-size rail tile from lg. Only one is ever visible.
+  const cover = isCategoryKey(skill.category) ? (
+    <CategoryCover
+      category={skill.category}
+      seed={`${author}/${slug}`}
+      className="relative h-full w-full"
+    />
+  ) : (
+    <CoverArt
+      seed={`${author}/${slug}`}
+      categories={[skill.category ?? null]}
+      listMark
+      className="h-full w-full"
+    />
+  )
   const sec = skill.security
   const usedBy = skill.usedByPeople ?? []
   const hasUsedBy = (skill.usedByCount ?? 0) > 0 || usedBy.length > 0
@@ -297,6 +313,23 @@ export async function SkillPageView({
           <div className="min-w-0 lg:mt-2 [&>*:first-child]:mt-0">
             <DetailHeader
               kind="skill"
+              byline={
+                <AuthorAboutRow
+                  inline
+                  handle={author}
+                  displayName={authorProfile?.displayName}
+                  avatarUrl={authorProfile?.avatarUrl ?? null}
+                  isTeam={authorProfile?.kind === 'team'}
+                  follow={<HeaderFollowButton owner={author} appearance="inline" />}
+                />
+              }
+              media={
+                <div
+                  className={`${DETAIL_MEDIA_SLOT} relative size-16 shrink-0 overflow-hidden rounded-xl shadow-sm ring-1 ring-black/5 lg:hidden`}
+                >
+                  {cover}
+                </div>
+              }
               title={skill.title}
               owner={author}
               description={skill.description}
@@ -317,7 +350,7 @@ export async function SkillPageView({
                 ) : undefined
               }
               action={
-                <div className="flex flex-wrap items-center gap-2">
+                <div className={`${DETAIL_ACTION_SLOT} flex flex-wrap items-center gap-2`}>
                   {!(skill.deprecated || blocked) && (
                     <Suspense fallback={<SkillInstallSkeleton />}>
                       <AddToKitButton refName={ref} />
@@ -486,22 +519,14 @@ export async function SkillPageView({
           </div>
 
           <aside className="lg:order-first lg:sticky lg:top-24">
-            {/* The cover leads the left rail, above the About block. */}
-            <div className="mb-6 relative aspect-square w-full overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5">
-              {isCategoryKey(skill.category) ? (
-                <CategoryCover
-                  category={skill.category}
-                  seed={`${author}/${slug}`}
-                  className="relative h-full w-full"
-                />
-              ) : (
-                <CoverArt
-                  seed={`${author}/${slug}`}
-                  categories={[skill.category ?? null]}
-                  listMark
-                  className="h-full w-full"
-                />
-              )}
+            {/* The cover leads the left rail, above the About block. Desktop
+                only: on a phone this rail sits BELOW the skill body, so a cover
+                down here was a picture nobody scrolls to, and the same art
+                leads the header as a small square instead. 90% of the rail,
+                matching the kit page — at full width it read as a second
+                column rather than a mark. */}
+            <div className="mb-6 relative hidden aspect-square w-[90%] overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5 lg:block">
+              {cover}
             </div>
 
             {/* Owner/contributor controls lead the rail — Manage (owner) or
@@ -518,17 +543,10 @@ export async function SkillPageView({
             <section className="py-4 first:pt-0">
               <Eyebrow>About</Eyebrow>
               <div className="mt-3 flex flex-col items-stretch gap-2.5 text-sm text-(--ink-2)">
-                {/* The author leads. Who made this is not the same class of
-                    thing as a token count, and the order says so. Provenance
-                    follows, which for a mirror is the next strongest identity
-                    fact in the block. */}
-                <AuthorAboutRow
-                  handle={author}
-                  displayName={authorProfile?.displayName}
-                  avatarUrl={authorProfile?.avatarUrl ?? null}
-                  isTeam={authorProfile?.kind === 'team'}
-                  follow={<HeaderFollowButton owner={author} appearance="inline" />}
-                />
+                {/* The author is no longer here: they lead the hero byline, with
+                    a face and a real name, the same as a kit page. Provenance
+                    leads what's left, which for a mirror is the strongest
+                    identity fact in the block. */}
                 {isFromGitHub && (
                   <MirrorNotice
                     sourceUrl={skill.mirrorSourceUrl}

@@ -231,8 +231,10 @@ export function KitSkillList({ entries, owner }: { entries: KitSkillEntry[]; own
         // with a mono header bar (label + view control) and a mono footer meta bar,
         // so a kit's skills and a skill's files read as one family of panels.
         <div className="surface-card mt-4 flex flex-col overflow-hidden">
+          {/* No leading glyph: a bulleted-list icon in front of "166 skills · 15
+              categories" restated the row it labelled and read as a control
+              nobody could press. */}
           <div className="flex items-center gap-2 border-b border-(--line) px-3.5 py-2">
-            <ListGlyph className="h-[18px] w-[18px] shrink-0 text-(--ink-2)" />
             <span className="min-w-0 flex-1 truncate font-mono text-xs text-(--ink-2)">
               {entries.length} {entries.length === 1 ? 'skill' : 'skills'}
               {grouped ? ` · ${groups.length} categories` : ''}
@@ -277,29 +279,5 @@ export function KitSkillList({ entries, owner }: { entries: KitSkillEntry[]; own
         </div>
       )}
     </>
-  )
-}
-
-/** A small bulleted-list glyph for the panel header, matching the file viewer's
- *  header icon in weight. */
-function ListGlyph({ className = '' }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      width="1em"
-      height="1em"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className={className}
-    >
-      <path d="M6 4.5h6.5M6 8h6.5M6 11.5h6.5" />
-      <circle cx="3.25" cy="4.5" r="0.6" fill="currentColor" stroke="none" />
-      <circle cx="3.25" cy="8" r="0.6" fill="currentColor" stroke="none" />
-      <circle cx="3.25" cy="11.5" r="0.6" fill="currentColor" stroke="none" />
-    </svg>
   )
 }

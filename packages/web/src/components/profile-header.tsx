@@ -69,9 +69,11 @@ export function ProfileHeader({
   /** Replaces the default action (Follow / Connect an agent) when set — e.g.
    *  the team-manager's "Manage team" button. */
   action?: ReactNode
-  /** Render identity without the avatar — for the profile page, where the avatar
-   *  leads the left rail (matching skill/kit). Followers/following keep the
-   *  default inline avatar. */
+  /** The RAIL owns the avatar from `lg` up — the profile page, matching skill and
+   *  kit. Below `lg` the rail stacks above the identity, so a full-width photo
+   *  there filled the screen before the reader learned whose it was; this branch
+   *  renders a small leading avatar instead. Followers/following keep the default
+   *  inline avatar at every width. */
   hideAvatar?: boolean
 }) {
   const githubHandle = profile.socials?.github?.replace(/^@/, '') || null
@@ -198,7 +200,22 @@ export function ProfileHeader({
         // Same mt-5 / gap-3 action row as DetailHeader, so the three page types
         // put their buttons in the same place.
         <div className="min-w-0">
-          {identityInner}
+          <div className="flex items-center gap-4">
+            {/* Phone only — from lg the same face leads the rail at full size.
+                A small `sizes` keeps this one's preload cheap next to the rail
+                avatar's, which is the desktop LCP. */}
+            <Avatar
+              src={profile.avatarUrl}
+              name={profile.displayName}
+              colorKey={author}
+              kind={isTeam ? 'team' : 'person'}
+              size="lg"
+              priority
+              sizes="64px"
+              className="h-16 w-16 shrink-0 ring-1 ring-black/10 lg:hidden"
+            />
+            <div className="min-w-0 flex-1">{identityInner}</div>
+          </div>
           {resolvedAction && (
             <div className="mt-5 flex flex-wrap items-center gap-3">{resolvedAction}</div>
           )}

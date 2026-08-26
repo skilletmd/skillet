@@ -173,7 +173,7 @@ export function SkillKitControl({
         <Link
           href={href}
           className={cn(
-            buttonClasses(big ? 'primary' : 'secondary', { size: big ? 'lg' : 'sm' }),
+            buttonClasses(big ? 'primary' : 'secondary', { size: big ? 'md' : 'sm' }),
             !big && 'min-w-[4.75rem]',
           )}
         >
@@ -207,7 +207,7 @@ export function SkillKitControl({
                 // Same face as the resting control (primary hero / secondary card)
                 // so the loading beat doesn't flash a different button.
                 buttonClasses(variant === 'hero' ? 'primary' : 'secondary', {
-                  size: variant === 'hero' ? 'lg' : 'sm',
+                  size: variant === 'hero' ? 'md' : 'sm',
                 }),
                 'opacity-60',
               )

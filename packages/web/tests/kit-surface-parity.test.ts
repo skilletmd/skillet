@@ -86,18 +86,19 @@ describe('every kit surface answers Add the same way', () => {
 describe('the Add button is the same size everywhere it is the page question', () => {
   const read = (rel: string) => readFileSync(join(process.cwd(), rel), 'utf8')
 
-  it('renders lg on all three detail pages', () => {
+  it('renders md on all three detail pages', () => {
     // Kit, skill, and author kit each make the SAME request of the reader, so
     // it cannot look like a bigger decision on one of them. These three drifted
     // once already: the author kit fell back to Button's default md while the
-    // other two asked for lg.
+    // other two asked for lg. All three are md now — lg (48px) read as a
+    // marketing CTA in a hero that is otherwise 36-40px controls.
     const kit = read('src/components/kits/subscribe-kit-button.tsx')
     const skill = read('src/components/kits/skill-kit-control.tsx')
     const authorKit = read('src/components/kits/subscribe-author-button.tsx')
 
-    expect(kit).toMatch(/size:\s*hero\s*\?\s*'lg'/)
-    expect(skill).toMatch(/size:\s*variant === 'hero'\s*\?\s*'lg'/)
-    expect(authorKit).toMatch(/size=\{hero \? 'lg'/)
+    expect(kit).toMatch(/size:\s*hero\s*\?\s*'md'/)
+    expect(skill).toMatch(/size:\s*variant === 'hero'\s*\?\s*'md'/)
+    expect(authorKit).toMatch(/size=\{hero \? 'md'/)
   })
 
   it('gives every detail page a hero flag to pass', () => {
