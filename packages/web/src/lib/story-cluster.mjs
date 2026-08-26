@@ -77,3 +77,27 @@ export function cluster(posts) {
 
 export const reach = (posts) => posts.reduce((n, p) => n + (p.likes ?? 0), 0)
 
+
+/**
+ * Put an @ on every handle the story names.
+ *
+ * The writer mixes `@MiaAI_lab` and a bare `rohanpaul_ai` in one paragraph, and
+ * a bare handle reads as a misspelled word rather than a person. Deterministic
+ * here rather than another prompt rule: the set of handles a story may name is
+ * exactly its own sources, so this is a lookup, not a judgement.
+ */
+export function normalizeHandles(text, sources) {
+  let out = text
+  for (const handle of new Set(sources.map((s) => s.handle).filter(Boolean))) {
+    // Skip when already @-prefixed or part of a longer token. The trailing
+    // guard has to allow a sentence-ending "@j_maffe." while rejecting
+    // "rohanpaul_ai.com" and "x.com/j_maffe", so it rejects a dot only when a
+    // word character follows it.
+    const re = new RegExp(
+      `(^|[^@\\w/.])${handle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w/@-]|\\.\\w)`,
+      'g',
+    )
+    out = out.replace(re, `$1@${handle}`)
+  }
+  return out
+}

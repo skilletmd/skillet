@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cluster, terms, MAX_CLUSTER, MIN_CLUSTER } from '@/lib/story-cluster.mjs'
+import { cluster, normalizeHandles, terms, MAX_CLUSTER, MIN_CLUSTER } from '@/lib/story-cluster.mjs'
 
 // Clustering decides what a story is ABOUT. Getting it wrong is only visible
 // after the prose is written and the tokens are spent, so the linkage rule is
@@ -106,5 +106,36 @@ describe('cluster', () => {
         post('sportsbook modelling backtesting simulation'),
       ]),
     ).toEqual([])
+  })
+})
+
+describe('normalizeHandles', () => {
+  const sources = [{ handle: 'rohanpaul_ai' }, { handle: 'MiaAI_lab' }, { handle: 'j_maffe' }]
+
+  it('prefixes a bare handle and leaves an @-prefixed one alone', () => {
+    expect(normalizeHandles('rohanpaul_ai relayed it. @MiaAI_lab agreed.', sources)).toBe(
+      '@rohanpaul_ai relayed it. @MiaAI_lab agreed.',
+    )
+  })
+
+  it('leaves domains and URL paths alone', () => {
+    // The naive \\b guard matched before the dot and produced "@rohanpaul_ai.com".
+    expect(normalizeHandles('see rohanpaul_ai.com and x.com/j_maffe', sources)).toBe(
+      'see rohanpaul_ai.com and x.com/j_maffe',
+    )
+  })
+
+  it('still prefixes a handle that ends a sentence', () => {
+    expect(normalizeHandles('credit goes to j_maffe.', sources)).toBe('credit goes to @j_maffe.')
+  })
+
+  it('does not match a handle inside a longer token', () => {
+    expect(normalizeHandles('j_maffe_two is someone else', sources)).toBe(
+      'j_maffe_two is someone else',
+    )
+  })
+
+  it('ignores sources with no handle', () => {
+    expect(normalizeHandles('nothing to do', [{ handle: null }])).toBe('nothing to do')
   })
 })

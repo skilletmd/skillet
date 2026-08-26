@@ -35,7 +35,7 @@ import { readFile } from 'node:fs/promises'
 import { DatabaseSync } from 'node:sqlite'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { cluster, reach, MAX_CLUSTER, MIN_CLUSTER } from '../src/lib/story-cluster.mjs'
+import { cluster, reach, normalizeHandles, MAX_CLUSTER, MIN_CLUSTER } from '../src/lib/story-cluster.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const SEED = path.join(HERE, '..', 'src', 'lib', 'news-signal-seed.json')
@@ -49,6 +49,16 @@ const MODEL = 'claude-opus-5'
 const DRY_RUN = process.argv.includes('--dry-run')
 
 // -------------------------------------------------------------------- write
+
+/** Real headlines from the feed, as calibration. Told only to be "specific",
+ *  the model returns category labels ("Skill authors ship packs..."), which sit
+ *  next to these in one feed and read as the filler between the real stories.
+ *  Examples move it further than any adjective in the instruction did. */
+const HOUSE_HEADLINES = [
+  "Shopify's CEO pushed back on Claude Code reading only CLAUDE.md. Anthropic answered the same afternoon.",
+  'NVIDIA measured whether security scans predict skill quality. They correlate at p = 0.14.',
+  'A 7,316-star skill was called unsafe by a practitioner. Stars were the only public signal it carried.',
+]
 
 function promptFor(posts) {
   const rendered = posts
@@ -70,9 +80,21 @@ function promptFor(posts) {
     `- Cover the subject as a trade publication would. We publish Skillet and we ` +
     `cover everyone; never promote Skillet or disparage anything.\n` +
     `- If the posts disagree, say so and give both sides.\n` +
-    `- Headline: one sentence, specific, no colon-prefix labels, under 120 chars.\n` +
-    `- Summary: two to four sentences of plain prose. No bullet points, no ` +
-    `em-dashes, no hype, no "in today's fast-moving landscape" throat-clearing.\n` +
+    `- These are real people who will read this. Name them by handle or by what ` +
+    `they built. Never by a label that sizes them up ("a tinkerer", "a hobbyist", ` +
+    `"some guy"), and never with a compliment either; we report, we do not rate.\n` +
+    `- Headline: name the actor and what they did. Specific nouns and real ` +
+    `numbers beat abstractions; "skill authors ship packs" is a category, not ` +
+    `a headline. Two short sentences with a turn are welcome. Under 110 chars. ` +
+    `No colon-prefix labels, and no "and also" clause bolted on the end. ` +
+    `The house style, for calibration:\n` +
+    HOUSE_HEADLINES.map((h) => `    ${h}\n`).join('') +
+    `- Summary: three to five sentences, each UNDER 30 WORDS. Short sentences ` +
+    `are the house style; a 50-word sentence is a paragraph wearing a disguise. ` +
+    `No bullet points, no em-dashes, no hype, no throat-clearing.\n` +
+    `- A number inside a post is that poster's claim, not a fact we checked. ` +
+    `Star counts, benchmarks and model names from a post get attributed ("the ` +
+    `roundup lists...") or left out. Never restate one in our own voice.\n` +
     `- kind: one of launch, labs, research, debate, trust.\n` +
     `- If these posts are not actually about one subject, or there is no story ` +
     `worth publishing, return {"skip": true} and nothing else.\n\n` +
@@ -129,6 +151,14 @@ async function writeStory(posts) {
   const parsed = firstJsonObject(text)
   if (!parsed || parsed.skip) return null
   if (typeof parsed.headline !== 'string' || typeof parsed.summary !== 'string') return null
+  // The length rule is enforced here, not just asked for: the first real run
+  // returned a 130-character headline with three clauses in it. A story we
+  // cannot headline is a story whose subject was too broad, so drop it rather
+  // than truncate mid-sentence and publish a fragment.
+  if (parsed.headline.length > 120) {
+    console.warn(`  ! headline too long (${parsed.headline.length} chars); skipping`)
+    return null
+  }
   return {
     headline: parsed.headline.trim(),
     summary: parsed.summary.trim(),
@@ -204,6 +234,9 @@ async function main() {
   for (const posts of clusters) {
     const story = await writeStory(posts)
     if (!story) continue
+    const sources = sourcesFrom(posts)
+    story.headline = normalizeHandles(story.headline, sources)
+    story.summary = normalizeHandles(story.summary, sources)
     const slug = slugify(story.headline)
     stmt.run(
       slug,
@@ -214,7 +247,7 @@ async function main() {
       JSON.stringify(['story']),
       DRAFT_ONLY ? 'draft' : 'published',
       story.summary,
-      JSON.stringify(sourcesFrom(posts)),
+      JSON.stringify(sources),
       story.kind,
     )
     written += 1

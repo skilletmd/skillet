@@ -230,6 +230,11 @@ apps.push({
     NODE_ENV: "production",
     // The collector resolves posts against the registry running beside it.
     REGISTRY_URL: webDotEnv.REGISTRY_URL ?? `http://127.0.0.1:${registryPort}`,
+    // The story writer and the registry's skill classifier are the same
+    // account, and the key already lives in the registry .env. Fall back to it
+    // rather than copying a secret into a second file, where the two would
+    // drift and this job would no-op for a day before anyone noticed.
+    ANTHROPIC_API_KEY: webDotEnv.ANTHROPIC_API_KEY ?? registryDotEnv.ANTHROPIC_API_KEY,
   },
   // An hour after mirror-nightly, so the day's newly mirrored skills are in the
   // registry before the collector tries to resolve posts against them. Keep in
