@@ -57,6 +57,13 @@ export function migrate(db: DatabaseSync): void {
   `)
 
   addColumn(db, 'seo_title', 'TEXT')
+  // Structured sources for a Skillet Daily story (a post tagged `story`). The
+  // sources list is what separates reporting from an unattributed summary, so
+  // it is data rather than prose inside `content`. JSON in a column follows the
+  // `tags_json` precedent on this table.
+  addColumn(db, 'sources_json', 'TEXT')
+  // Story kind, driving the kicker: launch, labs, research, debate, trust.
+  addColumn(db, 'story_kind', 'TEXT')
 }
 
 /**

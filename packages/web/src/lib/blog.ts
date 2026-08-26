@@ -2,6 +2,20 @@ import { getBlogDb } from './blog-db'
 
 export type PostStatus = 'draft' | 'published'
 
+/** One cited source under a story. Network drives the mark; label says what the
+ *  source contributes ("Anthropic's reply"); detail carries reach. */
+export interface StorySource {
+  network: 'x' | 'hn' | 'reddit' | 'web'
+  handle: string
+  label: string
+  detail?: string | null
+  url: string
+  avatarUrl?: string | null
+}
+
+/** Tag marking a post as an edition of the Skillet Daily feed's story stream. */
+export const STORY_TAG = 'story'
+
 export interface PostFrontmatter {
   title: string
   /** Optional `<title>` override, so a long display headline can still ship a
@@ -19,6 +33,9 @@ export interface PostFrontmatter {
   featured?: boolean
   readTime?: number
   status?: PostStatus
+  /** Present on story posts; empty for ordinary blog posts. */
+  sources?: StorySource[]
+  storyKind?: string
 }
 
 export interface Post extends PostFrontmatter {
@@ -42,6 +59,8 @@ interface PostRow {
   read_time: number | null
   status: string
   content: string
+  sources_json: string | null
+  story_kind: string | null
 }
 
 function calcReadTime(content: string): number {
@@ -74,7 +93,36 @@ function rowToPost(row: PostRow): Post {
     readTime: row.read_time ?? calcReadTime(row.content),
     status: row.status === 'published' ? 'published' : 'draft',
     content: row.content,
+    sources: parseSources(row.sources_json),
+    storyKind: row.story_kind ?? undefined,
   }
+}
+
+/** Sources, or an empty list. A malformed blob must not take down the feed the
+ *  post appears in, so this never throws. */
+function parseSources(raw: string | null): StorySource[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (s): s is StorySource =>
+        Boolean(s) && typeof s.url === 'string' && typeof s.handle === 'string',
+    )
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Published stories, newest first.
+ *
+ * Stories ride the blog store rather than a table of their own: drafts, the
+ * publish gate, the admin editor and the feed builder all already exist here,
+ * and a second CMS would duplicate every one of them.
+ */
+export function getStories(): Post[] {
+  return getAllPosts().filter((p) => p.tags.includes(STORY_TAG))
 }
 
 /** The post's `<title>` text: the SEO override when set, else the headline.

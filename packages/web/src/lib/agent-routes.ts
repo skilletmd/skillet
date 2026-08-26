@@ -219,7 +219,17 @@ export function classifyRoute(pathname: string): RouteVerdict {
   // an unknown topic into a soft-404 (404 body, 200 status).
   if (first === 'news') {
     if (segments.length === 1) return { kind: 'known' }
-    if (segments.length === 2 && (second === 'rss.xml' || isCategoryKey(second))) {
+    // /news/topic/<category> is a browse room; /news/<slug> is one story.
+    // Stories take the shorter path because a story is the thing worth sending
+    // to someone. A story slug cannot be enumerated here without the blog store
+    // (which proxy.ts cannot reach), so the shape resolves and the page's own
+    // notFound handles a miss — see the story route for why that is acceptable
+    // there and not for a guessed handle.
+    if (segments.length === 2) {
+      if (second === 'rss.xml') return { kind: 'known' }
+      return { kind: 'known' }
+    }
+    if (segments.length === 3 && second === 'topic' && isCategoryKey(third)) {
       return { kind: 'known' }
     }
     return { kind: 'unknown' }

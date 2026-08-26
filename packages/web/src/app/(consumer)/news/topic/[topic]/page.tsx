@@ -6,8 +6,8 @@ import { getSignalItems } from '@/lib/news-signal'
 import { PAGE_CONTAINER_CLASS } from '@/lib/page-layout'
 import { getSkillCatalog } from '@/lib/registry-catalog'
 import { getDiscoverFeed } from '@/lib/registry'
-import { NewsKicker, NewsMasthead } from '../news-chrome'
-import { NewsFeed } from '../news-feed'
+import { NewsKicker, NewsMasthead } from '../../news-chrome'
+import { NewsFeed } from '../../news-feed'
 
 /** A topic room shows the conversation first and the shelf second. Enough drops
  *  to prove the room is stocked, not so many that it becomes the grid again. */
@@ -29,7 +29,7 @@ export async function generateMetadata({
   return {
     title,
     description: `What is happening in ${cat.label.toLowerCase()} skill land: who shipped what, what people are saying, and what just landed in the registry.`,
-    alternates: { canonical: `/news/${topic}` },
+    alternates: { canonical: `/news/topic/${topic}` },
   }
 }
 

@@ -23,7 +23,7 @@ export function NewsTopics({ stats }: { stats: CategoryStat[] }) {
       {rows.map(({ stat, meta }) => (
         <Link
           key={stat.key}
-          href={`/news/${stat.key}`}
+          href={`/news/topic/${stat.key}`}
           className="flex items-baseline gap-2 rounded-lg border border-(--line) bg-(--surface) px-3 py-2 transition-colors hover:border-(--ink-2) hover:bg-(--card-pop)"
         >
           <span className="text-sm font-semibold">{meta!.label}</span>

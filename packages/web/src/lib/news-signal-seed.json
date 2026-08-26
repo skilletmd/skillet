@@ -9,7 +9,7 @@
    "text": "/scandinavian-design\n\nbuilt a skill that turns any site into scandi minimalism!\n\nnpx skills add ericzakariasson/scandinavian-design\n\ntry it: https://t.co/8i3zHybIj8 https://t.co/wfPrk6338v",
    "url": "https://x.com/ericzakariasson/status/2090831063845380516",
    "likes": 3662,
-   "views": 201552,
+   "views": 201558,
    "createdAt": "Fri Aug 21 15:59:06 +0000 2026",
    "source": "x",
    "context": null,
@@ -50,12 +50,12 @@
   {
    "handle": "Jakubantalik",
    "name": "Jakub Antalik",
-   "followers": 18821,
+   "followers": 18822,
    "avatarUrl": "https://pbs.twimg.com/profile_images/1286621650562228224/TAo9_z5s_bigger.jpg",
    "text": "Made a skill for UI transitions:\nIt reviews a project, identifies transitions, and suggests improvements or replacements based on the source Transitions-dev library, making them more polished and snappy.\n\nnpx skills add Jakubantalik/transitions.dev https://t.co/DvXh8KEFUl",
    "url": "https://x.com/Jakubantalik/status/2090473433175921148",
    "likes": 3550,
-   "views": 197963,
+   "views": 197965,
    "createdAt": "Thu Aug 20 16:18:00 +0000 2026",
    "source": "x",
    "context": null,
@@ -67,17 +67,17 @@
    "unknownSkill": null,
    "githubRepo": null,
    "topics": [],
-   "rank": 0.9818181818181818
+   "rank": 0.9787234042553191
   },
   {
    "handle": "emilkowalski",
    "name": "Emil Kowalski",
-   "followers": 88452,
+   "followers": 88454,
    "avatarUrl": "https://pbs.twimg.com/profile_images/1469017066795679751/CjEOyirb_bigger.jpg",
    "text": "New skill: /animate-expo\n\nAll the animation knowledge, but for your native apps.\n\nReact Native and Expo: gestures, sheets, haptics, screen transitions, and more.\n\nMade in collaboration with the @expo team.\n\nhttps://t.co/zEnLEjkvIp",
    "url": "https://x.com/emilkowalski/status/2090031918523842766",
    "likes": 3446,
-   "views": 258568,
+   "views": 258575,
    "createdAt": "Wed Aug 19 11:03:34 +0000 2026",
    "source": "x",
    "context": null,
@@ -103,7 +103,7 @@
    "unknownSkill": null,
    "githubRepo": "emilkowalski/skills",
    "topics": [],
-   "rank": 0.9636363636363636
+   "rank": 0.9574468085106383
   },
   {
    "handle": "JorgeCastilloPr",
@@ -113,7 +113,7 @@
    "text": "This Claude Code skill decompiles Android APK and AAR files and extracts the HTTP APIs used by the app.\n\nUse it at your own responsibility 😆\n\nhttps://t.co/EtLalWvOhL",
    "url": "https://x.com/JorgeCastilloPr/status/2091486889937154120",
    "likes": 1631,
-   "views": 108613,
+   "views": 108626,
    "createdAt": "Sun Aug 23 11:25:07 +0000 2026",
    "source": "x",
    "context": null,
@@ -127,7 +127,7 @@
    "unknownSkill": null,
    "githubRepo": "SimoneAvogadro/android-reverse-engineering-skill",
    "topics": [],
-   "rank": 0.9454545454545454
+   "rank": 0.9361702127659575
   },
   {
    "handle": "3Mathematicians",
@@ -154,12 +154,12 @@
   {
    "handle": "_avichawla",
    "name": "Avi Chawla",
-   "followers": 74589,
+   "followers": 74590,
    "avatarUrl": "https://pbs.twimg.com/profile_images/1868297128801390593/Ovl677JQ_bigger.jpg",
    "text": "OpenClaw vs. Hermes vs. Grok @bot, clearly explained:\n\nAll three let you set up an agent with a specific job, and it keeps its files and logins between sessions instead of starting fresh.\n\nOpenClaw and Hermes are self-hosted, so the machine can be a laptop, a VPS, or a container that someone already pays for and can log into.\n\nGrok Bot runs on a machine SpaceXAI provisions and operates. It gives one computer per account rather than one per agent.\n\nEvery Bot on that account reads the same files and carries the same browser logins, so handing work between two Bots does not require a re-login or file transfer.\n\nHermes and OpenClaw isolate agents instead, and their memory sits in plain files anyone can open and edit.\n\nHermes goes furthest since the agent writes its own skills and a background curator deletes the ones nobody uses.\n\nGrok Bot has the lowest-friction path to a new skill in my opinion.\n\nYou can record up to ten minutes of one pass through a workflow, and it can then turn that into a reusable set of instructions and store it as a skill.\n\nMoving on, OpenClaw and Hermes run on any model provider. Grok Bot runs on Grok.\n\nI prepared the graphic below that has the full breakdown, from hosting and memory through to what each of them costs to run.\n\nAnd if you want to dive deeper, I covered Grok Bot in full in a masterclass, including the shared computer, memory, skills, routines, and the macOS setup.\n\nRead it below.",
    "url": "https://x.com/_avichawla/status/2090368200693440841",
    "likes": 1489,
-   "views": 2631914,
+   "views": 2631944,
    "createdAt": "Thu Aug 20 09:19:50 +0000 2026",
    "source": "x",
    "context": null,
@@ -171,7 +171,7 @@
    "unknownSkill": null,
    "githubRepo": null,
    "topics": [],
-   "rank": 0.9272727272727272
+   "rank": 0.9148936170212766
   },
   {
    "handle": "elayadesigns",
@@ -181,7 +181,7 @@
    "text": "Higgsfield + Cursor Composer 2.5 + my custom landing-page-design-skill.md file.\n\nskill: https://t.co/Gs1RT1BZxi https://t.co/2UbwyBKEnS",
    "url": "https://x.com/elayadesigns/status/2090356254095130825",
    "likes": 1019,
-   "views": 74601,
+   "views": 74602,
    "createdAt": "Thu Aug 20 08:32:22 +0000 2026",
    "source": "x",
    "context": null,
@@ -195,7 +195,7 @@
    "unknownSkill": "landing-page-design-skill",
    "githubRepo": "elayadesign/ai-design-skills",
    "topics": [],
-   "rank": 0.9090909090909091
+   "rank": 0.8936170212765957
   },
   {
    "handle": "jakubkrehel",
@@ -205,7 +205,7 @@
    "text": "Introducing a new skill:\n\n/explain-interface\n\nWhen I'm curious how something was built on the web, I often use DevTools to try to figure it out. Now you can use this skill instead.\n\nTry something like:\n\n/explain-interface how is the gradient on interfere . com built?\n\nhttps://t.co/lcR4NU8I1p",
    "url": "https://x.com/jakubkrehel/status/2090456249460556007",
    "likes": 993,
-   "views": 38165,
+   "views": 38167,
    "createdAt": "Thu Aug 20 15:09:43 +0000 2026",
    "source": "x",
    "context": null,
@@ -231,31 +231,7 @@
    "unknownSkill": null,
    "githubRepo": "jakubkrehel/skills",
    "topics": [],
-   "rank": 0.8909090909090909
-  },
-  {
-   "handle": "MiaAI_lab",
-   "name": "Mia",
-   "followers": 18193,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/2063908041691484160/5XsJBn7I_bigger.jpg",
-   "text": "#1 underrated skill for your harness?\n\nPonytail\n\n- It forces your agent to think like the laziest senior dev\n- It can save you HOURS of research and work\n\nIt's like the developer who looks at 50 lines… says nothing… and replaces them with one.\n\nWorks with Claude Code, Codex, Hermes Agent, Copilot CLI, Pi, OMP, OpenCode, Cursor, Gemini, and more.\n\nhttps://t.co/5CxRPYLsI3",
-   "url": "https://x.com/MiaAI_lab/status/2091858917307421009",
-   "likes": 948,
-   "views": 61552,
-   "createdAt": "Mon Aug 24 12:03:25 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [
-    "dietrichgebert/ponytail"
-   ],
-   "unknownSkill": null,
-   "githubRepo": "dietrichgebert/ponytail",
-   "topics": [],
-   "rank": 0.8727272727272727
+   "rank": 0.8723404255319149
   },
   {
    "handle": "pancomplex",
@@ -280,14 +256,86 @@
    "rank": 0.8571428571428571
   },
   {
+   "handle": "MiaAI_lab",
+   "name": "Mia",
+   "followers": 18197,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/2063908041691484160/5XsJBn7I_bigger.jpg",
+   "text": "#1 underrated skill for your harness?\n\nPonytail\n\n- It forces your agent to think like the laziest senior dev\n- It can save you HOURS of research and work\n\nIt's like the developer who looks at 50 lines… says nothing… and replaces them with one.\n\nWorks with Claude Code, Codex, Hermes Agent, Copilot CLI, Pi, OMP, OpenCode, Cursor, Gemini, and more.\n\nhttps://t.co/5CxRPYLsI3",
+   "url": "https://x.com/MiaAI_lab/status/2091858917307421009",
+   "likes": 948,
+   "views": 61555,
+   "createdAt": "Mon Aug 24 12:03:25 +0000 2026",
+   "source": "x",
+   "context": null,
+   "match": "none",
+   "skills": [],
+   "collection": null,
+   "collections": [],
+   "repos": [
+    "dietrichgebert/ponytail"
+   ],
+   "unknownSkill": null,
+   "githubRepo": "dietrichgebert/ponytail",
+   "topics": [],
+   "rank": 0.851063829787234
+  },
+  {
+   "handle": "dzhng",
+   "name": "David",
+   "followers": 13559,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/1816551258905620480/kGMg3Z6W_bigger.jpg",
+   "text": "My fav new skill is this illustrations skill by @ianneo_ai, really opened my mind on much you can push AI to do something truly unique and non-slopy with the right guidance. AI slop is just a process issue.\n\nhttps://t.co/PCbcHQAzag\n\nSome other variants that I ended up not using: https://t.co/vT4oehEejv",
+   "url": "https://x.com/dzhng/status/2090301403394953711",
+   "likes": 845,
+   "views": 111064,
+   "createdAt": "Thu Aug 20 04:54:25 +0000 2026",
+   "source": "x",
+   "context": null,
+   "match": "none",
+   "skills": [],
+   "collection": null,
+   "collections": [],
+   "repos": [
+    "helloianneo/ian-xiaohei-illustrations"
+   ],
+   "unknownSkill": null,
+   "githubRepo": "helloianneo/ian-xiaohei-illustrations",
+   "topics": [],
+   "rank": 0.8297872340425532
+  },
+  {
+   "handle": "tom_doerr",
+   "name": "Tom Dörr",
+   "followers": 218569,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/1905090420142379008/Ydq5So7B_bigger.jpg",
+   "text": "Installs 160+ production-ready skills for Claude Code, Cursor, and Codex covering DevOps, security, and infrastructure.\n\nhttps://t.co/Afs0TIjUUZ https://t.co/hVdg7th0Hx",
+   "url": "https://x.com/tom_doerr/status/2090918881527205987",
+   "likes": 805,
+   "views": 35126,
+   "createdAt": "Fri Aug 21 21:48:03 +0000 2026",
+   "source": "x",
+   "context": null,
+   "match": "none",
+   "skills": [],
+   "collection": null,
+   "collections": [],
+   "repos": [
+    "BagelHole/DevOps-Security-Agent-Skills"
+   ],
+   "unknownSkill": null,
+   "githubRepo": "BagelHole/DevOps-Security-Agent-Skills",
+   "topics": [],
+   "rank": 0.8085106382978723
+  },
+  {
    "handle": "Dipanshu_AI",
    "name": "Dipanshu Kushwaha",
-   "followers": 27650,
+   "followers": 27654,
    "avatarUrl": "https://pbs.twimg.com/profile_images/1945713783378251776/PwSuIsis_bigger.jpg",
    "text": "INSTEAD OF WATCHING NETFLIX TONIGHT. Spend 2 hour with this. Claude AI FULL COURSE that teaches you how to BUILD and AUTOMATE anything. The people who watch this tonight will wake up tomorrow with a new skill. Watch it and bookmark it now. https://t.co/CMznf3CIbC",
    "url": "https://x.com/Dipanshu_AI/status/2091203876007669872",
    "likes": 714,
-   "views": 73880,
+   "views": 73882,
    "createdAt": "Sat Aug 22 16:40:31 +0000 2026",
    "source": "x",
    "context": null,
@@ -299,77 +347,7 @@
    "unknownSkill": null,
    "githubRepo": null,
    "topics": [],
-   "rank": 0.8545454545454545
-  },
-  {
-   "handle": "Dinosn",
-   "name": "Nicolas Krassas",
-   "followers": 159699,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/1932450033233747968/nu7wcCd5_bigger.jpg",
-   "text": "zyrexnn/cybermes: Autonomous Offensive Security, Bug Bounty &amp; Red Teaming Agent Framework powered by Hermes Agent, specialized reasoning skills, and multi-model LLM orchestration. https://t.co/PuVSXuitPv",
-   "url": "https://x.com/Dinosn/status/2091384639055073775",
-   "likes": 621,
-   "views": 27613,
-   "createdAt": "Sun Aug 23 04:38:48 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [
-    "Zyrexnn/Cybermes"
-   ],
-   "unknownSkill": null,
-   "githubRepo": "Zyrexnn/Cybermes",
-   "topics": [],
-   "rank": 0.8363636363636363
-  },
-  {
-   "handle": "uaghazadae",
-   "name": "uaghazada",
-   "followers": 2384,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/2084071617668292608/uzTw46Xl_bigger.jpg",
-   "text": "INTRODUCING OPEN ANALYTICS DESIGN SKILL\n\nA lot of you asked for a DESIGN-SKILL\n\nHere it is. Our entire design language, open source, MIT:\n\n- every real value from the shipped product: colors, squircles, all seven springs\n- 12 component recipes, type-checked source embedded\n- guides for layout, motion, landing pages, copy\n- one pasteable DESIGN-SKILL.[md] for any agent\n\nTry it:\nnpx getopen-design\n\nIt walks you through it: install the agent skill for Claude Code, drop recipes into your project, or just take the token CSS.\n\nCursor or Codex? Point your rules file at DESIGN-SKILL.[md]and build.\n\nRepo structure follows and includes @Jakubantalik transitions[.]dev. Big thanks to him.\n\nFull source code 👇",
-   "url": "https://x.com/uaghazadae/status/2090525353940820049",
-   "likes": 608,
-   "views": 40388,
-   "createdAt": "Thu Aug 20 19:44:19 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [],
-   "unknownSkill": "design-skill",
-   "githubRepo": null,
-   "topics": [],
-   "rank": 0.8181818181818182
-  },
-  {
-   "handle": "dani_avila7",
-   "name": "Daniel San",
-   "followers": 33637,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/1952921529504649216/RYHFCSSM_bigger.jpg",
-   "text": "Anthropic shipped a skill called discernment-nudge that does nothing but decide when Claude should second-guess itself in front of you\n\nHere's what's interesting about it, the section on when NOT to fire is 3x longer than when to fire\n\nBest trigger logic writing I've read this year\n\nInstall it with:\n/plugin marketplace add anthropics/skills\n/plugin install discernment-nudge@anthropic-agent-skills\n\nhttps://t.co/m5W7RdldqX",
-   "url": "https://x.com/dani_avila7/status/2090266638356566321",
-   "likes": 534,
-   "views": 46162,
-   "createdAt": "Thu Aug 20 02:36:16 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [
-    "anthropics/skills"
-   ],
-   "unknownSkill": "plugin",
-   "githubRepo": "anthropics/skills",
-   "topics": [],
-   "rank": 0.8
+   "rank": 0.7872340425531915
   },
   {
    "handle": "duck",
@@ -396,15 +374,15 @@
    "rank": 0.7857142857142857
   },
   {
-   "handle": "2020_hira",
-   "name": "hiraoku",
-   "followers": 870,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/1376799866593009665/vtUf7Wok_bigger.jpg",
-   "text": "最近話題のskill\n\neli5\nhttps://t.co/FEcE8HxkXw\n\nshow-me\nhttps://t.co/tbpd8g2U7g\n\ndiagram-design\nhttps://t.co/0DctZ93FaD",
-   "url": "https://x.com/2020_hira/status/2092027604195037397",
-   "likes": 451,
-   "views": 34874,
-   "createdAt": "Mon Aug 24 23:13:43 +0000 2026",
+   "handle": "Dinosn",
+   "name": "Nicolas Krassas",
+   "followers": 159699,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/1932450033233747968/nu7wcCd5_bigger.jpg",
+   "text": "zyrexnn/cybermes: Autonomous Offensive Security, Bug Bounty &amp; Red Teaming Agent Framework powered by Hermes Agent, specialized reasoning skills, and multi-model LLM orchestration. https://t.co/PuVSXuitPv",
+   "url": "https://x.com/Dinosn/status/2091384639055073775",
+   "likes": 621,
+   "views": 27614,
+   "createdAt": "Sun Aug 23 04:38:48 +0000 2026",
    "source": "x",
    "context": null,
    "match": "none",
@@ -412,25 +390,45 @@
    "collection": null,
    "collections": [],
    "repos": [
-    "anthropics/claude-plugins-community",
-    "humanlayer/skills",
-    "cathrynlavery/diagram-design"
+    "Zyrexnn/Cybermes"
    ],
    "unknownSkill": null,
-   "githubRepo": "anthropics/claude-plugins-community",
+   "githubRepo": "Zyrexnn/Cybermes",
    "topics": [],
-   "rank": 0.7818181818181819
+   "rank": 0.7659574468085106
   },
   {
-   "handle": "heyrohitai",
-   "name": "Rohit",
-   "followers": 66074,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/2086526402225217536/yj6p3to5_bigger.jpg",
-   "text": "INSTEAD OF WATCHING NETFLIX TONIGHT.\n\nSpend 1 hour with this.\n\nClaude AI FULL COURSE that teaches you how to BUILD and AUTOMATE anything.\n\nThe people who watch this tonight will wake up tomorrow with a new skill.\n\nWatch it and bookmark it now https://t.co/b1MTadWCee",
-   "url": "https://x.com/heyrohitai/status/2091035690733801844",
-   "likes": 436,
-   "views": 59402,
-   "createdAt": "Sat Aug 22 05:32:12 +0000 2026",
+   "handle": "uaghazadae",
+   "name": "uaghazada",
+   "followers": 2384,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/2084071617668292608/uzTw46Xl_bigger.jpg",
+   "text": "INTRODUCING OPEN ANALYTICS DESIGN SKILL\n\nA lot of you asked for a DESIGN-SKILL\n\nHere it is. Our entire design language, open source, MIT:\n\n- every real value from the shipped product: colors, squircles, all seven springs\n- 12 component recipes, type-checked source embedded\n- guides for layout, motion, landing pages, copy\n- one pasteable DESIGN-SKILL.[md] for any agent\n\nTry it:\nnpx getopen-design\n\nIt walks you through it: install the agent skill for Claude Code, drop recipes into your project, or just take the token CSS.\n\nCursor or Codex? Point your rules file at DESIGN-SKILL.[md]and build.\n\nRepo structure follows and includes @Jakubantalik transitions[.]dev. Big thanks to him.\n\nFull source code 👇",
+   "url": "https://x.com/uaghazadae/status/2090525353940820049",
+   "likes": 608,
+   "views": 40390,
+   "createdAt": "Thu Aug 20 19:44:19 +0000 2026",
+   "source": "x",
+   "context": null,
+   "match": "none",
+   "skills": [],
+   "collection": null,
+   "collections": [],
+   "repos": [],
+   "unknownSkill": "design-skill",
+   "githubRepo": null,
+   "topics": [],
+   "rank": 0.7446808510638298
+  },
+  {
+   "handle": "AskMichaelTaiwo",
+   "name": "Michael Taiwo",
+   "followers": 89368,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/1763996178465935360/dJ1UB2l7_bigger.jpg",
+   "text": "Three signs your career is not growing, even if your salary is:\n\n1. You can do your job without thinking. No new challenge, no new skill, no discomfort.\n\n2. Nobody asks for your opinion on decisions that matter. You execute. You do not shape.\n\n3. Your title changed but your responsibilities stayed the same. A promotion without expansion is a costume change.\n\nGrowth is not comfort with better pay. Growth is discomfort with better tools.",
+   "url": "https://x.com/AskMichaelTaiwo/status/2090608574481482166",
+   "likes": 564,
+   "views": 21521,
+   "createdAt": "Fri Aug 21 01:15:00 +0000 2026",
    "source": "x",
    "context": null,
    "match": "none",
@@ -441,65 +439,7 @@
    "unknownSkill": null,
    "githubRepo": null,
    "topics": [],
-   "rank": 0.7636363636363637
-  },
-  {
-   "handle": "mattpocockuk",
-   "name": "Matt Pocock",
-   "followers": 337114,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/1666460461884211204/SmBm505D_bigger.jpg",
-   "text": "FYI if you need to build any automations around new skill releases from me...\n\nMy skills have an RSS feed:\n\nhttps://t.co/M3zbnNZOeA",
-   "url": "https://x.com/mattpocockuk/status/2092221475881140713",
-   "likes": 405,
-   "views": 33145,
-   "createdAt": "Tue Aug 25 12:04:06 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [],
-   "unknownSkill": null,
-   "githubRepo": null,
-   "topics": [],
-   "rank": 0.7454545454545455
-  },
-  {
-   "handle": "ai_ba_reza",
-   "name": "Reza",
-   "followers": 397,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/2068287441820172288/7vLkZMX3_bigger.jpg",
-   "text": "اگه دانشجویید و می خواید مقاله بنویسید و از ابزار زیر استفاده نکنید به خودتون ظلم کردید\n\nhttps://t.co/SqpiAMmGXe\n\nکتابخونه Scientific Agent Skills شامل ۱۶۳ skill آماده برای تبدیل هر AI Agent به دستیار تحقیقات علمیه.\n\nاین مجموعه بیش از ۱۰۰ دیتابیس علمی را پوشش میده",
-   "url": "https://x.com/ai_ba_reza/status/2092126260118073410",
-   "likes": 377,
-   "views": 19156,
-   "createdAt": "Tue Aug 25 05:45:44 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "collection",
-   "skills": [],
-   "collection": {
-    "author": "k-dense-ai",
-    "count": 97,
-    "repo": "K-Dense-AI/scientific-agent-skills",
-    "repoOwner": "K-Dense-AI"
-   },
-   "collections": [
-    {
-     "author": "k-dense-ai",
-     "count": 97,
-     "repo": "K-Dense-AI/scientific-agent-skills",
-     "repoOwner": "K-Dense-AI"
-    }
-   ],
-   "repos": [
-    "K-Dense-AI/scientific-agent-skills"
-   ],
-   "unknownSkill": null,
-   "githubRepo": "K-Dense-AI/scientific-agent-skills",
-   "topics": [],
-   "rank": 0.7272727272727273
+   "rank": 0.723404255319149
   },
   {
    "handle": "ClachDev",
@@ -524,15 +464,39 @@
    "rank": 0.7142857142857143
   },
   {
-   "handle": "TheAhmadOsman",
-   "name": "Ahmad",
-   "followers": 72046,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/1831406651829559296/iMbSOxdP_bigger.jpg",
-   "text": "I built a skill that automates running ChatGPT Pro, the web version, from any agent I use\n\nNow I just tell my self-hosted DeepSeek V4 Flash 0731 running on OMP to work with ChatGPT 5.6 Sol Pro on plans and research, take the output as an MD document, implement, iterate https://t.co/G6xv4iANyG",
-   "url": "https://x.com/TheAhmadOsman/status/2091970726274216253",
-   "likes": 355,
-   "views": 16904,
-   "createdAt": "Mon Aug 24 19:27:42 +0000 2026",
+   "handle": "dani_avila7",
+   "name": "Daniel San",
+   "followers": 33637,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/1952921529504649216/RYHFCSSM_bigger.jpg",
+   "text": "Anthropic shipped a skill called discernment-nudge that does nothing but decide when Claude should second-guess itself in front of you\n\nHere's what's interesting about it, the section on when NOT to fire is 3x longer than when to fire\n\nBest trigger logic writing I've read this year\n\nInstall it with:\n/plugin marketplace add anthropics/skills\n/plugin install discernment-nudge@anthropic-agent-skills\n\nhttps://t.co/m5W7RdldqX",
+   "url": "https://x.com/dani_avila7/status/2090266638356566321",
+   "likes": 534,
+   "views": 46162,
+   "createdAt": "Thu Aug 20 02:36:16 +0000 2026",
+   "source": "x",
+   "context": null,
+   "match": "none",
+   "skills": [],
+   "collection": null,
+   "collections": [],
+   "repos": [
+    "anthropics/skills"
+   ],
+   "unknownSkill": "plugin",
+   "githubRepo": "anthropics/skills",
+   "topics": [],
+   "rank": 0.7021276595744681
+  },
+  {
+   "handle": "mattpocockuk",
+   "name": "Matt Pocock",
+   "followers": 337118,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/1666460461884211204/SmBm505D_bigger.jpg",
+   "text": "FYI if you need to build any automations around new skill releases from me...\n\nMy skills have an RSS feed:\n\nhttps://t.co/M3zbnNZOeA",
+   "url": "https://x.com/mattpocockuk/status/2092221475881140713",
+   "likes": 408,
+   "views": 33249,
+   "createdAt": "Tue Aug 25 12:04:06 +0000 2026",
    "source": "x",
    "context": null,
    "match": "none",
@@ -543,55 +507,7 @@
    "unknownSkill": null,
    "githubRepo": null,
    "topics": [],
-   "rank": 0.7090909090909091
-  },
-  {
-   "handle": "Helloleoli",
-   "name": "HelloLeo",
-   "followers": 2213,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/1753286891582205952/um3rrB67_bigger.jpg",
-   "text": "最近我们持续把这两年SEO 实战中反复验证的流程整理成可复用的 Codex Skills，逐步开源。\n这次开放的是 Backlink Skills，这个项目带着700+我们已经提交过的免费外链地址信息，支持通过codex驱动自动化提交skill，让提交外链的人工工作量大幅降低，欢迎大家参考和star: https://t.co/PqnIqPlP3v https://t.co/JcFRyAioQU",
-   "url": "https://x.com/Helloleoli/status/2090040121559224777",
-   "likes": 334,
-   "views": 55293,
-   "createdAt": "Wed Aug 19 11:36:10 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [
-    "flaqai/backlink_skills"
-   ],
-   "unknownSkill": null,
-   "githubRepo": "flaqai/backlink_skills",
-   "topics": [],
-   "rank": 0.6909090909090909
-  },
-  {
-   "handle": "goan999999",
-   "name": "govin.eth | G哥",
-   "followers": 9514,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/2085726397587443712/XkX2eLfE_bigger.jpg",
-   "text": "我找到了最牛逼的PPT Skill！【摁头推荐】\n\n再也不用担心做的PPT跟狗屎一样了！\n\n以前 Codex 做 PPT 简直一言难尽（就算用 ppt-master 也很难救），但用了这个 skill 之后，直接能生成非常高级的 PPT，而且它还支持二次编辑！\n\nhttps://t.co/g069C0E6Sg\n\n好东西建议收藏，做 PPT、汇报、方案的朋友可以直接试试。\n\n对啦！预告下！我在给大家制作Cdoex从0到1保姆级视频教程，请大家耐心等待",
-   "url": "https://x.com/goan999999/status/2091898444256612823",
-   "likes": 333,
-   "views": 80568,
-   "createdAt": "Mon Aug 24 14:40:29 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [
-    "chuspeeism/dashi-ppt-skill"
-   ],
-   "unknownSkill": null,
-   "githubRepo": "chuspeeism/dashi-ppt-skill",
-   "topics": [],
-   "rank": 0.6727272727272727
+   "rank": 0.6808510638297872
   },
   {
    "handle": "WalrusQuant",
@@ -601,7 +517,7 @@
    "text": "built a pack of agent skills for sports analytics and modeling.\n\ninstall them into claude code / cursor / whatever agent you use, point it at your data, and it can run EDA, time-safe features, baselines, models, walk-forward validation, leakage checks, calibration, and reporting.\n\nif you're looking for data, i also put together a pipeline to help access some nfl, nba, and mlb stats.\n\nhttps://t.co/S31nmPMv0f",
    "url": "https://x.com/WalrusQuant/status/2092046570850001347",
    "likes": 333,
-   "views": 24416,
+   "views": 24421,
    "createdAt": "Tue Aug 25 00:29:05 +0000 2026",
    "source": "x",
    "context": null,
@@ -615,7 +531,7 @@
    "unknownSkill": null,
    "githubRepo": "WalrusQuant/sports-analytic-skills",
    "topics": [],
-   "rank": 0.6545454545454545
+   "rank": 0.6595744680851063
   },
   {
    "handle": "joshstrange",
@@ -646,8 +562,8 @@
    "avatarUrl": "https://pbs.twimg.com/profile_images/1930709528829423616/U7t4WBAU_bigger.jpg",
    "text": "You installed Claude Code and stopped there.\n\n35 add-ons that turn it into a company (links below):\n\nIf you're new to Claude Code.\nStart here → https://t.co/YbdDKUJsSM\n\nA SENIOR ENGINEER\n\n1. superpowers\n→ https://t.co/tGNwFVYsEa\n\n2. agent-skills\n→ https://t.co/n3GAaErDOH\n\n3. karpathy-skills\n→ https://t.co/z0R8ozhtmb\n\n4. gstack\n→ https://t.co/XPJ0gmpOIx\n\nA PRODUCT DESIGNER\n\n5. ui-ux-pro-max-skill\n→ https://t.co/54NvwKmBix\n\n6. taste-skill\n→ https://t.co/gFud3Sa93j\n\n7. impeccable\n→ https://t.co/fFDkTq8wQR\n\nA QA TESTER\n\n8. Codex\n→ https://t.co/PPPmwl9F1p (paid)\n\n9. playwright-mcp\n→ https://t.co/C9b2nZxiTF\n\n10. skills\n→ https://t.co/iR9fyxUFvL\n\nA DOCS TEAM\n\n11. markitdown\n→ https://t.co/nJzODQKIDl\n\n12. skills\n→ https://t.co/Nj47wymxJR\n\n13. frontend-slides\n→ https://t.co/cjLcONPQIT\n\nA MARKETER\n\n14. marketingskills\n→ https://t.co/ZyoMWfvgf8\n\n15. claude-seo\n→ https://t.co/h481BlnvgB\n\n16. humanizer\n→ https://t.co/3a9HKsFIYX\n\n17. Apify\n→ https://t.co/yn7rQKdnnz (paid)\n\nA SOCIAL MANAGER\n\n18. social-media-skills\n→ https://t.co/ZwNtoUTdVm\n\n19. ManyChat\n→ https://t.co/vBo70XUjQK (paid)\n\n20. GPT Image 2 →https://t.co/Ptbm54A58B (paid)\n\nA MOTION DESIGNER\n\n21. HiggsField\n→ https://t.co/B3eLcc2Kn0 (paid)\n\n22. hyperframes\n→ https://t.co/ogS5d5ityj\n\n23. OpenMontage\n→ https://t.co/H8lDc70xNW\n\n24. OpenCut\n→https://t.co/9YLKSKYHCt\n\nA RESEARCHER\n\n25. Agent-Reach →https://t.co/1mFzc91H9X\n\n26. last30days-skill\n→ https://t.co/TdrSYOFQsT\n\n27. NotebookLM\n→ https://t.co/8ZW2a795nX (free)\n\nAN OPS MANAGER\n\n28. Notion MCP →https://t.co/OmXaT3B4iE (free)\n\n29. github-mcp-server\n→ https://t.co/ITX95VKOZJ\n\n30. claude-mem\n→ https://t.co/emHpdPtiUO\n\n31. mem0\n→ https://t.co/snaZn591kH\n\nTHE WHOLE AGENCY\n\n32. agency-agents\n→ https://t.co/9XD1C4BsmQ\n\n33. awesome-claude-skills\n→ https://t.co/hI8v1hrMkb\n\n34. agents\n→ https://t.co/0LNt2gpXGH\n\n35. claude-skills\n→ https://t.co/SqRj6vAzYh\n\nWhat each one does is on the graphic.\n\nEvery repo is free. Five of the tools are paid.\n\nSeven are ones I already run.\n\nThe rest are the ones I keep sending people.",
    "url": "https://x.com/charliejhills/status/2092256296242438236",
-   "likes": 321,
-   "views": 35337,
+   "likes": 323,
+   "views": 36007,
    "createdAt": "Tue Aug 25 14:22:27 +0000 2026",
    "source": "x",
    "context": null,
@@ -721,31 +637,29 @@
    "unknownSkill": null,
    "githubRepo": "obra/superpowers",
    "topics": [],
-   "rank": 0.6363636363636364
+   "rank": 0.6382978723404256
   },
   {
-   "handle": "FiniYang",
-   "name": "Fini.Yang",
-   "followers": 7147,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/2052051895683084288/ZehEoMjv_bigger.jpg",
-   "text": "持续做个人 IP 漫画，难的不是偶尔生成一张好看的图\n而是下一篇仍是同一个角色、同一种画面语言\n\n我把这套流程做成了开源 Craft Skill：\n默认整页生成，锁定角色、故事、方向和逐字对白\n再用原图与 25% 缩略图双轴验收\nSkill地址：https://t.co/foCOOE2Uat https://t.co/S5XUHVno6f",
-   "url": "https://x.com/FiniYang/status/2091386966504071672",
-   "likes": 304,
-   "views": 22979,
-   "createdAt": "Sun Aug 23 04:48:03 +0000 2026",
+   "handle": "Dipanshu_AI",
+   "name": "Dipanshu Kushwaha",
+   "followers": 27654,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/1945713783378251776/PwSuIsis_bigger.jpg",
+   "text": "INSTEAD OF WATCHING NETFLIX TONIGHT.\n\nSpend 1 hour with this.\n\nClaude AI FULL COURSE that teaches you how to BUILD and AUTOMATE anything.\n\nThe people who watch this tonight will wake up tomorrow with a new skill.\n\nWatch it and Bookmark it now. https://t.co/9fVXW76wwB",
+   "url": "https://x.com/Dipanshu_AI/status/2091490150119506157",
+   "likes": 291,
+   "views": 18507,
+   "createdAt": "Sun Aug 23 11:38:04 +0000 2026",
    "source": "x",
    "context": null,
    "match": "none",
    "skills": [],
    "collection": null,
    "collections": [],
-   "repos": [
-    "ZSeven-W/craft-skills"
-   ],
+   "repos": [],
    "unknownSkill": null,
-   "githubRepo": "ZSeven-W/craft-skills",
+   "githubRepo": null,
    "topics": [],
-   "rank": 0.6181818181818182
+   "rank": 0.6170212765957447
   },
   {
    "handle": "turtlesoupy",
@@ -755,7 +669,7 @@
    "text": "Roblox used to require coding skills to build games and we tried to see if that's true with Codex and Claude.\n\nFirst we ported Quake to Roblox with \"Frag Party\" => flop. Then we spent two weeks to lovingly craft a fish trash collection game \"You're a Fish, Save the World\" => flop.\n\nSo we got mad and made a game overnight called \"Peck for Profit\" where a drinking bird hits a button and coins spit out => 500K MAU and peak 1.8k concurrents. Roblox is strange.",
    "url": "https://x.com/turtlesoupy/status/2091597262564511853",
    "likes": 280,
-   "views": 38831,
+   "views": 38833,
    "createdAt": "Sun Aug 23 18:43:42 +0000 2026",
    "source": "x",
    "context": null,
@@ -767,18 +681,18 @@
    "unknownSkill": null,
    "githubRepo": null,
    "topics": [],
-   "rank": 0.6
+   "rank": 0.5957446808510638
   },
   {
    "handle": "tom_doerr",
    "name": "Tom Dörr",
    "followers": 218569,
    "avatarUrl": "https://pbs.twimg.com/profile_images/1905090420142379008/Ydq5So7B_bigger.jpg",
-   "text": "Curates over 1400 official agent skills from leading development teams for use with coding assistants like Claude Code, Cursor, and Gemini CLI.\n\nhttps://t.co/XcL1VqgO82 https://t.co/nfoJ8nc65u",
-   "url": "https://x.com/tom_doerr/status/2090883462873989168",
-   "likes": 272,
-   "views": 13419,
-   "createdAt": "Fri Aug 21 19:27:18 +0000 2026",
+   "text": "Collects 1497+ official agent skills created by engineering teams at Anthropic, Google Labs, Vercel, and Stripe.\n\nhttps://t.co/zFJRQCNxtg https://t.co/olOdu5XNDS",
+   "url": "https://x.com/tom_doerr/status/2092266436366332114",
+   "likes": 274,
+   "views": 15209,
+   "createdAt": "Tue Aug 25 15:02:45 +0000 2026",
    "source": "x",
    "context": null,
    "match": "none",
@@ -786,12 +700,12 @@
    "collection": null,
    "collections": [],
    "repos": [
-    "VoltAgent/awesome-claude-skills"
+    "VoltAgent/awesome-agent-skills"
    ],
    "unknownSkill": null,
-   "githubRepo": "VoltAgent/awesome-claude-skills",
+   "githubRepo": "VoltAgent/awesome-agent-skills",
    "topics": [],
-   "rank": 0.5818181818181818
+   "rank": 0.574468085106383
   },
   {
    "handle": "mtzaldo",
@@ -820,11 +734,11 @@
    "name": "Tom Dörr",
    "followers": 218569,
    "avatarUrl": "https://pbs.twimg.com/profile_images/1905090420142379008/Ydq5So7B_bigger.jpg",
-   "text": "Collects 1497+ official agent skills created by engineering teams at Anthropic, Google Labs, Vercel, and Stripe.\n\nhttps://t.co/zFJRQCNxtg https://t.co/olOdu5XNDS",
-   "url": "https://x.com/tom_doerr/status/2092266436366332114",
-   "likes": 268,
-   "views": 15130,
-   "createdAt": "Tue Aug 25 15:02:45 +0000 2026",
+   "text": "Curates over 1400 official agent skills from leading development teams for use with coding assistants like Claude Code, Cursor, and Gemini CLI.\n\nhttps://t.co/XcL1VqgO82 https://t.co/nfoJ8nc65u",
+   "url": "https://x.com/tom_doerr/status/2090883462873989168",
+   "likes": 272,
+   "views": 13419,
+   "createdAt": "Fri Aug 21 19:27:18 +0000 2026",
    "source": "x",
    "context": null,
    "match": "none",
@@ -832,39 +746,17 @@
    "collection": null,
    "collections": [],
    "repos": [
-    "VoltAgent/awesome-agent-skills"
+    "VoltAgent/awesome-claude-skills"
    ],
    "unknownSkill": null,
-   "githubRepo": "VoltAgent/awesome-agent-skills",
+   "githubRepo": "VoltAgent/awesome-claude-skills",
    "topics": [],
-   "rank": 0.5636363636363636
-  },
-  {
-   "handle": "Grow_withAI",
-   "name": "Ryan Carter",
-   "followers": 101053,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/2082190185685749760/1XFw8d2z_bigger.jpg",
-   "text": "Anthropic just dropped a 60-minute Claude AI course you should NOT skip.\n\nInstead of spending tonight watching Netflix, spend 1 hour learning how to BUILD and AUTOMATE almost anything with Claude.\n\nWatch this tonight → wake up tomorrow with a powerful new skill.\n\nWatch it now and bookmark it. 🔖",
-   "url": "https://x.com/Grow_withAI/status/2091691320213717103",
-   "likes": 257,
-   "views": 17349,
-   "createdAt": "Mon Aug 24 00:57:27 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [],
-   "unknownSkill": null,
-   "githubRepo": null,
-   "topics": [],
-   "rank": 0.5454545454545454
+   "rank": 0.5531914893617021
   },
   {
    "handle": "flornkm",
    "name": "Florian",
-   "followers": 12530,
+   "followers": 12531,
    "avatarUrl": "https://pbs.twimg.com/profile_images/2041035847844388864/5C6l7S9A_bigger.jpg",
    "text": "Working on a new skill to easily create WebGL components.\n\nUsed it to recreate Apple's new preview icon on the web: https://t.co/vPZ3Y11p5u",
    "url": "https://x.com/flornkm/status/2090108780222824752",
@@ -881,7 +773,7 @@
    "unknownSkill": null,
    "githubRepo": null,
    "topics": [],
-   "rank": 0.5272727272727272
+   "rank": 0.5319148936170213
   },
   {
    "handle": "8pq",
@@ -891,7 +783,7 @@
    "text": "my favorite notion skill: /generate architecture diagrams from meeting notes\n\ni made a skill that generates a lightweight whiteboard HTML artifact based on conversations i have with a customer\n\nthe skill gives me a before/after scenario of what we discussed. it makes it easier for me and the customer to conceptualize the problem we're trying to solve.\n\nit's not perfect but it's a good starting point for complex conversations. i'll usually take this and make a prettier version in figjam after.\n\ni wish i had this back when i was working in the data warehouse space",
    "url": "https://x.com/8pq/status/2090559767865688235",
    "likes": 209,
-   "views": 32726,
+   "views": 32728,
    "createdAt": "Thu Aug 20 22:01:04 +0000 2026",
    "source": "x",
    "context": null,
@@ -903,7 +795,7 @@
    "unknownSkill": "generate",
    "githubRepo": null,
    "topics": [],
-   "rank": 0.509090909090909
+   "rank": 0.5106382978723404
   },
   {
    "handle": "guidoiaquinti",
@@ -935,7 +827,7 @@
    "text": "Lists skills for building AI agent workflows in Claude Code, Codex, Gemini CLI, and custom agents.\n\nhttps://t.co/UpNlVle4LQ https://t.co/l6YhoNPt4Y",
    "url": "https://x.com/tom_doerr/status/2090866941502132720",
    "likes": 208,
-   "views": 12707,
+   "views": 12708,
    "createdAt": "Fri Aug 21 18:21:39 +0000 2026",
    "source": "x",
    "context": null,
@@ -949,7 +841,7 @@
    "unknownSkill": null,
    "githubRepo": "Prat011/awesome-llm-skills",
    "topics": [],
-   "rank": 0.4909090909090909
+   "rank": 0.48936170212765956
   },
   {
    "handle": "trevin",
@@ -959,7 +851,7 @@
    "text": "Compound Engineering got ~70% smaller.\n\n(Or at least the part your agent has to load up front did)\n\nOver the last month, we rewrote nearly every skill in the plugin to use less context.\n\nInstead of loading the full instruction set up front, skills now load the essentials first and pull in detailed procedures only when they’re needed. That means less wasted context, less risk of truncation, and more consistent behavior across harnesses.\n\nMost skills’ main SKILL.md files ended up about 70% smaller.\n\nThere wasn’t one clever compression trick. It took a long process of rewriting, testing, running evals, finding regressions, and doing it again (and again).\n\nv3.23 turned into one of the largest releases we’ve shipped since I started working on the plugin.\n\nIf you already have it installed through your harness, you can wait for the auto-update or force an update now.\n\nIf you’ve never installed it, now’s a good time:\n\nhttps://t.co/xZ0zZZj356",
    "url": "https://x.com/trevin/status/2091566761737117851",
    "likes": 205,
-   "views": 21559,
+   "views": 21560,
    "createdAt": "Sun Aug 23 16:42:30 +0000 2026",
    "source": "x",
    "context": null,
@@ -985,7 +877,7 @@
    "unknownSkill": null,
    "githubRepo": "EveryInc/compound-engineering-plugin",
    "topics": [],
-   "rank": 0.4727272727272727
+   "rank": 0.46808510638297873
   },
   {
    "handle": "rubenhassid",
@@ -1007,31 +899,7 @@
    "unknownSkill": "linkedin",
    "githubRepo": null,
    "topics": [],
-   "rank": 0.45454545454545453
-  },
-  {
-   "handle": "elayadesigns",
-   "name": "Elaya",
-   "followers": 5424,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/2066402050725027840/UAoYKzll_bigger.jpg",
-   "text": "Built this using Higgsfield + Cursor Composer 2.5 + my custom landing-page-design-skill.md file.\n\nSkill: https://t.co/Gs1RT1BZxi https://t.co/Er79hddDrc",
-   "url": "https://x.com/elayadesigns/status/2089981807190311199",
-   "likes": 200,
-   "views": 12619,
-   "createdAt": "Wed Aug 19 07:44:27 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [
-    "elayadesign/ai-design-skills"
-   ],
-   "unknownSkill": "landing-page-design-skill",
-   "githubRepo": "elayadesign/ai-design-skills",
-   "topics": [],
-   "rank": 0.43636363636363634
+   "rank": 0.44680851063829785
   },
   {
    "handle": "j_maffe",
@@ -1056,37 +924,15 @@
    "rank": 0.42857142857142855
   },
   {
-   "handle": "startupideaspod",
-   "name": "The Startup Ideas Podcast (SIP) 🧃",
-   "followers": 46498,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/1955709395553124352/b_NlfUL__bigger.jpg",
-   "text": "My whole company runs on skills I bundled into a GitHub repo.\n\nHere's how to build the same thing for your team:\n\n- Put your skills in a GitHub repo\n- Get Claude to write the couple of JSON files that make it readable as a plugin\n- In Claude Code, type /plugin, go to marketplaces, add marketplace, paste your repo URL\n- Split the plugins by department, so your copywriter isn't installing the finance skills\n\nIt works in Codex too. I've got the same team skills installed there and I use them the same way.\n\nNow when I build something like my Notion formatting skill, I add it to the repo and it lands on everyone's Claude and Codex. If someone wrecks a skill, we roll it back to an older version.\n\nThe key is enabling auto-update, so when someone improves a skill everyone benefits.\n\nI don't have a clue how the JSON works. I got Claude to set the whole thing up for me.\n\nStart with one skill and before you know it your whole team will be AI pilled.",
-   "url": "https://x.com/startupideaspod/status/2090438710101709178",
-   "likes": 192,
-   "views": 19263,
-   "createdAt": "Thu Aug 20 14:00:01 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [],
-   "unknownSkill": "plugin",
-   "githubRepo": null,
-   "topics": [],
-   "rank": 0.41818181818181815
-  },
-  {
-   "handle": "NielsRogge",
-   "name": "Niels Rogge",
-   "followers": 22433,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/1828883496066060288/n0OUAXhz_bigger.jpg",
-   "text": "Semantic Scholar (@SemanticScholar) is a rich source of information to find citation data of papers\n\nThere's now an easy-to-use CLI and Skill so you can ask your agent things like \"Find me all papers that cite the DeepSeek-R1 paper\"\n\nhttps://t.co/mTpej6TH3r",
-   "url": "https://x.com/NielsRogge/status/2091935416165236872",
-   "likes": 180,
-   "views": 14710,
-   "createdAt": "Mon Aug 24 17:07:24 +0000 2026",
+   "handle": "elayadesigns",
+   "name": "Elaya",
+   "followers": 5424,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/2066402050725027840/UAoYKzll_bigger.jpg",
+   "text": "Built this using Higgsfield + Cursor Composer 2.5 + my custom landing-page-design-skill.md file.\n\nSkill: https://t.co/Gs1RT1BZxi https://t.co/Er79hddDrc",
+   "url": "https://x.com/elayadesigns/status/2089981807190311199",
+   "likes": 200,
+   "views": 12620,
+   "createdAt": "Wed Aug 19 07:44:27 +0000 2026",
    "source": "x",
    "context": null,
    "match": "none",
@@ -1094,12 +940,12 @@
    "collection": null,
    "collections": [],
    "repos": [
-    "huggingface/s2-cli"
+    "elayadesign/ai-design-skills"
    ],
-   "unknownSkill": null,
-   "githubRepo": "huggingface/s2-cli",
+   "unknownSkill": "landing-page-design-skill",
+   "githubRepo": "elayadesign/ai-design-skills",
    "topics": [],
-   "rank": 0.4
+   "rank": 0.425531914893617
   },
   {
    "handle": "AamirAnsar94694",
@@ -1121,7 +967,7 @@
    "unknownSkill": null,
    "githubRepo": null,
    "topics": [],
-   "rank": 0.38181818181818183
+   "rank": 0.40425531914893614
   },
   {
    "handle": "tom_doerr",
@@ -1131,7 +977,7 @@
    "text": "Installs 28 portable thinking skills into Claude Code, GitHub Copilot, Codex, and Cursor to provide agents with structured mental models for diagnosis, decisions, and strategy.\n\nhttps://t.co/CbsVfNbStH https://t.co/AY1voCjJxW",
    "url": "https://x.com/tom_doerr/status/2091179191127441877",
    "likes": 150,
-   "views": 11172,
+   "views": 11173,
    "createdAt": "Sat Aug 22 15:02:26 +0000 2026",
    "source": "x",
    "context": null,
@@ -1145,7 +991,31 @@
    "unknownSkill": null,
    "githubRepo": "tjboudreaux/cc-thinking-skills",
    "topics": [],
-   "rank": 0.36363636363636365
+   "rank": 0.3829787234042553
+  },
+  {
+   "handle": "tom_doerr",
+   "name": "Tom Dörr",
+   "followers": 218569,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/1905090420142379008/Ydq5So7B_bigger.jpg",
+   "text": "Archify generates self-contained HTML architecture diagrams from codebases and system descriptions via its agent skill for Raven, Cursor, Claude Code, Codex CLI, and OpenCode.\n\nhttps://t.co/dDNDMBRLmW https://t.co/05xUav34sx",
+   "url": "https://x.com/tom_doerr/status/2092273129900941672",
+   "likes": 146,
+   "views": 9246,
+   "createdAt": "Tue Aug 25 15:29:21 +0000 2026",
+   "source": "x",
+   "context": null,
+   "match": "none",
+   "skills": [],
+   "collection": null,
+   "collections": [],
+   "repos": [
+    "tt-a1i/archify"
+   ],
+   "unknownSkill": null,
+   "githubRepo": "tt-a1i/archify",
+   "topics": [],
+   "rank": 0.3617021276595745
   },
   {
    "handle": "thehazarika",
@@ -1168,30 +1038,6 @@
    "githubRepo": null,
    "topics": [],
    "rank": 0.35714285714285715
-  },
-  {
-   "handle": "tom_doerr",
-   "name": "Tom Dörr",
-   "followers": 218569,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/1905090420142379008/Ydq5So7B_bigger.jpg",
-   "text": "Archify generates self-contained HTML architecture diagrams from codebases and system descriptions via its agent skill for Raven, Cursor, Claude Code, Codex CLI, and OpenCode.\n\nhttps://t.co/dDNDMBRLmW https://t.co/05xUav34sx",
-   "url": "https://x.com/tom_doerr/status/2092273129900941672",
-   "likes": 145,
-   "views": 9204,
-   "createdAt": "Tue Aug 25 15:29:21 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [
-    "tt-a1i/archify"
-   ],
-   "unknownSkill": null,
-   "githubRepo": "tt-a1i/archify",
-   "topics": [],
-   "rank": 0.34545454545454546
   },
   {
    "handle": "charliejhills",
@@ -1280,40 +1126,18 @@
    "unknownSkill": null,
    "githubRepo": "garrytan/gstack",
    "topics": [],
-   "rank": 0.32727272727272727
+   "rank": 0.3404255319148936
   },
   {
-   "handle": "Arzoo12sh",
-   "name": "Arzoo Ai",
-   "followers": 4565,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/2085768447754170370/7dwNEgIl_bigger.jpg",
-   "text": "OAI video is no longer just a collection of random clips it is moving from generation to delivery\n\nI used Flova AI and Seedance 2 5 to create a complete cohesive 30 second GRWM narrative video\n\nFrom prompt roulette to reference driven creation Flova Skills make it effortless to turn your creative concepts into repeatable workflows\n\nSeedance 2 5 Super Savings Month is LIVE\nGet Up to 74% OFF Limited Time Only\nUp to 2x Credits and 60% OFF 480p Generation As low as $0 02 per sec\n\nStop copying prompts start running Skill\n[ Video add]\n\nThread Reply 1 (Workflow Breakdown & Concept):\nThe Concept\nAn authentic DV camcorder POV Get Ready With Me vlog featuring CHASE a Korean creator in her 20s\n\nWhy Flova and Seedance 2 5\n1 Complete Narrative Instead of stitching broken clips Flova Agent planned the storyboard and script for a cohesive 30s video\n2 Character and Visual Consistency Supported by multimodal references keeping character identity warm vanity lighting and realistic DV texture consistent throughout\n3 Precision Editing Fine tuned details without discarding the entire sequence or wasting credits\n\nThread Reply 2 (CTA):\nWant to reproduce this exact workflow for your own videos or brand ads\n\nInstead of copying a single prompt line run the full Flova Skill to preserve the visual style shot rhythm and storytelling structure\n\nTry the Skill on Flova AI today\n\nhttps://t.co/lKH0gud4vJ",
-   "url": "https://x.com/Arzoo12sh/status/2092143249251242115",
-   "likes": 115,
-   "views": 8500,
-   "createdAt": "Tue Aug 25 06:53:15 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [],
-   "unknownSkill": null,
-   "githubRepo": null,
-   "topics": [],
-   "rank": 0.3090909090909091
-  },
-  {
-   "handle": "GitTrend0x",
-   "name": "GitTrend",
-   "followers": 24297,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/2027224265200902144/BG6LQpAG_bigger.jpg",
-   "text": "今天 GitHub 上封神的项目🔥\n\n1. ayghri/i-have-adhd\nADHD 友好输出神器。强制 Agent 先给下一步行动、再解释原因，彻底告别把答案埋在第八段的啰嗦病。\n🔗 直达：https://t.co/0e5kIopMc3\n以前对着墙砖式回复干瞪眼，现在直接拿结果干活。生产级输出纪律，星标狂飙！\n\n2. titanwings/distilly\n把任何人的思考方式、判断风格、表达习惯蒸馏成可复用 Person Profile Skill。同事、偶像、自己都能做成“第二大脑”挂载到任意 Agent。\n🔗 直达：https://t.co/54nh2ls5pM\n以前抄作业还得自己提炼，现在一键蒸馏人格级 Know-How。Agent 终于有“同事灵魂”了！\n\n3. citrolabs/ego-lite\n把你已登录的浏览器会话零配置借给 Agent 用（共享 cookie/session），Codex / Claude Code 直接复用，再也不用重新过 2FA。\n🔗 直达：https://t.co/u9pxdZnel6\nAgent 终于能用你的真实登录态干活了。隐私友好 + 零成本，刚需到爆炸！\n\n4. 42-evey/hermes-plugins\nHermes 专用插件全家桶：目标管理、跨 Agent 桥接、智能模型路由、成本护栏、自省反射、记忆巩固……23 个生产级插件一次装齐。\n🔗 直达：https://t.co/YRVhhq2aWC\n把 Hermes 从“能聊天”直接升级成“能自主决策 + 控成本 + 自进化”的完整操作系统。\n\n5. Romanescu11/hermes-skill-factory\nMeta-Skill：默默观察你的真实工作流，自动提议并生成可复用 SKILL.md + 插件命令。重复做过的事再也不用重新教。\n🔗 直达：https://t.co/EwNBXVsHuN\nAgent 开始自己写技能了。从“用技能”到“造技能”的闭环正式打通！\n\n//\n\n总结\n\n2026 年下半年的真正风口已经不是“再做一个 Agent”，而是 技能蒸馏 + 输出纪律 + 会话复用 + 自进化插件。谁先把这五件套玩透，谁就站在下一波生产力 C 位。",
-   "url": "https://x.com/GitTrend0x/status/2091869132417540433",
-   "likes": 112,
-   "views": 27356,
-   "createdAt": "Mon Aug 24 12:44:00 +0000 2026",
+   "handle": "tom_doerr",
+   "name": "Tom Dörr",
+   "followers": 218569,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/1905090420142379008/Ydq5So7B_bigger.jpg",
+   "text": "Generate Excalidraw, Mermaid, and Canvas diagrams from text in Obsidian using Claude Code skills.\n\nhttps://t.co/Wh6uH71Ape https://t.co/HuWYDY6wxH",
+   "url": "https://x.com/tom_doerr/status/2090765135740616711",
+   "likes": 113,
+   "views": 8503,
+   "createdAt": "Fri Aug 21 11:37:07 +0000 2026",
    "source": "x",
    "context": null,
    "match": "none",
@@ -1321,16 +1145,36 @@
    "collection": null,
    "collections": [],
    "repos": [
-    "ayghri/i-have-adhd",
-    "titanwings/distilly",
-    "citrolabs/ego-lite",
-    "42-evey/hermes-plugins",
-    "Romanescu11/hermes-skill-factory"
+    "axtonliu/axton-obsidian-visual-skills"
    ],
-   "unknownSkill": "hermes-skill",
-   "githubRepo": "ayghri/i-have-adhd",
+   "unknownSkill": null,
+   "githubRepo": "axtonliu/axton-obsidian-visual-skills",
    "topics": [],
-   "rank": 0.2909090909090909
+   "rank": 0.3191489361702128
+  },
+  {
+   "handle": "tom_doerr",
+   "name": "Tom Dörr",
+   "followers": 218569,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/1905090420142379008/Ydq5So7B_bigger.jpg",
+   "text": "Installs 132 hand-curated SKILL.md playbooks into Mercury, Claude Code, Codex CLI, and other AI agents to support diverse coding workflows.\n\nhttps://t.co/ysM63FsRmY https://t.co/KVMmi6kIYx",
+   "url": "https://x.com/tom_doerr/status/2091384004654027132",
+   "likes": 108,
+   "views": 11033,
+   "createdAt": "Sun Aug 23 04:36:17 +0000 2026",
+   "source": "x",
+   "context": null,
+   "match": "none",
+   "skills": [],
+   "collection": null,
+   "collections": [],
+   "repos": [
+    "cosmicstack-labs/mercury-agent-skills"
+   ],
+   "unknownSkill": null,
+   "githubRepo": "cosmicstack-labs/mercury-agent-skills",
+   "topics": [],
+   "rank": 0.2978723404255319
   },
   {
    "handle": "notatoad",
@@ -1355,33 +1199,9 @@
    "rank": 0.2857142857142857
   },
   {
-   "handle": "tom_doerr",
-   "name": "Tom Dörr",
-   "followers": 218569,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/1905090420142379008/Ydq5So7B_bigger.jpg",
-   "text": "Installs 132 hand-curated SKILL.md playbooks into Mercury, Claude Code, Codex CLI, and other AI agents to support diverse coding workflows.\n\nhttps://t.co/ysM63FsRmY https://t.co/KVMmi6kIYx",
-   "url": "https://x.com/tom_doerr/status/2091384004654027132",
-   "likes": 108,
-   "views": 11032,
-   "createdAt": "Sun Aug 23 04:36:17 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [
-    "cosmicstack-labs/mercury-agent-skills"
-   ],
-   "unknownSkill": null,
-   "githubRepo": "cosmicstack-labs/mercury-agent-skills",
-   "topics": [],
-   "rank": 0.2727272727272727
-  },
-  {
    "handle": "piyascode9",
    "name": "Ai With Piyas",
-   "followers": 44574,
+   "followers": 44577,
    "avatarUrl": "https://pbs.twimg.com/profile_images/1992414944080662529/23KNi-17_bigger.jpg",
    "text": "🚨 BREAKING: Claude can now BUILD YOUTUBE CHANNEL From Zero and reach monetization requirements in 90 days. For free.\n\nNo costly course.\nNo advanced AI skills.\nNo guessing what to post.\n\nHere are 10 prompts to Monetize YouTube: https://t.co/2sEvqEwuQ0",
    "url": "https://x.com/piyascode9/status/2090302679079932010",
@@ -1398,7 +1218,7 @@
    "unknownSkill": null,
    "githubRepo": null,
    "topics": [],
-   "rank": 0.2545454545454545
+   "rank": 0.2765957446808511
   },
   {
    "handle": "reiraxbt",
@@ -1408,7 +1228,7 @@
    "text": "Andrew Ng just released a free 2-hour course\n\nOn building agentic skills from scratch with Anthropic:\n\n00:00 - Build agent skills with Claude\n22:32 - Use Claude's pre-built skills\n41:07 - Skills vs tools, MCP, and sub-agents\n01:06:06 - Skills for long-running agents\n\nSkills → Tools → Sub-agents → Graphs → Long-Running Systems\n\nThis 2-hour watch can replace 10 paid courses on building agents\n\nTaught alongside Anthropic engineers\n\nBookmark and watch it tonight\n\nThen read the full article on graph engineering below ↓",
    "url": "https://x.com/reiraxbt/status/2091918831065129165",
    "likes": 101,
-   "views": 5362,
+   "views": 5366,
    "createdAt": "Mon Aug 24 16:01:29 +0000 2026",
    "source": "x",
    "context": null,
@@ -1420,18 +1240,18 @@
    "unknownSkill": null,
    "githubRepo": null,
    "topics": [],
-   "rank": 0.23636363636363636
+   "rank": 0.2553191489361702
   },
   {
-   "handle": "opensourcelab9",
-   "name": "オープンソース研究所",
-   "followers": 5758,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/2043709040921059328/1qDRmMiX_bigger.jpg",
-   "text": "【保存版】\nAIにコードを書かせる環境、この9本で差がつきます。\nどれも★5万超えなのに、今も1日数百スター伸び続けてる現役ばかりです👀\n\n1. Egonex-AI/Understand-Anything\n→ コードを歩いて質問できる地図に変える。Claude CodeもCodexもCursorも対応\n\nhttps://t.co/1rIRVscMwT\n\n2. Leonxlnx/taste-skill\n→ AIの出力が“ありがち”に落ちるのを止める、審美眼の追加部品\n\nhttps://t.co/KaTUb4JEwF\n\n3. ComposioHQ/awesome-claude-skills\n→ Claude用のskillと道具を集めた総まとめ。まず何を入れるか迷った時の索引\n\nhttps://t.co/30aEeReRFT\n\n4. cline/cline\n→ 自律コーディングの担当役。開発部品・エディタ拡張・ターミナルの3つの姿で入る\n\nhttps://t.co/Bq7TfANeYK\n\n5. upstash/context7\n→ 最新の公式ドキュメントをAIへ流し込む。古い書き方で提案されるのを止める\n\nhttps://t.co/lJzuBV5EYB\n\n6. MemPalace/mempalace\n→ AIの記憶を担う土台。検証の成績で最強を名乗り、しかも無料\n\nhttps://t.co/R5WK2E0j5c\n\n7. aaif-goose/goose\n→ 提案で終わらせず、導入・実行・編集・テストまで自分でやりに行く担当役\n\nhttps://t.co/8CRqnBuCDa\n\n8. CherryHQ/cherry-studio\n→ 主要なAIを1画面に集約。用途別のアシスタント300以上が最初から入ってる\n\nhttps://t.co/4l4XboIyH9\n\n9. stablyai/orca\n→ 並列で走る担当役をまとめて見張る作業場。自分の契約のまま動かせる\n\nhttps://t.co/PvlEL9VxaH\n\n9本とも★5万超で、全部無料。\n名前が出てこないと探せない領域なので、このオープンソース9選はブックマーク推奨です。",
-   "url": "https://x.com/opensourcelab9/status/2091352237465579688",
-   "likes": 99,
-   "views": 7871,
-   "createdAt": "Sun Aug 23 02:30:03 +0000 2026",
+   "handle": "DivyanshT91162",
+   "name": "divyansh tiwari",
+   "followers": 11197,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/2018942374924451840/PvkjYG2F_bigger.jpg",
+   "text": "A Japanese developer discovered a seriously underrated Claude Code trick.\n\nInstall the \"Find Skills\" skill, then simply ask:\n\n“Is there a good skill for [YOUR GOAL]?”\n\nClaude can discover the right skills for your project and use them to get the job done more effectively.\n\nInstall it:\n\nnpx skills add https://t.co/Xl56bAz6gL --skill find-skills\n\nThis is one of those tiny Claude Code tricks that can completely change how you build with it.\n\nSave this. You’ll thank yourself later.",
+   "url": "https://x.com/DivyanshT91162/status/2091094262037500401",
+   "likes": 85,
+   "views": 8630,
+   "createdAt": "Sat Aug 22 09:24:57 +0000 2026",
    "source": "x",
    "context": null,
    "match": "none",
@@ -1439,20 +1259,12 @@
    "collection": null,
    "collections": [],
    "repos": [
-    "Egonex-AI/Understand-Anything",
-    "Leonxlnx/taste-skill",
-    "ComposioHQ/awesome-claude-skills",
-    "cline/cline",
-    "upstash/context7",
-    "MemPalace/mempalace",
-    "aaif-goose/goose",
-    "CherryHQ/cherry-studio",
-    "stablyai/orca"
+    "vercel-labs/skills"
    ],
-   "unknownSkill": "taste-skill",
-   "githubRepo": "Egonex-AI/Understand-Anything",
+   "unknownSkill": null,
+   "githubRepo": "vercel-labs/skills",
    "topics": [],
-   "rank": 0.21818181818181817
+   "rank": 0.23404255319148937
   },
   {
    "handle": "jonathanhefner",
@@ -1481,58 +1293,10 @@
    "name": "divyansh tiwari",
    "followers": 11197,
    "avatarUrl": "https://pbs.twimg.com/profile_images/2018942374924451840/PvkjYG2F_bigger.jpg",
-   "text": "A Japanese developer discovered a seriously underrated Claude Code trick.\n\nInstall the \"Find Skills\" skill, then simply ask:\n\n“Is there a good skill for [YOUR GOAL]?”\n\nClaude can discover the right skills for your project and use them to get the job done more effectively.\n\nInstall it:\n\nnpx skills add https://t.co/Xl56bAz6gL --skill find-skills\n\nThis is one of those tiny Claude Code tricks that can completely change how you build with it.\n\nSave this. You’ll thank yourself later.",
-   "url": "https://x.com/DivyanshT91162/status/2091094262037500401",
-   "likes": 85,
-   "views": 8630,
-   "createdAt": "Sat Aug 22 09:24:57 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [
-    "vercel-labs/skills"
-   ],
-   "unknownSkill": null,
-   "githubRepo": "vercel-labs/skills",
-   "topics": [],
-   "rank": 0.2
-  },
-  {
-   "handle": "tom_doerr",
-   "name": "Tom Dörr",
-   "followers": 218569,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/1905090420142379008/Ydq5So7B_bigger.jpg",
-   "text": "Organizes creative workflows and prompt patterns into structured SKILL.md playbooks for AI coding agents like Codex, Claude, and Cursor.\n\nhttps://t.co/xlaaCpqNg6 https://t.co/oK7tqjigAC",
-   "url": "https://x.com/tom_doerr/status/2090739168380854442",
-   "likes": 80,
-   "views": 8048,
-   "createdAt": "Fri Aug 21 09:53:56 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [
-    "MengTo/Skills"
-   ],
-   "unknownSkill": null,
-   "githubRepo": "MengTo/Skills",
-   "topics": [],
-   "rank": 0.18181818181818182
-  },
-  {
-   "handle": "DivyanshT91162",
-   "name": "divyansh tiwari",
-   "followers": 11197,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/2018942374924451840/PvkjYG2F_bigger.jpg",
    "text": "TOP 11 OPEN-SOURCE GITHUB REPOS FOR AI CODING AGENTS\n\nWorth bookmarking if you’re building with AI coding agents.\n\n1. Everything Claude Code\nAgent harness with skills, memory, security & workflows.\nhttps://t.co/nbvFEfrXDf\n\n2. Superpowers\nA complete agentic skills framework for serious software development.\nhttps://t.co/gAt8Fimfvj\n\n3. Agent Skills\nProduction-ready skills designed to make AI coding agents more capable.\nhttps://t.co/iyWBG5buKJ\n\n4. Google Skills\nOpen-source agent skills for Google products and technologies.\nhttps://t.co/fAHIu6cW4j\n\n5. Prime Agent\nA self-improving coding agent built for long-running autonomous tasks.\nhttps://t.co/MmWD1UFYG1\n\n6. AgentMemory\nPersistent memory for AI coding agents across projects and sessions.\nhttps://t.co/Y6vAYJcF9s\n\n7. OmniRoute\nOne AI gateway connecting coding agents to hundreds of providers and models.\nhttps://t.co/DyQkj165aY\n\n8. CC Switch\nManage Claude Code, Codex, Gemini CLI, OpenCode and more from one place.\nhttps://t.co/OUYolWf8I1\n\n9. AgentTrail\nMonitor AI coding agents, tool calls, file changes and progress in real time.\nhttps://t.co/OIe7ZjgNed\n\n10. Last30Days Skill\nResearch any topic across X, Reddit, YouTube, HN and the web with an AI agent.\nhttps://t.co/BldnZAeh8B\n\n11. Awesome Harness Engineering\nA curated collection of agent memory, orchestration, MCP, evals & observability tools.\nhttps://t.co/EYUyXG6PLo\n\nAll are open source.\n\nBookmark this for the weekend — you’ll want these when building with AI agents.",
    "url": "https://x.com/DivyanshT91162/status/2091950944363872677",
    "likes": 73,
-   "views": 4730,
+   "views": 4732,
    "createdAt": "Mon Aug 24 18:09:06 +0000 2026",
    "source": "x",
    "context": null,
@@ -1580,12 +1344,36 @@
    "unknownSkill": null,
    "githubRepo": "obra/superpowers",
    "topics": [],
-   "rank": 0.16363636363636364
+   "rank": 0.2127659574468085
+  },
+  {
+   "handle": "Howaboua",
+   "name": "Howaboua",
+   "followers": 1531,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/2070564812447252480/h-r1R4x2_bigger.jpg",
+   "text": "People of @pidotdev! I spent last 3 days rejigging my skills completely and got some juicy ones for y'all tinkerers. For this package you gotta scroll down and actually read lol.\n\nWhen I initially rewrote the skillset for 5.6, I didn't test in isolation. This time around, I ran Pi without any extensions, skills or context. It turns out 5.6 models just know what a skill is anyway and how to create it. So the optimisation is around descriptions being triggers, and giving the agent deltas that prevent Clankas from slop, instead of feeding it massive instructions like some older skills do (seeing how compact some of the Clanking Maestros' skills are).\n\nAs such:\n\nFoundations package - stuff you shouldn't start your agents without.\nhttps://t.co/wGBO48BpQr\n\n- skill-creator - \"Read before creating or revising a reusable agent skill.\" - I cannot believe this is now 26 lines and that's enough.\n- agents-md - \"Read before creating, auditing, or revising an AGENTS.md file.\" (25 lines)\n- communication - \"Speak and write like a real person. Must always apply.\" - with references: conversation, explain-and-teach, exploration, review, technical writing, writing. Clankers load them at the beginning of the conversation. Why not global agents.md or sysprompt? Because loading it at the start of the conversation is less rigid than having it be part of the system prompt - if you put something in an agents.md for 5.6, it will refuse to behave otherwise. You also avoid having separate agent profiles for this etc (16 lines for main skill, a bit more for references. References are inteded as living docs)\n\nCode package - documenting how I work with Clankas to produce Gourmet Slop™\nhttps://t.co/VC8gHIXIdL\n\n- codebase-hygiene - \"Must always apply when working on maintained code.\" - all-in-one for working with agents and producing codebases that agents can live in (as opposed to writing human readable code). References for execution topology, refactoring, testing (with measures to prevent overengineering tests), some lanugages references and dep safety.\n- code-review - \"Must apply when reviewing or accepting maintained-code changes.\" - esp useful if you have review subagents (78 lines)\n- project-reference- \"Read before investigating a project the user mentions\" - I use it because I have my repos in ~/Work and reference repos in ~/Frameworks. Asks the Clanka to research stuff without wandering and creating rando temp dirs. (9 lines)\n\nHarness and Agent Engineering package - the big one. This shit took a lot of time to put together. 3000hrs if we really wanna cout it like that.\nhttps://t.co/k4XUnEOS2r\n\n- agent-session-diagnostics - \"Read before diagnosing a coding-agent session or recurring skill or tool failure that drifted, looped, ignored intent, or behaved unexpectedly.\" - simple SOP, nothing fancy, but documents how I actually diagnose this kind of stuff (82 lines).\n- agent-tool-design - \"Read before creating, reviewing, or refining a tool exposed to an agent.\" - how to create tools for agents that actually do not suck. Token savvy, minimal arguments, etc. (71 lines)\n- extension-design - \"Read before creating or refining a coding-agent extension.\" - this one is to prevent the clankers from creating slop extensions. Too many tools? Too many /commands instead of a single entry point? Everything hidden in a json config file when it could've had a UI? Readme that screams slop? Clankers building an extension that makes sense to them, but won't make sense to any user? (we've seen them all with far too many downloads on the charts) Not anymore. (57 lines)\n- instruction calibration - \"Read before empirically tuning a reusable skill or agent prompt.\" - how I arrived at these skills. An SOP of how to actually tune Clankers to do what you want them to do. (61 lines)\n- prompt caching - \"Read before designing, measuring, or debugging prompt-cache behaviour in an agent harness or extension.\" - because agents think that a complete miss followed by a full recovery hit is fine (NO IT'S NOT STOP TELLING ME ABOUT YOUR MONTHLY AVERAGES, SOMETHING IN YOUR SETUP IS BROKEN). This tells them it's not and how to actually trace the cause. (96 lines)\n- harness checklist - \"Read before auditing a coding-agent harness environment and recommending improvements.\" - lighly opinionated checklist that tells the agent to scan your env for BS.\n\nThis is all best paired with a custom skill tool of sorts that makes the agent list all the skills at the start of the session. I found it more reliable than relying on the system prompt block, and it takes less tokens.\n1. Wrap Pi's PATH around -ns/--no-skills.\n2. Clank up an extension that supports skill categories.\n3. This is roughly what my skill tool looks like for code mode (this goes in the system prompt):\n\n'''await tools.skills(\"list\" | \"read \") // At session start list once, then read skills marked always apply and task-relevant skills before work'''\n\nLink for the ones that wanna steal it. Problem is that it's a custom tool for pi-codex-conversion, but your Clanker can handle this.\n\nhttps://t.co/3UxUjPdNJs\n\nFeatures:\n- supports skill categories\n- skill list displays uncategorised aka more important skills on the top (like the foundation package), then lists project level skills, then the rest of the skills follows. Dumps all skill names and descriptions so make sure they're short and actionable\n- when a skill gets called, Clanker gets full path for the references so it can just call the read tool or whatever have you\n- this works with a standard Pi skills installation. .pi/agent/*/SKILL.md becomes a top level skill, .pi/agent/*/*/SKILL.md land in categories defined by the folder name.\n\nAnyway, that was a long one. Happy Clanking!\n\nNo Clawa has touched this post, lol.",
+   "url": "https://x.com/Howaboua/status/2091789833794376005",
+   "likes": 65,
+   "views": 3827,
+   "createdAt": "Mon Aug 24 07:28:54 +0000 2026",
+   "source": "x",
+   "context": null,
+   "match": "none",
+   "skills": [],
+   "collection": null,
+   "collections": [],
+   "repos": [
+    "IgorWarzocha/howaboua-pi-stuff"
+   ],
+   "unknownSkill": "commands",
+   "githubRepo": "IgorWarzocha/howaboua-pi-stuff",
+   "topics": [],
+   "rank": 0.19148936170212766
   },
   {
    "handle": "rohanpaul_ai",
    "name": "Rohan Paul",
-   "followers": 155012,
+   "followers": 155011,
    "avatarUrl": "https://pbs.twimg.com/profile_images/1816185267037859840/Fd18CH0v_bigger.jpg",
    "text": "A public GitHub now holds 3.8 million agent skill files.\n\nAnd finds that over half of the agent skill files on public GitHub are exact copies of another file.\n\nOnly about 1.9 million of the 3.8 million files are actually different.\n\nThat is what a format with no registry and no package manager looks like.\n\nPeople copy the folder and move on. A skill is a folder with a Markdown file that tells an agent how to handle a task.\n\nThe agent reads the short description at run time and decides on its own whether to load it. No compiler checks that decision.\n\nSo the skill in your repo is frozen, and whoever wrote it cannot send you a fix.\n\nThe paper raises the obvious next question: whether edited copies of popular skills add commands or network calls the original never had.\n\nNobody could check that at this scale before.\n\nThe whole dataset ships as one SQLite file, so now somebody can.\n\n– arxiv. org/abs/2608.10906\n\nTitle: \"GitSkills: A Dataset of Agent Skills on GitHub\"",
    "url": "https://x.com/rohanpaul_ai/status/2091543736538837004",
@@ -1602,7 +1390,29 @@
    "unknownSkill": null,
    "githubRepo": null,
    "topics": [],
-   "rank": 0.14545454545454545
+   "rank": 0.1702127659574468
+  },
+  {
+   "handle": "1006_amit7481",
+   "name": "Amit Kumar Pandey",
+   "followers": 1495,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/1952565269458804736/vsYCSm6u_bigger.jpg",
+   "text": "50 rules. Better prompts. Better outputs.\n\nI just used these courses to grab the skills:\n\n1. Mastering Claude Code: From Setup to Real Projects\nhttps://t.co/iAYEFVhRgT\n\n2. Claude Code: Software Engineering with Generative AI Agents\nhttps://t.co/TTXZQ0p0TE\n\n3. Claude Cowork for Automating Processes\nhttps://t.co/dma6fuvNGz\n\n4. Mastering Claude AI: Prompting, APIs, RAG, and MCP Specialization\nhttps://t.co/rOJhEyVGiP\n\n5. Intro to Claude AI\nhttps://t.co/9pu0zDooZs\n\n6. Anthropic: AI Automation with Claude\nhttps://t.co/GV9dV0heR3\n\n7. AI Automation with Claude\nhttps://t.co/0SS2h1ReKX\n\n8. Anthropic: AI Collaboration with Claude\nhttps://t.co/8MX1dADZ9b\n\n9. AI Fundamentals with Claude\nhttps://t.co/fTg4zGjLGs\n\n10. Anthropic: Building with the Claude API\nhttps://t.co/ZPWLyAJAAI\n\n11. Claude Code in Action\nhttps://t.co/HKGEipwfTE\n\nDo not forget to save, and stay tuned for the next posts.\n\nHere are websites that pay in USD for remote work:☯️\n\n1. Remotive\nCurates active, fully remote tech jobs\nTrusted by top global tech companies\nhttps://t.co/y1nhmcNYBg…\n\n2.Remote Rocketship\nFree resource for companies looking for remote talent\nInsights into flexible jobs and company culture.\nhttps://t.co/e5J3HzxAxR\n\n3. Eztrackr (Most Used)\n→ Track job applications. Tailor resumes. Land your dream job faster.\n→ One platform for your entire job search\n→ 700,000+ jobs tracked\n→ Get started here: https://t.co/lP3JTbC9zu",
+   "url": "https://x.com/1006_amit7481/status/2092085244140912680",
+   "likes": 63,
+   "views": 454,
+   "createdAt": "Tue Aug 25 03:02:45 +0000 2026",
+   "source": "x",
+   "context": null,
+   "match": "none",
+   "skills": [],
+   "collection": null,
+   "collections": [],
+   "repos": [],
+   "unknownSkill": null,
+   "githubRepo": null,
+   "topics": [],
+   "rank": 0.14893617021276595
   },
   {
    "handle": "jbirnick",
@@ -1627,70 +1437,28 @@
    "rank": 0.14285714285714285
   },
   {
-   "handle": "1006_amit7481",
-   "name": "Amit Kumar Pandey",
-   "followers": 1495,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/1952565269458804736/vsYCSm6u_bigger.jpg",
-   "text": "50 rules. Better prompts. Better outputs.\n\nI just used these courses to grab the skills:\n\n1. Mastering Claude Code: From Setup to Real Projects\nhttps://t.co/iAYEFVhRgT\n\n2. Claude Code: Software Engineering with Generative AI Agents\nhttps://t.co/TTXZQ0p0TE\n\n3. Claude Cowork for Automating Processes\nhttps://t.co/dma6fuvNGz\n\n4. Mastering Claude AI: Prompting, APIs, RAG, and MCP Specialization\nhttps://t.co/rOJhEyVGiP\n\n5. Intro to Claude AI\nhttps://t.co/9pu0zDooZs\n\n6. Anthropic: AI Automation with Claude\nhttps://t.co/GV9dV0heR3\n\n7. AI Automation with Claude\nhttps://t.co/0SS2h1ReKX\n\n8. Anthropic: AI Collaboration with Claude\nhttps://t.co/8MX1dADZ9b\n\n9. AI Fundamentals with Claude\nhttps://t.co/fTg4zGjLGs\n\n10. Anthropic: Building with the Claude API\nhttps://t.co/ZPWLyAJAAI\n\n11. Claude Code in Action\nhttps://t.co/HKGEipwfTE\n\nDo not forget to save, and stay tuned for the next posts.\n\nHere are websites that pay in USD for remote work:☯️\n\n1. Remotive\nCurates active, fully remote tech jobs\nTrusted by top global tech companies\nhttps://t.co/y1nhmcNYBg…\n\n2.Remote Rocketship\nFree resource for companies looking for remote talent\nInsights into flexible jobs and company culture.\nhttps://t.co/e5J3HzxAxR\n\n3. Eztrackr (Most Used)\n→ Track job applications. Tailor resumes. Land your dream job faster.\n→ One platform for your entire job search\n→ 700,000+ jobs tracked\n→ Get started here: https://t.co/lP3JTbC9zu",
-   "url": "https://x.com/1006_amit7481/status/2092085244140912680",
-   "likes": 63,
-   "views": 453,
-   "createdAt": "Tue Aug 25 03:02:45 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [],
-   "unknownSkill": null,
-   "githubRepo": null,
-   "topics": [],
-   "rank": 0.12727272727272726
-  },
-  {
-   "handle": "DanKornas",
-   "name": "Dan Kornas",
-   "followers": 97896,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/2040754559711432704/ZSBG2g7X_bigger.jpg",
-   "text": "Stop piecing together AI-agent skills from random tutorials.\n\nAwesome LLM Skills is a curated GitHub list of LLM skills, resources, and tools for builders customizing AI workflows with Claude Code, Codex, Gemini CLI, Qwen Code, OpenCode, and other agents.\n\nIt helps you find reusable workflows and get started with your own skill by combining a categorized directory with a Quick Start guide, SKILL.md template, and platform notes.\n\nKey features:\n\n• Broad skill directory – browse document processing, development, data, marketing, communication, media, productivity, collaboration, and security resources\n• Quick Start guide – shows a project- or user-level skill folder and a basic SKILL.md template\n• Platform notes – includes setup and usage guidance for Claude Code, Claude Desktop, Codex CLI, Gemini CLI, OpenCode, and Qwen Code\n• Official learning links – points to LLM Skills documentation, user guidance, creation docs, and API resources\n• Contribution checklist – asks contributors to use real use cases, check duplicates, follow the structure, and test across platforms\n\nIt’s open-source (Apache License 2.0 license).\n\nLink in the reply 👇",
-   "url": "https://x.com/DanKornas/status/2091512024362541076",
-   "likes": 59,
-   "views": 3365,
-   "createdAt": "Sun Aug 23 13:04:59 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [],
-   "unknownSkill": null,
-   "githubRepo": null,
-   "topics": [],
-   "rank": 0.10909090909090909
-  },
-  {
-   "handle": "monicaa_AI",
-   "name": "Monica",
-   "followers": 6758,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/1984703198914060288/DypDH2sg_bigger.jpg",
-   "text": "You installed Claude Code... and there you stopped.\n\nHere are 22 Skills that are really worth adding.\n\nAll are GitHub repositories, organized by category:\n\nDEVELOPMENT\n\nsuperpowers — plans and debugs before writing code.\nInstall → https://t.co/oHDAfmQTJa (259k★)\n\ngstack — 23 Skills in a single installation.\nInstall → https://t.co/nMhEJgtmZ7 (124k★)\n\ncaveman — direct responses, no fluff.\nInstall → https://t.co/vv9tZoMQTj (92k★)\n\nponytail — stop talking and write the code.\nInstall → https://t.co/egyhpzAitU (88k★)\n\ncodex — runs Codex inside Claude Code.\nInstall → https://t.co/VEBPMrE253 (30k★)\n\ni-have-adhd — prevents it from hiding the response among explanations.\nInstall → https://t.co/VMawb3XZaf (9k★)\n\nDESIGN\n\nui-ux-pro-max — color palettes and fonts that work.\nInstall → https://t.co/ofgm0Y7boQ (109k★)\n\ntaste-skill — makes any page look premium.\nInstall → https://t.co/7RQd6rN8TL (66k★)\n\nimpeccable — adds the finishing touch to any interface.\nInstall → https://t.co/9a5dekIKKY (49k★)\n\nhyperframes — turns a web page into a video.\nInstall → https://t.co/URrc5w9W8f (37k★)\n\nemil — creates elegant animations for interfaces.\nInstall → https://t.co/S5VNUaM84Y (20k★)\n\ngsap — fluid web animations.\nInstall → https://t.co/1KyiDEMYSz (12k★)\n\nRESEARCH\n\nskill-creator — creates your own Skills.\nInstall → https://t.co/KoaJeb94H7 (163k★)\n\ngraphify — transforms your notes into visual maps.\nInstall → https://t.co/R50slDNpR9 (94k★)\n\nlast30days — summarizes what the Internet has said over the last month.\nInstall → https://t.co/O6zmtQedQm (53k★)\n\nagent-browser — allows Claude to browse any website.\nInstall → https://t.co/0ITzV232rv (39k★)\n\nfind-skills — finds any Skill for you.\nInstall → https://t.co/fQGYNyHcQl (27k★)\n\nclaude-hud — shows in real time what Claude is doing.\nInstall → https://t.co/V6aUhfLt6P (27k★)\n\nMARKETING\n\nremotion — creates full videos with React.\nInstall → https://t.co/WgtDNAZDGP (54k★)\n\nmarketingskills — package with 40 marketing Skills.\nInstall → https://t.co/Tc8YMeZhcc (41k★)\n\nhumanizer — removes typical signals of AI-generated text.\nInstall → https://t.co/ipuvMddgI7 (31k★)",
-   "url": "https://x.com/monicaa_AI/status/2091868583878172710",
+   "handle": "tom_doerr",
+   "name": "Tom Dörr",
+   "followers": 218569,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/1905090420142379008/Ydq5So7B_bigger.jpg",
+   "text": "Generates diagrams, data charts, infographics, and system architecture directly in Markdown using 14 opinionated skills for AI coding agents like Claude Code and Cursor.\n\nhttps://t.co/9xBj5RR154 https://t.co/pWbycpyBhe",
+   "url": "https://x.com/tom_doerr/status/2090305615809691984",
    "likes": 55,
-   "views": 1409,
-   "createdAt": "Mon Aug 24 12:41:50 +0000 2026",
+   "views": 8288,
+   "createdAt": "Thu Aug 20 05:11:09 +0000 2026",
    "source": "x",
    "context": null,
    "match": "none",
    "skills": [],
    "collection": null,
    "collections": [],
-   "repos": [],
-   "unknownSkill": "taste-skill",
-   "githubRepo": null,
+   "repos": [
+    "markdown-viewer/skills"
+   ],
+   "unknownSkill": null,
+   "githubRepo": "markdown-viewer/skills",
    "topics": [],
-   "rank": 0.09090909090909091
+   "rank": 0.1276595744680851
   },
   {
    "handle": "IBuzovskyi",
@@ -1712,7 +1480,31 @@
    "unknownSkill": "learn",
    "githubRepo": null,
    "topics": [],
-   "rank": 0.07272727272727272
+   "rank": 0.10638297872340426
+  },
+  {
+   "handle": "tom_doerr",
+   "name": "Tom Dörr",
+   "followers": 218569,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/1905090420142379008/Ydq5So7B_bigger.jpg",
+   "text": "Installs as a Claude Code skill to enforce consistent UI design and remember spacing decisions across sessions.\n\nhttps://t.co/68SR0tWcLO https://t.co/c8rUbXmy5h",
+   "url": "https://x.com/tom_doerr/status/2090241412323254308",
+   "likes": 41,
+   "views": 7860,
+   "createdAt": "Thu Aug 20 00:56:02 +0000 2026",
+   "source": "x",
+   "context": null,
+   "match": "none",
+   "skills": [],
+   "collection": null,
+   "collections": [],
+   "repos": [
+    "Dammyjay93/interface-design"
+   ],
+   "unknownSkill": null,
+   "githubRepo": "Dammyjay93/interface-design",
+   "topics": [],
+   "rank": 0.0851063829787234
   },
   {
    "handle": "TonyAlicea10",
@@ -1737,30 +1529,6 @@
    "rank": 0.07142857142857142
   },
   {
-   "handle": "tom_doerr",
-   "name": "Tom Dörr",
-   "followers": 218569,
-   "avatarUrl": "https://pbs.twimg.com/profile_images/1905090420142379008/Ydq5So7B_bigger.jpg",
-   "text": "Open-source Claude Code skills for resume writing, ATS compatibility checks, job match analysis, cover letters, and interview prep.\n\nhttps://t.co/ahfP9sXYf3 https://t.co/kjPue0oZL7",
-   "url": "https://x.com/tom_doerr/status/2092388408211427800",
-   "likes": 41,
-   "views": 3476,
-   "createdAt": "Tue Aug 25 23:07:25 +0000 2026",
-   "source": "x",
-   "context": null,
-   "match": "none",
-   "skills": [],
-   "collection": null,
-   "collections": [],
-   "repos": [
-    "Paramchoudhary/ResumeSkills"
-   ],
-   "unknownSkill": null,
-   "githubRepo": "Paramchoudhary/ResumeSkills",
-   "topics": [],
-   "rank": 0.05454545454545454
-  },
-  {
    "handle": "sakatayasha",
    "name": "Sakata",
    "followers": 3847,
@@ -1780,7 +1548,29 @@
    "unknownSkill": "book-to-skill",
    "githubRepo": null,
    "topics": [],
-   "rank": 0.03636363636363636
+   "rank": 0.06382978723404255
+  },
+  {
+   "handle": "I_AM_AYASHA",
+   "name": "Ayasha",
+   "followers": 8359,
+   "avatarUrl": "https://pbs.twimg.com/profile_images/2064633695076769793/rqh69EJI_bigger.jpg",
+   "text": "You installed Claude Code... and there you stopped.\n\nHere are 22 Skills that are really worth adding.\n\nAll are GitHub repositories, organized by category:\n\nDEVELOPMENT\n\nsuperpowers — Plans and debugs before writing code.\nInstall → https://t.co/HdTK1IjEfP (268k★)\n\ngstack — 23 Skills in a single installation.\nInstall → https://t.co/pGQhfkaCkK (124k★)\n\ncaveman — Direct responses, no fluff.\nInstall → https://t.co/TD1KnA2Me9 (93k★)\n\nponytail — Stop talking and write the code.\nInstall → https://t.co/hWyCa0Z391 (89k★)\n\ncodex — Runs Codex inside Claude Code.\nInstall → https://t.co/kUzJgKznr6 (30k★)\n\ni-have-adhd — Keeps responses focused and concise.\nInstall → https://t.co/m0heB9MGYG (9.4k★)\n\nDESIGN\n\nui-ux-pro-max — Color palettes and fonts that work.\nInstall → https://t.co/4oPHP7hVvp (110k★)\n\ntaste-skill — Makes any page look premium.\nInstall → https://t.co/PeUyf6QCUq (67k★)\n\nimpeccable — Adds the finishing touch to any interface.\nInstall → https://t.co/6NCWmpCX8f (49k★)\n\nhyperframes — Turns a web page into a video.\nInstall → https://t.co/lDDUoruXfX (37k★)\n\nemil — Creates elegant interface animations.\nInstall → https://t.co/T3jHohArjz (20k★)\n\ngsap — Fluid web animations.\nInstall → https://t.co/BLBlacgOVv (12k★)\n\nRESEARCH\n\nskill-creator — Create your own Skills.\nInstall → https://t.co/cW8kOapDyV (164k★)\n\ngraphify — Turns notes into visual maps.\nInstall → https://t.co/Z8bb5o8aFQ (95k★)\n\nlast30days — What the Internet said this month.\nInstall → https://t.co/H64SCCwmnW (53k★)\n\nagent-browser — Lets Claude use any website.\nInstall → https://t.co/fTp1rV82Lj (39k★)\n\nfind-skills — Find any Skill you need.\nInstall → https://t.co/kg5m0kWWP7 (27k★)\n\nclaude-hud — Shows what Claude is doing in real time.\nInstall → https://t.co/gqmSS9fljc (27k★)\n\nMARKETING\n\nremotion — Creates full videos with React.\nInstall → https://t.co/XcawR7M1VU (54k★)\n\nmarketingskills — 40 marketing Skills in one pack.\nInstall → https://t.co/t1c9Dt2A9w (41k★)\n\nhumanizer — Removes typical AI-writing signals.\nInstall → https://t.co/PAY0RPtyTu (31k★)\n\nsocial-media-skills — A free content creation Skill pack.\nInstall → https://t.co/CtHDXzsjkQ\n\nSave this. These 22 Skills can seriously level up Claude Code. 🚀",
+   "url": "https://x.com/I_AM_AYASHA/status/2092155291681136954",
+   "likes": 41,
+   "views": 1461,
+   "createdAt": "Tue Aug 25 07:41:06 +0000 2026",
+   "source": "x",
+   "context": null,
+   "match": "none",
+   "skills": [],
+   "collection": null,
+   "collections": [],
+   "repos": [],
+   "unknownSkill": "taste-skill",
+   "githubRepo": null,
+   "topics": [],
+   "rank": 0.0425531914893617
   },
   {
    "handle": "tom_doerr",
@@ -1790,7 +1580,7 @@
    "text": "Provides skills, plugins, and MCP servers to Claude Code to generate better-looking frontends.\n\nhttps://t.co/cS1n9T4oBL https://t.co/jETZuqMIYt",
    "url": "https://x.com/tom_doerr/status/2092416434529816792",
    "likes": 40,
-   "views": 3091,
+   "views": 3179,
    "createdAt": "Wed Aug 26 00:58:47 +0000 2026",
    "source": "x",
    "context": null,
@@ -1804,7 +1594,7 @@
    "unknownSkill": null,
    "githubRepo": "wilwaldon/Claude-Code-Frontend-Design-Toolkit",
    "topics": [],
-   "rank": 0.01818181818181818
+   "rank": 0.02127659574468085
   },
   {
    "handle": "BkashJosi",
@@ -1814,7 +1604,7 @@
    "text": "7 more Hermes Agent skills—no repeats.\n\n🪽 From video research and document actions to monitoring, verified PRs, session organization, and X workflows.\n\nBuild an agent that finishes real work. 🚀 #HermesAgent https://t.co/A4tJUfukcQ",
    "url": "https://x.com/BkashJosi/status/2091811862044438660",
    "likes": 40,
-   "views": 6070,
+   "views": 6088,
    "createdAt": "Mon Aug 24 08:56:26 +0000 2026",
    "source": "x",
    "context": null,

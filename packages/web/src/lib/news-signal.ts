@@ -133,33 +133,46 @@ export function interleaveSignal<T extends { kind: string }>(
   return out
 }
 
-import storySeed from './news-stories-seed.json'
+import { getStories } from './blog'
 import type { FeedStoryEvent } from './registry-feed-types'
-
-interface StorySeed {
-  generatedAt: string
-  stories: Array<Omit<FeedStoryEvent, 'kind' | 'storyKind'> & { kind: string }>
-}
 
 /**
  * The written stories, as feed events.
  *
- * Hand-authored today, the same way the /news edition is: clustering raw posts
- * into "here is what the field is arguing about" is editorial work, and an
- * unedited auto-summary of a day's chatter is exactly the slop this feed exists
- * to be better than. The sources list is the part that makes it checkable.
+ * Authored in the blog admin as posts tagged `story`, so publishing one needs
+ * no deploy and every story passes a human before it is public. Clustering raw
+ * posts into "here is what the field is arguing about" is editorial work, and
+ * an unedited auto-summary of a day's chatter is exactly the slop this feed
+ * exists to be better than. The sources list is what makes a story checkable.
+ *
+ * Degrades to an empty list: the story store is a separate SQLite file from the
+ * registry, so it fails independently and must not take the feed with it.
  */
 export function storyFeedEvents(limit?: number): FeedStoryEvent[] {
-  const seed = storySeed as unknown as StorySeed
-  const rows = seed.stories.map((s) => ({
-    kind: 'story' as const,
-    id: s.id,
-    storyKind: s.kind,
-    headline: s.headline,
-    summary: s.summary,
-    at: s.at,
-    sources: s.sources,
-  }))
+  let stories
+  try {
+    stories = getStories()
+  } catch {
+    return []
+  }
+  const rows = stories
+    .filter((post) => (post.sources ?? []).length > 0)
+    .map((post) => ({
+      kind: 'story' as const,
+      id: post.slug,
+      storyKind: post.storyKind ?? 'story',
+      headline: post.title,
+      summary: post.description,
+      at: post.publishedAt ? Math.floor(new Date(post.publishedAt).getTime() / 1000) || 0 : 0,
+      sources: (post.sources ?? []).map((src) => ({
+        network: src.network,
+        handle: src.handle,
+        label: src.label,
+        detail: src.detail ?? null,
+        url: src.url,
+        avatarUrl: src.avatarUrl ?? null,
+      })),
+    }))
   return limit ? rows.slice(0, limit) : rows
 }
 

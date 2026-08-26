@@ -279,12 +279,14 @@ function StoryEventRow({ event }: { event: FeedStoryEvent }) {
         </p>
 
         <div className="mt-2 overflow-hidden rounded-xl border border-(--line) bg-(--surface)">
-          <div className="p-4">
-            <h3 className="text-base leading-snug font-semibold tracking-tight text-pretty text-(--ink)">
+          {/* The headline is the permalink. A story nobody can link to is a
+              story nobody forwards, which is the whole point of writing one. */}
+          <Link href={`/news/${event.id}`} className="group block p-4">
+            <h3 className="text-base leading-snug font-semibold tracking-tight text-pretty text-(--ink) group-hover:text-(--accent)">
               {event.headline}
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-(--ink-2)">{event.summary}</p>
-          </div>
+          </Link>
 
           <div className="border-t border-(--line)">
             <p className="px-4 pt-3 font-mono text-2xs tracking-[0.08em] uppercase text-(--ink-2)">
@@ -338,17 +340,6 @@ function StoryEventRow({ event }: { event: FeedStoryEvent }) {
   )
 }
 
-/** The post, demoted to supporting evidence under a skill that leads. */
-function QuoteFooter({ event }: { event: FeedSignalEvent }) {
-  return (
-    <a
-      href={event.url}
-      className="block border-t border-(--line) px-4 py-3 text-xs leading-relaxed whitespace-pre-line text-(--ink-2) hover:text-(--ink)"
-    >
-      “{readableQuote(event.text, 180)}”
-    </a>
-  )
-}
 
 /**
  * Two row shapes, chosen by whether the post resolved to something we carry.
@@ -363,7 +354,6 @@ function QuoteFooter({ event }: { event: FeedSignalEvent }) {
  */
 function SignalEventRow({ event }: { event: FeedSignalEvent }) {
   const score = signalScore(event)
-  const resolved = event.skills.length > 0 || Boolean(event.collection)
 
   const byline = (
     <p className="feed-line flex items-baseline gap-1.5">
@@ -397,79 +387,25 @@ function SignalEventRow({ event }: { event: FeedSignalEvent }) {
       <FeedAvatar handle={event.actor} avatarUrl={event.actorAvatarUrl} className="feed-avatar" />
       <div className="min-w-0 flex-1">
         {byline}
+        {/* One shape, always. Leading with the skill when we happened to
+            resolve it and with the quote when we did not made placement encode
+            our own match state — invisible to a reader, and inconsistent for no
+            reason they can see. The quote is why the item is in the feed;
+            whatever it points at is the payoff underneath. */}
         <div className="mt-2 overflow-hidden rounded-xl border border-(--line) bg-(--surface)">
-          {resolved ? (
-            <>
-              <ResolvedHeader event={event} />
-              <QuoteFooter event={event} />
-            </>
-          ) : (
-            <>
-              <a href={event.url} className="block p-4 text-sm leading-normal hover:underline">
-                “{readableQuote(event.text)}”
-              </a>
-              <SignalAttachment event={event} />
-            </>
-          )}
+          <a
+            href={event.url}
+            className="block p-4 text-sm leading-normal whitespace-pre-line hover:underline"
+          >
+            “{readableQuote(event.text)}”
+          </a>
+          <SignalAttachment event={event} />
         </div>
       </div>
     </li>
   )
 }
 
-/** The skill (or the author's library) as the card's headline. */
-function ResolvedHeader({ event }: { event: FeedSignalEvent }) {
-  if (event.skills.length > 0) {
-    return (
-      <div className="divide-y divide-(--line)">
-        {event.skills.map((sk) => (
-          <Link
-            key={`${sk.author}/${sk.slug}`}
-            href={`/${sk.author}/${sk.slug}`}
-            className="group flex items-center gap-3 p-4 transition-colors hover:bg-(--accent-bg)"
-          >
-            <span className="relative h-11 w-11 shrink-0">
-              <SkillIcon seed={`${sk.author}/${sk.slug}`} radius="rounded-xl" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-base font-semibold group-hover:text-(--accent)">
-                {sk.slug}
-              </span>
-              <span className="block truncate text-xs text-(--ink-2)">@{sk.author}</span>
-            </span>
-            <span className="shrink-0 font-mono text-2xs text-(--ink-2)">in the registry</span>
-          </Link>
-        ))}
-      </div>
-    )
-  }
-
-  const owner = event.collection!.repoOwner ?? event.collection!.author
-  // When the person posting is the person whose library this is, we already
-  // have their face in the byline; a monogram beside it looks like a stranger.
-  const sameAsPoster = owner.toLowerCase() === event.actor.toLowerCase()
-  return (
-    <Link
-      href={`/${event.collection!.author}`}
-      className="group flex items-center gap-3 p-4 transition-colors hover:bg-(--accent-bg)"
-    >
-      <Avatar
-        src={sameAsPoster ? event.actorAvatarUrl : null}
-        name={owner}
-        colorKey={owner}
-        size="sm"
-      />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-base font-semibold group-hover:text-(--accent)">
-          @{owner}
-        </span>
-        <span className="block truncate text-xs text-(--ink-2)">
-          {event.collection!.count} skills in the registry
-        </span>
-      </span>
-    </Link>
-  )
-}
 
 /** A kit's full md discovery card (cover, description, Used-by, Add) — shown
  *  inline for a small add and as the hover preview behind a chip. */

@@ -107,6 +107,7 @@ async function collectX() {
           createdAt: t.createdAt ?? null,
           urls: (t.entities?.urls ?? []).map((u) => u.expanded_url).filter(Boolean),
           context: null,
+          lang: t.lang ?? null,
           net,
         })
       }
@@ -207,6 +208,28 @@ const clean = (t) =>
  *  no faithful way to render one, so they never enter the feed. */
 const IS_RETWEET = /^RT @[A-Za-z0-9_]+:/
 
+/**
+ * English only, for now.
+ *
+ * The feed is written and read in English, and a post nobody reading it can
+ * parse is noise however good it is. X reports a `lang` per post, which is
+ * authoritative; Hacker News and Reddit do not, so those fall back to script.
+ *
+ * The script test measures the share of *letters* that are Latin, so a mostly
+ * English post carrying a CJK product name or an emoji still passes, while a
+ * Persian or Chinese post does not.
+ */
+const NON_LATIN = /[\u0400-\u04FF\u0590-\u06FF\u0900-\u097F\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/gu
+const LATIN = /[A-Za-z]/gu
+
+function isEnglish(text, lang) {
+  if (typeof lang === 'string' && lang.length >= 2) return lang.toLowerCase().startsWith('en')
+  const latin = (text.match(LATIN) ?? []).length
+  const other = (text.match(NON_LATIN) ?? []).length
+  if (latin + other === 0) return false
+  return latin / (latin + other) >= 0.7
+}
+
 /** Long-body sources (a Reddit post carries title + full body) pass ABOUT on one
  *  incidental "skill" buried in paragraph six, which lets career and vibe posts
  *  in. Require it up front, where a title lives, or repeated. */
@@ -229,6 +252,7 @@ async function main() {
   for (const raw of [...xs, ...hns]) {
     const text = clean(raw.text)
     if (!text || IS_RETWEET.test(text)) continue
+    if (!isEnglish(text, raw.lang)) continue
     if (LINK_ONLY.test(text) || !aboutSkills(text) || NOT_SKILL.test(text)) continue
     const key = text.slice(0, 90).toLowerCase()
     if (seen.has(key)) continue
