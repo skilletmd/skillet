@@ -230,9 +230,34 @@ const NEWS_HEADLINES = [
  *  as the one to add to your harness" is the failure this exists to prevent:
  *  every word about the pitch, none about what the thing does. */
 const SKILL_HEADLINES = [
-  '/scandinavian-design restyles a site in monochrome. It rejects edits whose only argument is that they look Nordic.',
-  'Ponytail answers a date-picker request with a native input. Correctness and security are out of scope.',
-  'transitions.dev ships 32 CSS transitions and rewrites the ad-hoc ones already in the project.',
+  'Agent-built pages all look agent-built. /scandinavian-design gives one a point of view.',
+  'Ponytail answers a date-picker request with a native input instead of three dependencies.',
+  'transitions.dev replaces the durations your agent guessed at with 32 tested transitions.',
+]
+
+/**
+ * What a skeptical practitioner needs, in order.
+ *
+ * The reader is deciding whether to install this, and they have seen a hundred
+ * skills. A card that opens on mechanism ("restyles a surface in monochrome")
+ * makes them work out the problem it solves for themselves, and most will not
+ * bother. Open on the problem they already have.
+ *
+ * The evidence line is the one that earns trust. Almost no skill ships any, so
+ * saying which ones do, and saying plainly when one does not, is the single
+ * most useful sentence we can add to a link someone could have found on X.
+ */
+const CARD_SHAPE = [
+  'SHAPE. Four beats, in this order. One or two sentences each, not labelled.',
+  '  1. THE MOMENT. When would I reach for this? Name the problem I already have,',
+  '     in terms I would recognise from my own work. Never open on mechanism.',
+  '  2. WHAT IT DOES about that, with the one concrete detail that shows the',
+  '     author thought it through rather than prompted it into existence.',
+  '  3. EVIDENCE. Tests, before-and-after, a benchmark with its conditions, real',
+  '     usage. If the repo shows none, say so plainly: most skills ship none, and',
+  '     a reader deciding between two of them needs to know which is which.',
+  '  4. WHO IT IS NOT FOR, or what it decides for you that you may not want',
+  '     decided. Never omit this to be nice.',
 ]
 
 /**
@@ -281,12 +306,20 @@ const SPEC_TRANSCRIPTION = [
   '      until the product shots carry it',
   'WHY:  Right subject, wrong register. That is a copywriter reaching for a',
   '      line. Trade press does not do cadence.',
-  'GOOD: /scandinavian-design restyles a site in monochrome. It rejects edits',
-  '      whose only argument is that they look Nordic.',
-  '      "Point it at a page and it cuts the palette back and opens up the',
-  '      spacing, rewriting layout too when that is the problem. A review mode',
-  '      returns findings and changes nothing. It was built against marketing',
-  '      pages, so it has little to say about dense app UI."',
+  'ALSO BAD: /scandinavian-design restyles a surface in monochrome. It rejects',
+  '      edits argued only on style.',
+  'WHY:  Opens on mechanism. The reader has to work out for themselves what',
+  '      problem this solves, and no evidence is offered either way.',
+  'GOOD: Agent-built pages all look agent-built. /scandinavian-design gives one',
+  '      a point of view.',
+  '      "Ask an agent for a landing page and you get the same soft gradients',
+  '      everyone else got. This one commits: monochrome, heavy spacing, the',
+  '      product shots doing the work, and it will rewrite layout rather than',
+  '      only repaint. It argues back when a change is style for its own sake.',
+  '      Zakariasson ran it against ten live sites and kept the suggestions he',
+  '      rejected in the repo, which is more evidence than most skills ship.',
+  '      All ten are marketing pages, so it has little to say about dense app',
+  '      UI."',
 ]
 
 /** Mechanics every skill shares. A card that spends its body on these has said
@@ -333,10 +366,11 @@ function promptFor(posts, isSkill, context = []) {
         `    BANNED: "runs as a slash command" / "from a single slash command"\n` +
         `    BANNED: "it is a single markdown file you drop into a project"\n` +
         `The reader gets an install button. Spend the words on the thing itself.\n` +
-        `\n- Body: who would reach for this and what changes for them. Then the ` +
-        `honest catch: what it will not do, who it is not for, what it decides ` +
-        `for you that you might not want decided. The catch is the most useful ` +
-        `sentence on the card and the one the author's own post never contains.\n` +
+        `\n` +
+        CARD_SHAPE.map((line) => `${line}\n`).join('') +
+        `\n- Write it for someone who has already seen a hundred skills this ` +
+        `month and installs almost none of them. They are not asking what it is. ` +
+        `They are asking whether it is worth their afternoon.\n` +
         `- You are an editor, not a technical writer. You read the repository to ` +
         `UNDERSTAND the skill. Never translate it back. No class names, token ` +
         `names, config keys, file layouts, mode names or internal vocabulary ` +
