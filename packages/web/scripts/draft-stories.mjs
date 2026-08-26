@@ -35,14 +35,17 @@ import { readFile } from 'node:fs/promises'
 import { DatabaseSync } from 'node:sqlite'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { cluster, reach, normalizeHandles, MAX_CLUSTER, MIN_CLUSTER } from '../src/lib/story-cluster.mjs'
+import { storyCandidates, reach, normalizeHandles } from '../src/lib/story-cluster.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const SEED = path.join(HERE, '..', 'src', 'lib', 'news-signal-seed.json')
 const DB = process.env.BLOG_DB_PATH ?? path.join(HERE, '..', 'content', 'blog.db')
 const API_KEY = process.env.ANTHROPIC_API_KEY
 const DRAFT_ONLY = process.env.STORY_DRAFT_ONLY === '1'
-const MAX_STORIES = Number(process.env.STORY_MAX ?? 3)
+const MAX_STORIES = Number(process.env.STORY_MAX ?? 8)
+/** A story is one post in the feed, so it is sized like one. Six subjects in a
+ *  single body read as a list and got skipped; each subject gets its own card. */
+const MAX_BODY = 280
 
 
 const MODEL = 'claude-opus-5'
@@ -71,10 +74,17 @@ function promptFor(posts) {
     .join('\n\n')
 
   return (
-    `You write Skillet Daily, a trade brief about AI agent skills. Below are ` +
-    `${posts.length} posts collected today that appear to be about the same subject.\n\n` +
-    `Write one story about what they collectively show.\n\n` +
+    `You write Skillet Daily, a trade brief about AI agent skills. Below ` +
+    (posts.length === 1
+      ? `is one post collected today.\n\n`
+      : `are ${posts.length} posts collected today about the same event.\n\n`) +
+    `Write one short post about it. This is a card in a feed, not an article.\n\n` +
     `Rules:\n` +
+    `- ONE subject. If the material covers several unrelated things, pick the ` +
+    `single most newsworthy one and ignore the rest. A body that lists three ` +
+    `things is a list, and a reader skips a list.\n` +
+    `- Body: AT MOST ${MAX_BODY} CHARACTERS. Two or three short sentences. Say ` +
+    `what happened and the one detail that makes it worth knowing, then stop.\n` +
     `- Assert only what these posts support. No outside knowledge, no numbers ` +
     `that do not appear here, no predictions.\n` +
     `- Cover the subject as a trade publication would. We publish Skillet and we ` +
@@ -89,15 +99,15 @@ function promptFor(posts) {
     `No colon-prefix labels, and no "and also" clause bolted on the end. ` +
     `The house style, for calibration:\n` +
     HOUSE_HEADLINES.map((h) => `    ${h}\n`).join('') +
-    `- Summary: three to five sentences, each UNDER 30 WORDS. Short sentences ` +
-    `are the house style; a 50-word sentence is a paragraph wearing a disguise. ` +
-    `No bullet points, no em-dashes, no hype, no throat-clearing.\n` +
+    `- The headline carries the claim; the body must not restate it in other ` +
+    `words. Give the body the detail the headline left out.\n` +
+    `- No bullet points, no em-dashes, no hype, no throat-clearing.\n` +
     `- A number inside a post is that poster's claim, not a fact we checked. ` +
     `Star counts, benchmarks and model names from a post get attributed ("the ` +
     `roundup lists...") or left out. Never restate one in our own voice.\n` +
     `- kind: one of launch, labs, research, debate, trust.\n` +
-    `- If these posts are not actually about one subject, or there is no story ` +
-    `worth publishing, return {"skip": true} and nothing else.\n\n` +
+    `- If there is no story here worth a reader's attention, return ` +
+    `{"skip": true} and nothing else. Skipping is cheap; a dull card is not.\n\n` +
     `Reply with ONLY a JSON object: ` +
     `{"headline": "...", "summary": "...", "kind": "..."} or {"skip": true}\n\n` +
     `Posts:\n\n${rendered}`
@@ -159,6 +169,14 @@ async function writeStory(posts) {
     console.warn(`  ! headline too long (${parsed.headline.length} chars); skipping`)
     return null
   }
+  // Same reason the headline cap is enforced rather than asked for. Truncating
+  // instead would publish a body that stops mid-sentence, and a body over the
+  // cap almost always means it covered more than one subject, which is the
+  // thing the cap exists to prevent. Drop it and keep the day's other cards.
+  if (parsed.summary.trim().length > MAX_BODY) {
+    console.warn(`  ! body too long (${parsed.summary.trim().length} chars); skipping`)
+    return null
+  }
   return {
     headline: parsed.headline.trim(),
     summary: parsed.summary.trim(),
@@ -201,7 +219,7 @@ async function main() {
   // Posts that already resolve to a skill are their own feed item; stories are
   // built from the rest, which is what the unresolved majority is FOR.
   const material = items.filter((i) => i.match === 'none' && i.text.length > 80)
-  const clusters = cluster(material).slice(0, MAX_STORIES)
+  const clusters = storyCandidates(material, MAX_STORIES)
   console.log(`${material.length} unclustered posts → ${clusters.length} candidate stories`)
 
   if (DRY_RUN) {

@@ -6,13 +6,16 @@
  * visible after the prose is written.
  */
 
-/** A cluster below this is one person's post, not a story the field is having. */
-export const MIN_CLUSTER = 3
-/** Above this a "story" is really a topic, and no summary can be true of all of
- *  it. A cluster that wants to grow past this stops instead of swallowing the day. */
-export const MAX_CLUSTER = 8
-/** Two posts sharing one common word is a coincidence; three is a subject. */
-export const MIN_SHARED_TERMS = 3
+/** One post is a story. A tight cluster only forms when several posts are about
+ *  the SAME event, and then it is still one story with several sources. */
+export const MIN_CLUSTER = 1
+/** Above this a cluster stops being one event. Six posts about six different
+ *  releases produced one paragraph that listed all six, which is a list, not a
+ *  story. Three is the most that can share a single 280-character body. */
+export const MAX_CLUSTER = 3
+/** Grouping now means "the same event", not "the same topic", so the bar for
+ *  joining is higher than it was when clusters could run to eight. */
+export const MIN_SHARED_TERMS = 5
 
 /** Words too common in this corpus to distinguish one story from another. */
 const STOPWORDS = new Set(
@@ -54,8 +57,12 @@ function overlap(a, b) {
  * ANY member, so A-B-C-D collects even when A and D share nothing, and a dry run
  * over one real day produced a 23-post "story" spanning scandi CSS, model
  * choice, and a free course. Requiring a post to match a MAJORITY of the cluster
- * keeps a cluster about one subject, and MAX_CLUSTER stops a broad subject from
- * swallowing the day.
+ * keeps a cluster about one subject.
+ *
+ * Grouping is deliberately reluctant. A cluster is several posts about the same
+ * event, not several posts about the same area: when six unrelated releases
+ * grouped, the only summary true of all six was a list of six things, which is
+ * what a reader skips. Posts that do not group become their own story instead.
  */
 export function cluster(posts) {
   const withTerms = posts.map((post) => ({ post, terms: terms(post) }))
@@ -76,6 +83,21 @@ export function cluster(posts) {
 }
 
 export const reach = (posts) => posts.reduce((n, p) => n + (p.likes ?? 0), 0)
+
+/**
+ * The day's stories, best first.
+ *
+ * Every post is a candidate, so selection rather than grouping decides what runs.
+ * Ranking by the loudest post rather than by summed reach keeps a genuine
+ * three-source event from outranking a bigger single one purely on arithmetic.
+ */
+export function storyCandidates(posts, limit) {
+  return cluster(posts)
+    .sort((a, b) => loudest(b) - loudest(a) || reach(b) - reach(a))
+    .slice(0, limit)
+}
+
+const loudest = (posts) => Math.max(...posts.map((p) => p.likes ?? 0))
 
 
 /**

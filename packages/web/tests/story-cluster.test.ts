@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { cluster, normalizeHandles, terms, MAX_CLUSTER, MIN_CLUSTER } from '@/lib/story-cluster.mjs'
+import {
+  cluster,
+  normalizeHandles,
+  storyCandidates,
+  terms,
+  MAX_CLUSTER,
+} from '@/lib/story-cluster.mjs'
 
 // Clustering decides what a story is ABOUT. Getting it wrong is only visible
 // after the prose is written and the tokens are spent, so the linkage rule is
@@ -41,7 +47,7 @@ describe('cluster', () => {
   it('does not chain unrelated posts through a shared middle', () => {
     // The failure this rule exists for. Single-link agglomeration joined A-B-C-D
     // when A and D shared nothing, and a real day produced one 23-post "story"
-    // spanning scandi CSS, model choice and a free course.
+    // spanning scandi CSS, model choice, and a free course.
     const chain = [
       post('kubernetes helm terraform deployment pipeline'),
       post('kubernetes helm rendering typography spacing'),
@@ -54,58 +60,62 @@ describe('cluster', () => {
       const first = terms(group[0]!)
       const last = terms(group[group.length - 1]!)
       const shared = [...first].filter((t) => last.has(t))
-      expect(shared.length).toBeGreaterThan(0)
+      if (group.length > 1) expect(shared.length).toBeGreaterThan(0)
     }
   })
 
-  it('groups posts that genuinely share a subject', () => {
-    const shared = 'discernment nudge anthropic shipped behaviour'
-    const groups = cluster([
-      post(`${shared} rollout announcement`),
-      post(`${shared} rollout reaction`),
-      post(`${shared} rollout critique`),
-    ])
+  it('groups posts about the same event', () => {
+    const shared = 'discernment nudge anthropic shipped behaviour rollout'
+    const groups = cluster([post(`${shared} one`), post(`${shared} two`)])
     expect(groups).toHaveLength(1)
-    expect(groups[0]).toHaveLength(3)
+    expect(groups[0]).toHaveLength(2)
   })
 
-  it('drops a group below the minimum', () => {
-    const shared = 'scandinavian minimalism restyling website'
-    expect(cluster([post(`${shared} one`), post(`${shared} two`)])).toEqual([])
-    expect(MIN_CLUSTER).toBe(3)
+  it('keeps a lone post as its own story', () => {
+    // Every post is a story now. Six unrelated releases used to group into one
+    // body that listed all six, which is a list, and a reader skips a list.
+    expect(cluster([post('kerning ligatures typeface specimen foundry')])).toHaveLength(1)
+  })
+
+  it('leaves posts with no shared subject ungrouped rather than merged', () => {
+    const groups = cluster([
+      post('kerning ligatures typeface specimen'),
+      post('kubernetes helm terraform ingress'),
+      post('sportsbook modelling backtesting simulation'),
+    ])
+    expect(groups).toHaveLength(3)
+    expect(groups.every((g) => g.length === 1)).toBe(true)
   })
 
   it('never returns a cluster larger than the cap', () => {
-    const shared = 'quantitative sportsbook modelling backtesting simulation'
+    const shared = 'quantitative sportsbook modelling backtesting simulation walkforward'
     const many = Array.from({ length: MAX_CLUSTER + 6 }, (_, i) => post(`${shared} variant ${i}`))
     for (const group of cluster(many)) {
       expect(group.length).toBeLessThanOrEqual(MAX_CLUSTER)
     }
   })
+})
 
-  it('orders clusters by reach so the biggest story leads', () => {
-    const quiet = 'kerning ligatures typeface specimen foundry'
-    const loud = 'permissions sandboxing capability revocation auditing'
-    const groups = cluster([
-      post(`${quiet} a`, { likes: 1 }),
-      post(`${quiet} b`, { likes: 1 }),
-      post(`${quiet} c`, { likes: 1 }),
-      post(`${loud} a`, { likes: 900 }),
-      post(`${loud} b`, { likes: 900 }),
-      post(`${loud} c`, { likes: 900 }),
-    ])
-    expect(groups.length).toBeGreaterThanOrEqual(2)
+describe('storyCandidates', () => {
+  it('ranks by the loudest post, not by summed reach', () => {
+    // Otherwise a three-source cluster of quiet posts outranks a bigger single
+    // one on arithmetic alone, and the day leads with the wrong story.
+    const quiet = 'kerning ligatures typeface specimen foundry letterforms'
+    const groups = storyCandidates(
+      [
+        post(`${quiet} a`, { likes: 400 }),
+        post(`${quiet} b`, { likes: 400 }),
+        post(`${quiet} c`, { likes: 400 }),
+        post('permissions sandboxing capability revocation auditing', { likes: 900 }),
+      ],
+      5,
+    )
     expect(groups[0]![0]!.text).toContain('permissions')
   })
 
-  it('returns nothing for posts with no shared subject', () => {
-    expect(
-      cluster([
-        post('kerning ligatures typeface specimen'),
-        post('kubernetes helm terraform ingress'),
-        post('sportsbook modelling backtesting simulation'),
-      ]),
-    ).toEqual([])
+  it('caps the day at the limit', () => {
+    const many = Array.from({ length: 20 }, (_, i) => post(`unrelated subject number ${i} here`))
+    expect(storyCandidates(many, 8)).toHaveLength(8)
   })
 })
 
