@@ -33,13 +33,35 @@ import {
 // grid (the canonical /browse). 'featured' is intentionally NOT a category key — a
 // static /browse/featured route wins over the /browse/[category] dynamic segment,
 // and a drift test asserts it never becomes a CategoryKey.
-type BrowseViewKind = 'all' | 'skills' | 'kits' | 'people'
+export type BrowseViewKind = 'all' | 'skills' | 'kits' | 'people'
 const TYPES: BrowseViewKind[] = ['skills', 'kits', 'people']
 
 /** Derive the active {category, view} from the URL — /browse, /browse/<seg1>,
  *  /browse/<category>/<type>. The chrome lives in the persistent layout, so it
  *  reads the path itself instead of taking props that would force a re-mount. */
-function parseBrowsePath(pathname: string): {
+/** The four result-type filters and where each one points, for a given category.
+ *  Exported so the phone chrome bar (BrowseStrip) and the desktop tabs offer the
+ *  same four choices at the same hrefs — two lists would drift. */
+export function browseTypes(
+  category: string,
+): { key: BrowseViewKind; label: string; href: string }[] {
+  const href = (t: BrowseViewKind) =>
+    t === 'all'
+      ? category
+        ? `/browse/${category}`
+        : '/browse/all'
+      : category
+        ? `/browse/${category}/${t}`
+        : `/browse/${t}`
+  return [
+    { key: 'all', label: 'All', href: href('all') },
+    { key: 'skills', label: 'Skills', href: href('skills') },
+    { key: 'kits', label: 'Kits', href: href('kits') },
+    { key: 'people', label: 'People', href: href('people') },
+  ]
+}
+
+export function parseBrowsePath(pathname: string): {
   category: string
   view: BrowseViewKind
   featured: boolean
@@ -398,7 +420,12 @@ function TypeSegmented({
   return (
     <SegmentedControl
       ariaLabel="Filter by type"
-      className={isPending ? 'opacity-60' : ''}
+      // Bare: no track, no pill. This control sits directly above the grid it
+      // filters, where the chrome read as a second card competing with the
+      // results.
+      // -ml-2.5 pulls the first item's hit-padding outside the column so "All"
+      // sits on the same left line as the strip above and the title below.
+      className={`seg--bare -ml-2.5 ${isPending ? 'opacity-60' : ''}`}
       options={types.map((t) => ({ value: t.key, label: t.label }))}
       value={view}
       onChange={(key) => {
@@ -421,46 +448,32 @@ export function BrowseChrome({ children }: { children: ReactNode }) {
   const cat = isCategoryKey(category) ? CATEGORY_BY_KEY[category] : null
   const section = sectionFromSlug(category)
 
+  // Title only. The standfirst under each heading restated what the grid below
+  // already showed ("Curated kits you can install as one." over a wall of kits),
+  // so it cost a line of vertical space on every browse surface and told the
+  // reader nothing they could not see. The same sentences still ship as the
+  // page's meta description in browse-view.tsx, where they do work.
   const header = featured
-    ? {
-        title: 'Featured',
-        blurb: 'Hand-picked kits and the top skills, kits, and creators on Skillet.',
-      }
+    ? { title: 'Featured' }
     : cat
-      ? { title: cat.label, blurb: cat.blurb }
+      ? { title: cat.label }
       : section
-        ? { title: SECTION_LABEL[section], blurb: SECTION_BLURB[section] }
+        ? { title: SECTION_LABEL[section] }
         : view === 'people'
-          ? { title: 'Browse people', blurb: 'Everyone publishing skills on Skillet.' }
+          ? { title: 'Browse people' }
           : view === 'skills'
-            ? { title: 'Browse skills', blurb: 'Every individual skill on Skillet, newest first.' }
+            ? { title: 'Browse skills' }
             : view === 'kits'
-              ? { title: 'Browse kits', blurb: 'Curated kits you can install as one.' }
-              : {
-                  title: 'Browse skills & kits',
-                  blurb: 'Every skill and kit on Skillet, newest first.',
-                }
+              ? { title: 'Browse kits' }
+              : { title: 'Browse skills & kits' }
 
-  const typeHref = (t: BrowseViewKind) =>
-    t === 'all'
-      ? category
-        ? `/browse/${category}`
-        : '/browse/all'
-      : category
-        ? `/browse/${category}/${t}`
-        : `/browse/${t}`
-  const types: { key: BrowseViewKind; label: string; href: string }[] = [
-    { key: 'all', label: 'All', href: typeHref('all') },
-    { key: 'skills', label: 'Skills', href: typeHref('skills') },
-    { key: 'kits', label: 'Kits', href: typeHref('kits') },
-    { key: 'people', label: 'People', href: typeHref('people') },
-  ]
+  const types = browseTypes(category)
 
   // Below lg the mobile subnav row leads (no hero above it), so use the tight top
   // padding Feed/Settings use to put the tab bar at the same height. At lg the layout
   // switches to the rail + hero, which keeps the standard pt-10 breathing room.
   return (
-    <main className="marketing-home consumer-theme mx-auto max-w-[1120px] px-[clamp(16px,4vw,32px)] pt-2 pb-12 sm:pt-4 sm:pb-16 lg:pt-10">
+    <main className="marketing-home consumer-theme mx-auto max-w-[1120px] px-[clamp(16px,4vw,32px)] pt-5 pb-12 sm:pt-6 sm:pb-16 lg:pt-10">
       <div className="flex gap-10">
         {/* Left rail: Featured | All Skills tabs, then the category sidebar — both
             shown on Featured and All Skills. self-start keeps the rail in flow but
@@ -477,26 +490,11 @@ export function BrowseChrome({ children }: { children: ReactNode }) {
         </aside>
 
         <div className="min-h-[calc(100vh-112px)] min-w-0 flex-1">
-          {/* Mobile: the whole subnav row — Featured / All Skills on the left, the
-              type / category / sort filters on the right — leads above the title, the
-              same shape as the Feed subnav. On desktop the tabs live in the left rail
-              and this row is hidden. */}
-          {/* Mobile toolbar: Type ↔ Sort. Featured/All Skills + categories now live
-              in the top SectionNav strip (mobile-only), so this row is just the two
-              result controls. Featured is curated — no type/sort there. */}
-          {!featured && (
-            <div className="mt-2 mb-5 flex items-center justify-between gap-3 border-b border-(--line) pb-3 lg:hidden">
-              <TypeSegmented types={types} view={view} />
-              <Suspense fallback={<div className="h-9 w-24" aria-hidden="true" />}>
-                <SortControl
-                  options={view === 'people' ? PEOPLE_SORTS : undefined}
-                  defaultValue="new"
-                />
-              </Suspense>
-            </div>
-          )}
-
-          <div className="mb-5 max-w-[60ch]">
+          {/* The title sits under the chrome bar's rule, so it needs air ABOVE
+              it to read as the page rather than the bar's caption — and less
+              below, where the results start immediately. text-3xl was tuned for
+              the desktop hero; on a phone it ran the full column width. */}
+          <div className="mb-3 max-w-[60ch] sm:mb-5">
             {/* Category pages name their family: the section mark + label, in
                 the section color, so a category's place in the three-shape
                 system reads at the top of its page. */}
@@ -509,8 +507,9 @@ export function BrowseChrome({ children }: { children: ReactNode }) {
                 {SECTION_LABEL[cat.section]}
               </div>
             )}
-            <h1 className="text-3xl font-semibold tracking-tight text-(--ink)">{header.title}</h1>
-            <p className="mt-1.5 leading-[1.5] text-(--ink-2)">{header.blurb}</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-(--ink) sm:text-3xl">
+              {header.title}
+            </h1>
           </div>
 
           {/* Desktop: the type tab bar — categories live in the left rail, so only

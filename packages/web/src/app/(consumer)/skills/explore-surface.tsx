@@ -20,6 +20,7 @@ import { kitCardMenu } from '@/lib/kit-card-menu'
 import { PersonDirectoryCard } from './person-directory-card'
 import { withViewerFollows } from '@/lib/follows-server'
 import { Avatar } from '@/components/ui/avatar'
+import { LadderCarousel } from '@/components/home/ladder-carousel'
 import { ArrowRight } from '@/components/ui/icons'
 import { usedByFacesFromWire } from '@/lib/used-by'
 import { SubscribeKitButton } from '@/components/kits/subscribe-kit-button'
@@ -396,34 +397,17 @@ async function PeopleTab({
  *  scoped to the active category. A face is the right primitive for a person —
  *  so people ride above the content grid as circles, not as cards mixed in. */
 
-// The tray fills whatever width it gets: every slot is a fixed 96px (+8px gap),
-// and each face past the second appears only once the container fits it whole —
-// so the row always ends on a full face with "View all" in the last slot. No
-// scroll, no half-clipped avatar, and display:none keeps hidden ones out of the
-// tab order. Thresholds are 96 (View all) + 104 × faces.
-const TRAY_SLOTS = [
-  '',
-  '',
-  'hidden @min-[408px]:block',
-  'hidden @min-[512px]:block',
-  'hidden @min-[616px]:block',
-  'hidden @min-[720px]:block',
-  'hidden @min-[824px]:block',
-  'hidden @min-[928px]:block',
-  'hidden @min-[1032px]:block',
-  'hidden @min-[1136px]:block',
-  'hidden @min-[1240px]:block',
-  'hidden @min-[1344px]:block',
-  'hidden @min-[1448px]:block',
-  'hidden @min-[1552px]:block',
-]
+// How many faces the tray asks for. It scrolls now, so this is a real limit on
+// the tray's length rather than "as many as fit" — past a couple of dozen the
+// row stops being a peek and the "View all" door is the better answer.
+const TRAY_LIMIT = 24
 
 async function PeopleStrip({ category }: { category: string }) {
   const { items } = await browseSsrSpan('people_strip', () =>
     softRegistry(
       'browse catalog soft-fail (people strip)',
-      getPeopleCatalog({ limit: TRAY_SLOTS.length, category }),
-      { items: [] as PersonCatalogEntry[], total: 0, limit: TRAY_SLOTS.length, offset: 0 },
+      getPeopleCatalog({ limit: TRAY_LIMIT, category }),
+      { items: [] as PersonCatalogEntry[], total: 0, limit: TRAY_LIMIT, offset: 0 },
     ),
   )
   if (items.length === 0) return null
@@ -432,12 +416,15 @@ async function PeopleStrip({ category }: { category: string }) {
   return (
     // No heading — the handles already say "people". The tray just exists, and
     // the last slot is the "View all" door into the full people directory.
-    <section aria-label="People to follow" className="mb-6 @container">
-      {/* overflow-x only ever engages below ~330px, where even the two
-          always-on faces can't fit — everywhere else the slots fit by math. */}
-      <ul className="-mx-1 flex gap-2 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {items.map((person, i) => (
-          <li key={person.handle} className={`shrink-0 ${TRAY_SLOTS[i]}`}>
+    <section aria-label="People to follow" className="mb-6">
+      {/* A real rail, shared with the homepage ladder: native scroll (so a thumb
+          drags it with momentum) plus arrows that appear only on a pointer, only
+          when there is something to scroll to. It replaces a container-query
+          slot table that hid every face past the fold — the row always ended
+          tidily, and nobody knew there were twenty more people. */}
+      <LadderCarousel label="People to follow" trackClassName="-mx-1 gap-2 px-1 py-1">
+        {items.map((person) => (
+          <div key={person.handle} className="shrink-0">
             <Link
               href={`/${person.handle}`}
               className="group flex w-24 flex-col items-center gap-2 rounded-xl px-2.5 py-2 text-center transition-colors hover:bg-(--surface)"
@@ -454,9 +441,9 @@ async function PeopleStrip({ category }: { category: string }) {
                 @{person.handle}
               </span>
             </Link>
-          </li>
+          </div>
         ))}
-        <li className="shrink-0">
+        <div className="shrink-0">
           <Link
             href={seeAllHref}
             className="group flex w-24 flex-col items-center gap-2 rounded-xl px-2.5 py-2 text-center transition-colors hover:bg-(--surface)"
@@ -479,8 +466,8 @@ async function PeopleStrip({ category }: { category: string }) {
               View all
             </span>
           </Link>
-        </li>
-      </ul>
+        </div>
+      </LadderCarousel>
     </section>
   )
 }

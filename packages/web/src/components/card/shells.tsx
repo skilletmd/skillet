@@ -121,8 +121,13 @@ export function CardLg({
       >
         {/* The cover is flush to the top/left/right edges; the card's overflow-hidden
             clips its corners to the card radius. The tinted ground shows only in the
-            text well below. */}
-        <div className="relative aspect-[4/3] shrink-0 overflow-hidden">
+            text well below.
+
+            Wider on a phone: in the swipe rail a card is 78% of the column, so a
+            4:3 cover stood nearly as tall as the screen and pushed the name and
+            byline — the part that says what the card IS — below the fold. 16:9
+            keeps the art readable and the card a card. */}
+        <div className="relative aspect-[16/9] shrink-0 overflow-hidden sm:aspect-[4/3]">
           {cover}
           {badge}
         </div>

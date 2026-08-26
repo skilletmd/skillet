@@ -2,7 +2,7 @@ import { Suspense, type ReactNode } from 'react'
 import { BrowseChrome } from './browse-chrome'
 import { BrowseStrip } from './browse-strip'
 
-// MOBILE-ONLY: a compact nav strip — Featured · All Skills · Code ▾ · Creative ▾
+// MOBILE-ONLY: a compact nav strip — Featured · All · Code ▾ · Creative ▾
 // · Grow ▾ — collapsing the 15 flat categories into their 3 sections (each a
 // dropdown). Replaces the cramped mobile dropdowns. Desktop keeps the left rail
 // (this is hidden below lg via the wrapper).

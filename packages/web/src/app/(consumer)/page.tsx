@@ -309,7 +309,10 @@ function HomeLadder() {
           strand the dividers again, which is what an arrow row underneath used
           to require. The arrows moved onto the rail's edges instead. */}
       <div className="mx-auto max-w-[1120px] px-[clamp(16px,4vw,32px)]">
-        <LadderCarousel label="How people use Skillet">
+        <LadderCarousel
+          label="How people use Skillet"
+          trackClassName="snap-x snap-mandatory border-x border-(--line)"
+        >
           {LADDER.map((r) => (
             <LadderCard key={r.title}>
               <div className="flex h-11 items-center">

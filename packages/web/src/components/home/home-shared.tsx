@@ -8,6 +8,7 @@ import { SkillCard } from '@/components/skill-card'
 import { KitCardMenu } from '@/components/kits/kit-card-menu'
 import { FollowButton } from '@/components/follow-button'
 import { SkillKitControl } from '@/components/kits/skill-kit-control'
+import { ChartTabs } from '@/components/home/chart-tabs'
 import { kitCardMenu } from '@/lib/kit-card-menu'
 import { humanizeSlug } from '@/components/skill-card'
 import { SkillIcon, KitStackIcon, kitCoverCategories } from '@/components/directory-card'
@@ -19,9 +20,20 @@ import { SHELF_TITLE_CLASS } from '@/lib/page-layout'
 import { softRegistry } from '@/lib/registry-soft'
 
 export const CHART_SIZE = 10
-// Fixed responsive columns: a tidy row of 3 from sm up, 2-up on the narrowest
-// screens. The handful of featured kits fits one row; more wrap to a second.
-export const KITS_GRID_CLASS = 'grid grid-cols-2 gap-4 sm:grid-cols-3'
+// A tidy row of 3 from sm up; the handful of featured kits fits one row and more
+// wrap to a second.
+//
+// Phones get a swipe rail instead. Two columns on a 390px screen left each cover
+// a thumbnail, and the covers are the whole point of a kit card. Cards sit at 78%
+// of the column so the next one always peeks in from the right, which is what
+// tells a thumb there is more without any dots or arrows. Scrolling is native
+// (overflow + scroll-snap), so momentum and axis-locking are the browser's — and
+// deliberately no `touch-action`, or a vertical swipe starting on a card would
+// freeze the page.
+export const KITS_GRID_CLASS =
+  'rail-scroll flex snap-x snap-mandatory gap-4 overflow-x-auto ' +
+  '[&>*]:w-[78%] [&>*]:shrink-0 [&>*]:snap-start ' +
+  'sm:grid sm:snap-none sm:grid-cols-3 sm:overflow-visible sm:[&>*]:w-auto'
 
 const SKILLS_GRID = 'grid grid-cols-1 gap-4 md:grid-cols-2'
 const numberFormat = new Intl.NumberFormat('en-US')
@@ -85,27 +97,22 @@ export function SeeAllLink({ href }: { href: string }) {
 
 export function Shelf({
   title,
-  blurb,
   seeAllHref,
   children,
 }: {
   title?: string
-  blurb?: string
   seeAllHref?: string
   children: React.ReactNode
 }) {
-  // With no title/blurb/link the header row is empty — drop it so the content
+  // With no title/link the header row is empty — drop it so the content
   // sits directly under whatever heading already precedes it (e.g. the /browse
   // page's own "Featured" h1).
-  const hasHeader = title || blurb || seeAllHref
+  const hasHeader = title || seeAllHref
   return (
     <section className="mt-12 first:mt-0">
       {hasHeader && (
         <div className="group/shelf mb-4 flex items-baseline justify-between gap-4">
-          <div>
-            {title && <h2 className={SHELF_TITLE_CLASS}>{title}</h2>}
-            {blurb && <p className="mt-1 text-sm text-(--ink-2)">{blurb}</p>}
-          </div>
+          <div>{title && <h2 className={SHELF_TITLE_CLASS}>{title}</h2>}</div>
           {seeAllHref && <SeeAllLink href={seeAllHref} />}
         </div>
       )}
@@ -227,22 +234,22 @@ function ChartIcon({ children }: { children: React.ReactNode }) {
 
 function MiniChart({
   title,
-  blurb,
   seeAllHref,
   children,
 }: {
   title: string
-  blurb: string
   seeAllHref?: string
   children: React.ReactNode
 }) {
   return (
     <section>
-      <div className="group/shelf mb-4 flex items-baseline justify-between gap-4">
-        <div>
-          <h2 className={SHELF_TITLE_CLASS}>{title}</h2>
-          <p className="mt-1 text-sm text-(--ink-2)">{blurb}</p>
-        </div>
+      {/* data-chart-heading: on a phone ChartTabs replaces these headings with a
+          tab bar, and two titles for one visible panel is one title too many. */}
+      <div
+        data-chart-heading
+        className="group/shelf mb-4 flex items-baseline justify-between gap-4"
+      >
+        <h2 className={SHELF_TITLE_CLASS}>{title}</h2>
         {seeAllHref && <SeeAllLink href={seeAllHref} />}
       </div>
       <Panel as="ol" padding="none" className="overflow-hidden">
@@ -341,83 +348,98 @@ export function ChartsRow({
 
   return (
     <section className="mt-12 first:mt-0">
-      <div className="grid grid-cols-1 gap-x-8 gap-y-10 sm:grid-cols-2">
-        {topCreators.length > 0 && (
-          <MiniChart
-            title="Top creators"
-            blurb="By total installs across their skills."
-            seeAllHref={seeAll ? '/browse/people' : undefined}
-          >
-            {topCreators.map((p, i) => (
-              <RankRow
-                key={p.handle}
-                rank={i + 1}
-                href={`/${p.handle}`}
-                visual={
-                  <Avatar
-                    src={p.avatarUrl}
-                    name={p.name}
-                    colorKey={p.handle}
-                    size="md"
-                    className="h-11 w-11"
-                    aria-hidden="true"
-                  />
-                }
-                title={p.name}
-                subtitle={<span className="truncate font-medium">@{p.handle}</span>}
-                {...metricCount(p.totalInstalls, 'installs')}
-                action={
-                  viewerHandle == null || viewerHandle === p.handle ? undefined : (
-                    <FollowButton
-                      author={p.handle}
-                      initialFollowing={p.viewerFollows}
-                      isAuthed
-                      appearance="card"
-                    />
-                  )
-                }
-              />
-            ))}
-          </MiniChart>
-        )}
-        {content.length > 0 && (
-          <MiniChart
-            title="Top skills & kits"
-            blurb="Most popular across Skillet."
-            seeAllHref={seeAll ? '/browse' : undefined}
-          >
-            {content.map((c, i) => (
-              <RankRow
-                key={c.key}
-                rank={i + 1}
-                href={c.href}
-                visual={c.visual}
-                title={c.title}
-                subtitle={
-                  // Above the row's stretched title link (relative z-[1]) so the
-                  // byline routes to the author, not the skill/kit.
-                  <Link
-                    href={`/${c.owner}`}
-                    className="relative z-[1] flex min-w-0 items-center gap-1.5 hover:text-(--ink) hover:underline underline-offset-2"
-                  >
-                    <Avatar
-                      src={c.ownerAvatarUrl}
-                      name={c.owner}
-                      colorKey={c.owner}
-                      size="xxs"
-                      aria-hidden="true"
-                    />
-                    <span className="truncate font-medium">@{c.owner}</span>
-                  </Link>
-                }
-                {...metricCount(c.value, c.metricLabel)}
-                action={c.action}
-              />
-            ))}
-          </MiniChart>
-        )}
-
-      </div>
+      <ChartTabs
+        tabs={[
+          ...(topCreators.length > 0
+            ? [
+                {
+                  key: 'creators',
+                  label: 'Top creators',
+                  panel: (
+                    <MiniChart
+                      title="Top creators"
+                      seeAllHref={seeAll ? '/browse/people' : undefined}
+                    >
+                      {topCreators.map((p, i) => (
+                        <RankRow
+                          key={p.handle}
+                          rank={i + 1}
+                          href={`/${p.handle}`}
+                          visual={
+                            <Avatar
+                              src={p.avatarUrl}
+                              name={p.name}
+                              colorKey={p.handle}
+                              size="md"
+                              className="h-11 w-11"
+                              aria-hidden="true"
+                            />
+                          }
+                          title={p.name}
+                          subtitle={<span className="truncate font-medium">@{p.handle}</span>}
+                          {...metricCount(p.totalInstalls, 'installs')}
+                          action={
+                            viewerHandle == null || viewerHandle === p.handle ? undefined : (
+                              <FollowButton
+                                author={p.handle}
+                                initialFollowing={p.viewerFollows}
+                                isAuthed
+                                appearance="card"
+                              />
+                            )
+                          }
+                        />
+                      ))}
+                    </MiniChart>
+                  ),
+                },
+              ]
+            : []),
+          ...(content.length > 0
+            ? [
+                {
+                  key: 'content',
+                  label: 'Top skills',
+                  panel: (
+                    <MiniChart
+                      title="Top skills & kits"
+                      seeAllHref={seeAll ? '/browse' : undefined}
+                    >
+                      {content.map((c, i) => (
+                        <RankRow
+                          key={c.key}
+                          rank={i + 1}
+                          href={c.href}
+                          visual={c.visual}
+                          title={c.title}
+                          subtitle={
+                            // Above the row's stretched title link (relative z-[1]) so the
+                            // byline routes to the author, not the skill/kit.
+                            <Link
+                              href={`/${c.owner}`}
+                              className="relative z-[1] flex min-w-0 items-center gap-1.5 hover:text-(--ink) hover:underline underline-offset-2"
+                            >
+                              <Avatar
+                                src={c.ownerAvatarUrl}
+                                name={c.owner}
+                                colorKey={c.owner}
+                                size="xxs"
+                                aria-hidden="true"
+                              />
+                              <span className="truncate font-medium">@{c.owner}</span>
+                            </Link>
+                          }
+                          {...metricCount(c.value, c.metricLabel)}
+                          action={c.action}
+                        />
+                      ))}
+                    </MiniChart>
+                  ),
+                },
+              ]
+            : []),
+        ]}
+      />
     </section>
   )
 }
@@ -482,4 +504,3 @@ export function BlogRail({ posts }: { posts: Post[] }) {
     </div>
   )
 }
-

@@ -33,9 +33,10 @@ import { ArrowLeft, ArrowRight } from '@/components/ui/icons'
  * an arrow would straddle is where the body copy starts, so they would sit on
  * top of it. Touch has finger dragging, which is the better affordance anyway.
  *
- * Lives in `home/` rather than `ui/` on purpose. There is one call site; the ui
- * README reserves that directory for primitives that actually repeat. Promote
- * it there the second something else needs a rail.
+ * Used by the homepage ladder and by the Browse people tray. It stayed in
+ * `home/` while it had one call site; now that the track's look is the caller's
+ * (see `trackClassName`) and a second surface uses it, it is a primitive in
+ * everything but address — move it to `ui/` next time this file is touched.
  *
  * Scrolling is native (`overflow-x: auto` + scroll-snap), which is what makes
  * finger dragging work on a phone: touch panning is the browser's, not
@@ -55,9 +56,14 @@ import { ArrowLeft, ArrowRight } from '@/components/ui/icons'
 export function LadderCarousel({
   children,
   label,
+  trackClassName = '',
 }: {
   children: ReactNode
   label: string
+  /** The track's own look — snap behavior, dividers, padding. The ladder wants
+   *  `border-x` and mandatory snap; a tray of faces wants neither, so this is
+   *  the caller's to set rather than baked in. */
+  trackClassName?: string
 }) {
   const trackRef = useRef<HTMLDivElement>(null)
   // Both false until measured, so the arrows never flash on a track that turns
@@ -119,7 +125,7 @@ export function LadderCarousel({
         role="group"
         aria-label={label}
         tabIndex={0}
-        className="rail-scroll flex snap-x snap-mandatory overflow-x-auto border-x border-(--line) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent)"
+        className={`rail-scroll flex overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent) ${trackClassName}`}
       >
         {children}
       </div>

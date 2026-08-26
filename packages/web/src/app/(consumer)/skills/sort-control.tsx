@@ -39,11 +39,19 @@ export const PEOPLE_SORTS: SortOption[] = [
 export function SortControl({
   options = CONTENT_SORTS,
   defaultValue = 'new',
+  compact = false,
 }: {
   options?: SortOption[]
   /** The sort that's active with no `sort` param in the URL. Must match the
    *  server-side default in parseBrowseQuery. */
   defaultValue?: string
+  /**
+   * Trade the "Sort:" prefix for a sort glyph, and the 44px row height for 36px.
+   * For the phone's single chrome bar, where the label costs more width than it
+   * explains — the glyph plus the live value ("Newest") already says what this
+   * is. The `aria-label` carries the word for anyone who can't see the glyph.
+   */
+  compact?: boolean
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -65,9 +73,25 @@ export function SortControl({
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="Sort results"
-        className={`group inline-flex h-11 items-center gap-1.5 rounded-md px-0.5 text-sm font-medium text-(--ink-2) outline-none transition-colors hover:text-(--ink) focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--accent) data-[state=open]:text-(--ink) ${isPending ? 'opacity-60' : ''}`}
+        className={`group inline-flex items-center gap-1.5 rounded-md px-0.5 text-sm font-medium text-(--ink-2) outline-none transition-colors hover:text-(--ink) focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--accent) data-[state=open]:text-(--ink) ${compact ? 'h-9' : 'h-11'} ${isPending ? 'opacity-60' : ''}`}
       >
-        Sort:<span className="font-semibold text-(--ink)">{currentLabel}</span>
+        {compact ? (
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M2.5 4.5h11M4.5 8h7M6.5 11.5h3" />
+          </svg>
+        ) : (
+          'Sort:'
+        )}
+        <span className="font-semibold text-(--ink)">{currentLabel}</span>
         <svg
           aria-hidden="true"
           viewBox="0 0 12 12"

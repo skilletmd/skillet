@@ -166,7 +166,6 @@ export async function HomeCatalogShelves({
       {showNewlyPublished && newlyPublished.length > 0 && (
         <Shelf
           title="New on Skillet"
-          blurb="Just published across the registry."
           seeAllHref={seeAll ? feedGlobalHref() : undefined}
         >
           <SkillEventGrid skills={newlyPublished} avatarByHandle={avatarByHandle} />

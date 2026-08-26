@@ -29,7 +29,6 @@ export async function HomeFreshShelf() {
   return (
     <Shelf
       title="Fresh from people you follow"
-      blurb="The latest from the authors you trust."
       seeAllHref={feedHref()}
     >
       <SkillEventGrid skills={fresh} avatarByHandle={avatarByHandle} />
