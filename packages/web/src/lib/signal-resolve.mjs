@@ -19,11 +19,24 @@ export const REPO_RE = /github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)/gi
 /**
  * An install line naming a repo without linking it: `npx skills add owner/name`.
  *
- * The most common shape for a skill announcement, and it carried no repo, so
- * the card offered "not in the registry" and no way to get it. The repo is
- * right there in the text the author asked people to copy.
+ * Every one of these IS a GitHub repo reference, so it is rewritten into the
+ * link form and matched by the same pattern rather than tracked as a second
+ * kind of thing. The most common shape for a skill announcement, and it used to
+ * carry no repo at all: the card said "not in the registry" and offered no way
+ * to get the skill, directly under a line the author wrote to be copied.
+ *
+ * The tool name is required and comes from a closed list. `add owner/name` on
+ * its own is far too common a shape — `git add src/foo`, `npm add scope/pkg` —
+ * and a false repo is worse than a missing one, because it sends a reader to
+ * someone else's project.
  */
-export const INSTALL_REPO_RE = /\bskills?\s+add\s+([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)/gi
+const INSTALL_REPO_RE =
+  /\b(?:skills?|skilletmd|skillet)\s+add\s+([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)/gi
+
+/** Install lines rewritten as GitHub URLs, so one pattern finds every repo. */
+export function expandInstallLines(text) {
+  return String(text ?? '').replace(INSTALL_REPO_RE, (_m, repo) => ` github.com/${repo} `)
+}
 /**
  * A slash-command skill name, or a `*-skill` name.
  *
@@ -97,10 +110,10 @@ export function normalizeRepo(path) {
  * rest away, which is both a miss and misleading about what the post is.
  */
 export function findRepos(text, urls = []) {
-  const blob = [String(text ?? ''), ...urls.filter(Boolean)].join(' ')
+  const blob = [expandInstallLines(text), ...urls.filter(Boolean)].join(' ')
   const seen = new Set()
   const out = []
-  for (const match of [...blob.matchAll(REPO_RE), ...blob.matchAll(INSTALL_REPO_RE)]) {
+  for (const match of blob.matchAll(REPO_RE)) {
     const repo = normalizeRepo(match[1])
     if (!repo) continue
     const key = repo.toLowerCase()

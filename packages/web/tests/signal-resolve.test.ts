@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { buildIndex, findRepo, namedSkill, normalizeRepo, resolvePost } from '@/lib/signal-resolve.mjs'
+import {
+  buildIndex,
+  findRepo,
+  findRepos,
+  namedSkill,
+  normalizeRepo,
+  resolvePost,
+} from '@/lib/signal-resolve.mjs'
 
 // Every attribution bug this surface has had shipped invisibly and was caught by
 // a human looking at one card: a mirror-holder credited for someone else's
@@ -65,6 +72,34 @@ describe('findRepo', () => {
 
   it('returns null when no repo is present', () => {
     expect(findRepo('just talking about skills')).toBeNull()
+  })
+})
+
+describe('install lines are repo references', () => {
+  // "npx skills add owner/name" IS a GitHub repo reference, and it is the most
+  // common shape for a skill announcement. Reading only github.com links left
+  // those posts with no repo, so the card said "not in the registry" and gave
+  // no way to get the skill, right under the line the author wrote to be copied.
+  it('reads a repo out of an install line', () => {
+    expect(findRepos('npx skills add ericzakariasson/scandinavian-design')).toEqual([
+      'ericzakariasson/scandinavian-design',
+    ])
+    expect(findRepos('npx skilletmd add vercel-labs/skills')).toEqual(['vercel-labs/skills'])
+    expect(findRepos('skillet add foo/bar')).toEqual(['foo/bar'])
+  })
+
+  it('does NOT match other tools that take an owner/name-shaped argument', () => {
+    // The reason the tool name is required and comes from a closed list. A false
+    // repo is worse than a missing one: it sends the reader to someone else's
+    // project, with an Import button under it.
+    expect(findRepos('git add src/components')).toEqual([])
+    expect(findRepos('npm add @scope/pkg')).toEqual([])
+    expect(findRepos('please add docs/readme')).toEqual([])
+  })
+
+  it('finds both forms in one post, in order, without duplicating', () => {
+    expect(findRepos('npx skills add a/b then see https://github.com/c/d')).toEqual(['a/b', 'c/d'])
+    expect(findRepos('skills add a/b and https://github.com/a/b')).toEqual(['a/b'])
   })
 })
 
