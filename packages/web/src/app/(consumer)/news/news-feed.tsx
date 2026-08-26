@@ -116,7 +116,7 @@ function PostRow({ post }: { post: SignalItem }) {
     <article className="flex flex-col gap-3 rounded-xl border border-(--line) bg-(--surface) p-4">
       <div className="flex items-center gap-2.5">
         <Avatar
-          src={src === 'x' ? `https://unavatar.io/x/${post.handle}` : null}
+          src={post.avatarUrl ?? null}
           name={post.name ?? post.handle ?? '?'}
           colorKey={post.handle ?? 'anon'}
           size="xs"

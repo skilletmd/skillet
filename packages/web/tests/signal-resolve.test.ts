@@ -136,3 +136,63 @@ describe('resolvePost', () => {
     expect(resolvePost({ text: 'github.com/someone/thing' }, bare).match).toBe('none')
   })
 })
+
+describe('roundup posts', () => {
+  const wide = buildIndex([
+    skill('garrytan', 'ship', 'garrytan/gstack'),
+    skill('garrytan', 'qa', 'garrytan/gstack'),
+    skill('addyosmani', 'a11y-audit', 'addyosmani/agent-skills'),
+  ])
+
+  it('collects every carried repo, not just the first', () => {
+    // One real roundup named 42 repos; attaching the first was both a miss and
+    // an arbitrary pick.
+    const out = resolvePost(
+      {
+        text: 'skills you should install: github.com/garrytan/gstack github.com/addyosmani/agent-skills github.com/cline/cline',
+      },
+      wide,
+    )
+    expect(out.match).toBe('roundup')
+    expect(out.collections.map((c) => c.repoOwner).sort()).toEqual(['addyosmani', 'garrytan'])
+    expect(out.repos).toHaveLength(3)
+  })
+
+  it('stays a plain collection when only one repo is carried', () => {
+    const out = resolvePost({ text: 'nice work github.com/garrytan/gstack' }, wide)
+    expect(out.match).toBe('collection')
+    expect(out.collections).toHaveLength(1)
+  })
+
+  it('prefers an exact named skill over roundup handling', () => {
+    const out = resolvePost(
+      { text: '/a11y-audit is great — github.com/addyosmani/agent-skills github.com/garrytan/gstack' },
+      wide,
+    )
+    expect(out.match).toBe('named')
+    expect(out.skills[0]).toEqual({ author: 'addyosmani', slug: 'a11y-audit' })
+  })
+
+  it('dedupes the same repo referenced twice', () => {
+    const out = resolvePost(
+      { text: 'github.com/garrytan/gstack and again github.com/garrytan/gstack/tree/main' },
+      wide,
+    )
+    expect(out.repos).toEqual(['garrytan/gstack'])
+  })
+})
+
+describe('slash names in prose', () => {
+  it('does not read a bracketed choice as a skill', () => {
+    // `Tone: [casual/formal]` published a skill called `formal`.
+    expect(namedSkill('Keep it short. Tone: [casual/formal]. No preamble.')).toBeNull()
+  })
+
+  it('does not read an npx repo argument as a skill', () => {
+    expect(namedSkill('npx skills add ericzakariasson/scandinavian-design')).toBeNull()
+  })
+
+  it('still reads a real slash command', () => {
+    expect(namedSkill('a skill people use a lot: /eli5 <topic>')).toBe('eli5')
+  })
+})

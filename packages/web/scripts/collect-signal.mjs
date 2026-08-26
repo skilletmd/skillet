@@ -34,6 +34,12 @@ const FLOOR = { x: 40, hn: 3, reddit: 10 }
 /** Scoreless items (HN comments have no points) qualify on substance instead. */
 const MIN_CHARS = 90
 
+/** `_normal` is the 48px variant, which is soft on a retina 34px avatar.
+ *  `_bigger` (73px) is the same long-standing Twitter convention and exists
+ *  wherever `_normal` does. */
+const upgradeAvatar = (url) =>
+  typeof url === 'string' ? url.replace(/_normal\.(jpg|jpeg|png|webp)$/i, '_bigger.$1') : null
+
 const since = () => {
   const d = new Date(Date.now() - DAYS * 86400_000)
   return d.toISOString().slice(0, 10)
@@ -89,6 +95,11 @@ async function collectX() {
           handle: t.author?.userName,
           name: t.author?.name,
           followers: t.author?.followers ?? null,
+          // The real avatar, straight from the API. It used to be proxied
+          // through unavatar.io, which rate-limits: a 429 rendered a broken
+          // image for whichever handles happened to lose the lottery. pbs.twimg
+          // is already on the image allowlist, so this optimizes too.
+          avatarUrl: upgradeAvatar(t.author?.profilePicture ?? null),
           text: t.text ?? '',
           url: t.url ?? `https://x.com/i/status/${t.id}`,
           likes: t.likeCount ?? null,
@@ -129,6 +140,8 @@ async function collectHN() {
           handle: h.author,
           name: h.author,
           followers: null,
+          // Hacker News has no avatars; the monogram is the honest fallback.
+          avatarUrl: null,
           text,
           url: h.url ?? `https://news.ycombinator.com/item?id=${h.objectID}`,
           likes: h.points ?? null,
@@ -171,7 +184,24 @@ const ABOUT = /\b(skill|skills|SKILL\.md)\b/i
 const LINK_ONLY = /^\s*(https?:\/\/\S+\s*)+$/
 const NOT_SKILL = /\b(inference|quantiz|fine-?tun|token\/s|drum|sequencer)\b/i
 
-const clean = (t) => (t ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+/**
+ * Normalise a post without destroying it.
+ *
+ * Collapsing all whitespace turns a formatted post — a numbered decision tree,
+ * a checklist, a step sequence — into an unreadable run-on. Structure IS the
+ * content in the posts most worth quoting, so line breaks survive: spaces and
+ * tabs collapse, runs of blank lines cap at one, newlines stay.
+ */
+const clean = (t) =>
+  (t ?? '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[^\S\n]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .join('\n')
+    .trim()
 /** A retweet is not the retweeter's statement, and the name, avatar, follower
  *  count and permalink on the record all belong to whoever reposted it. There is
  *  no faithful way to render one, so they never enter the feed. */
@@ -203,15 +233,16 @@ async function main() {
     const key = text.slice(0, 90).toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
-    const { match, skills, collection, repo, unknownSkill } = resolvePost(
+    const { match, skills, collection, collections, repo, repos, unknownSkill } = resolvePost(
       { text, urls: raw.urls ?? [] },
       index,
     )
     rows.push({
       handle: raw.handle, name: raw.name, followers: raw.followers,
+      avatarUrl: raw.avatarUrl ?? null,
       text, url: raw.url, likes: raw.likes, views: raw.views, createdAt: raw.createdAt,
       source: raw.source, context: raw.context,
-      match, skills, collection,
+      match, skills, collection, collections, repos,
       unknownSkill,
       githubRepo: repo,
       topics: [],

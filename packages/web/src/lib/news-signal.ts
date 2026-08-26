@@ -43,11 +43,15 @@ export interface SignalItem {
   match: 'named' | 'collection' | 'none'
   skills: SignalSkillRef[]
   collection: { author: string; count: number; repo?: string; repoOwner?: string } | null
+  collections?: Array<{ author: string; count: number; repo?: string; repoOwner?: string }>
+  repos?: string[]
   /** A skill the post names that the registry does not carry. */
   unknownSkill: string | null
   topics: string[]
   /** Any GitHub repo the post linked, resolved or not. */
   githubRepo?: string | null
+  /** Avatar from the source API; null falls back to a monogram. */
+  avatarUrl?: string | null
   /** Which network the post came from. */
   source?: 'x' | 'hn' | 'reddit'
   /** Where it sat on that network: a subreddit, or the HN story it replied to. */
@@ -93,7 +97,10 @@ export function signalFeedEvents(limit: number): import('./registry-feed-types')
     network: (item.source ?? 'x') as 'x' | 'hn' | 'reddit',
     actor: item.handle,
     actorName: item.name,
-    actorAvatarUrl: item.source === 'x' ? `https://unavatar.io/x/${item.handle}` : null,
+    // The avatar the collector captured from the source API. Proxying through
+    // unavatar.io rate-limited (429) and rendered broken images for whichever
+    // handles lost that lottery; a null here falls back to the monogram.
+    actorAvatarUrl: item.avatarUrl ?? null,
     followers: item.followers,
     text: item.text,
     url: item.url,
@@ -103,6 +110,8 @@ export function signalFeedEvents(limit: number): import('./registry-feed-types')
     context: item.context ?? null,
     skills: item.skills,
     collection: item.collection,
+    collections: item.collections ?? [],
+    repoCount: item.repos?.length ?? 0,
     unknownSkill: item.unknownSkill,
     repo: item.githubRepo ?? item.collection?.repo ?? null,
   }))

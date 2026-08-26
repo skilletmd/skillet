@@ -93,6 +93,11 @@ export interface FeedSignalEvent {
    *  wrote it. Always credit `repoOwner` in the UI — a post about someone's
    *  plugin is about their work, not about whoever mirrored it. */
   collection: { author: string; count: number; repo?: string; repoOwner?: string } | null
+  /** Every carried repo the post referenced. A roundup names many; showing one
+   *  both undersells the post and picks an arbitrary winner. */
+  collections?: Array<{ author: string; count: number; repo?: string; repoOwner?: string }>
+  /** How many GitHub repos the post referenced in total, carried or not. */
+  repoCount?: number
   unknownSkill: string | null
   /** `owner/repo` the post linked, when it linked one. Any repo, resolved or
    *  not: an unresolved skill with a repo is one click from `/import`. */

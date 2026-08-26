@@ -15,7 +15,15 @@
  */
 
 export const REPO_RE = /github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)/gi
-export const NAME_RE = /\/([a-z][a-z0-9-]{3,34})\b|\b([a-z][a-z0-9-]{3,30}-skill)\b/gi
+/**
+ * A slash-command skill name, or a `*-skill` name.
+ *
+ * The leading `(?<=^|\s)` is load-bearing: without it every slash inside prose
+ * reads as a command. `Tone: [casual/formal]` published a skill called `formal`,
+ * and `npx skills add owner/repo` published one called `repo`. A real invocation
+ * starts a token; a repo path is matched by findRepo instead.
+ */
+export const NAME_RE = /(?<=^|\s)\/([a-z][a-z0-9-]{3,34})\b|\b([a-z][a-z0-9-]{3,30}-skill)\b/gi
 
 /** GitHub paths that look like `owner/repo` but are not repositories. */
 const NOT_AN_OWNER = new Set([
@@ -72,14 +80,31 @@ export function normalizeRepo(path) {
   return `${owner}/${name}`
 }
 
-/** First GitHub repo referenced anywhere in a post, or null. */
-export function findRepo(text, urls = []) {
+/**
+ * Every GitHub repo a post references, in order of first appearance.
+ *
+ * Roundup posts are common and long: one "skills you should install" thread
+ * named 42 repos. Taking only the first attached an arbitrary one and threw the
+ * rest away, which is both a miss and misleading about what the post is.
+ */
+export function findRepos(text, urls = []) {
   const blob = [String(text ?? ''), ...urls.filter(Boolean)].join(' ')
+  const seen = new Set()
+  const out = []
   for (const match of blob.matchAll(REPO_RE)) {
     const repo = normalizeRepo(match[1])
-    if (repo) return repo
+    if (!repo) continue
+    const key = repo.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(repo)
   }
-  return null
+  return out
+}
+
+/** First repo referenced, or null. Convenience over {@link findRepos}. */
+export function findRepo(text, urls = []) {
+  return findRepos(text, urls)[0] ?? null
 }
 
 /** A skill name the post states outright, or null. */
@@ -88,7 +113,7 @@ export function namedSkill(text) {
   for (const match of stripUrls(text).matchAll(NAME_RE)) {
     const candidate = (match[1] ?? match[2] ?? '').toLowerCase()
     if (!candidate || candidate.length <= 3 || GENERIC.has(candidate)) continue
-    if (candidate.includes('-') || bare.includes(`/${candidate}`)) return candidate
+    if (candidate.includes('-') || new RegExp(`(^|\\s)/${candidate}\\b`).test(bare)) return candidate
   }
   return null
 }
@@ -126,38 +151,68 @@ export function buildIndex(corpus) {
  * still one click from `/import` and the card offers that instead of a dead end.
  */
 export function resolvePost({ text, urls = [] }, index) {
-  const repo = findRepo(text, urls)
+  const repos = findRepos(text, urls)
+  const repo = repos[0] ?? null
   const named = namedSkill(text)
   const ref = (s) => ({ author: s.author, slug: s.slug })
 
-  if (repo) {
-    const inRepo = index.byRepo.get(repo.toLowerCase())
-    if (inRepo?.length) {
-      const exact = named ? inRepo.filter((s) => String(s.slug).toLowerCase() === named) : []
-      if (exact.length) {
-        return { match: 'named', skills: exact.slice(0, 2).map(ref), collection: null, repo, unknownSkill: null }
-      }
+  const asCollection = (r, skills) => ({
+    author: skills[0].author,
+    count: skills.length,
+    repo: r,
+    repoOwner: r.split('/')[0],
+  })
+
+  const carried = repos
+    .map((r) => ({ repo: r, skills: index.byRepo.get(r.toLowerCase()) ?? [] }))
+    .filter((entry) => entry.skills.length > 0)
+
+  // A post that names one skill in a repo we carry is the strongest signal
+  // available; take it before any roundup handling.
+  for (const entry of carried) {
+    const exact = named ? entry.skills.filter((s) => String(s.slug).toLowerCase() === named) : []
+    if (exact.length) {
       return {
-        match: 'collection',
-        skills: [],
-        collection: {
-          author: inRepo[0].author,
-          count: inRepo.length,
-          repo,
-          repoOwner: repo.split('/')[0],
-        },
-        repo,
+        match: 'named',
+        skills: exact.slice(0, 2).map(ref),
+        collection: null,
+        collections: [],
+        repo: entry.repo,
+        repos,
         unknownSkill: null,
       }
+    }
+  }
+
+  if (carried.length) {
+    const collections = carried.map((entry) => asCollection(entry.repo, entry.skills))
+    return {
+      // A post referencing several carried repos is a roundup, not a pointer at
+      // one library, and the card says so instead of picking a winner.
+      match: collections.length > 1 ? 'roundup' : 'collection',
+      skills: [],
+      collection: collections[0],
+      collections,
+      repo: carried[0].repo,
+      repos,
+      unknownSkill: null,
     }
   }
 
   if (named) {
     const bySlug = index.bySlug.get(named)
     if (bySlug?.length) {
-      return { match: 'named', skills: bySlug.slice(0, 2).map(ref), collection: null, repo, unknownSkill: null }
+      return {
+        match: 'named',
+        skills: bySlug.slice(0, 2).map(ref),
+        collection: null,
+        collections: [],
+        repo,
+        repos,
+        unknownSkill: null,
+      }
     }
   }
 
-  return { match: 'none', skills: [], collection: null, repo, unknownSkill: named }
+  return { match: 'none', skills: [], collection: null, collections: [], repo, repos, unknownSkill: named }
 }

@@ -81,12 +81,27 @@ function signalScore(event: FeedSignalEvent): string | null {
   return `${n} likes`
 }
 
-/** Quoted text without the link furniture. A trailing `https://t.co/…` carries
- *  no meaning for a reader and the card already links the post. */
+/**
+ * Quoted text, trimmed to length but not to one line.
+ *
+ * Link furniture goes — a trailing `https://t.co/…` means nothing to a reader
+ * and the card already links the post — but line breaks stay. The posts most
+ * worth quoting are often structured (a decision tree, a checklist), and
+ * flattening them to a paragraph destroys the thing that made them readable.
+ * The card renders with `whitespace-pre-line` to honour what survives here.
+ */
 function readableQuote(text: string, max = 320): string {
-  const clean = text.replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim()
-  if (clean.length <= max) return clean
-  return `${clean.slice(0, clean.lastIndexOf(' ', max))}…`
+  const stripped = text
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/[^\S\n]+/g, ' ')
+    .split('\n')
+    .map((line) => line.trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  if (stripped.length <= max) return stripped
+  const cut = stripped.lastIndexOf(' ', max)
+  return `${stripped.slice(0, cut > 0 ? cut : max)}…`
 }
 
 /**
@@ -97,8 +112,6 @@ function readableQuote(text: string, max = 320): string {
  * with a hairline divider reads as a quote with an unfurl, which is what it is.
  */
 function SignalAttachment({ event }: { event: FeedSignalEvent }) {
-  const repoOwner = event.collection?.repoOwner ?? null
-
   if (event.skills.length > 0) {
     return (
       <div className="divide-y divide-(--line) border-t border-(--line)">
@@ -126,11 +139,50 @@ function SignalAttachment({ event }: { event: FeedSignalEvent }) {
     )
   }
 
-  if (event.collection) {
-    const owner = repoOwner ?? event.collection.author
+  const collections = event.collections?.length
+    ? event.collections
+    : event.collection
+      ? [event.collection]
+      : []
+
+  if (collections.length > 1) {
+    // A roundup. Naming one library from a post that listed forty is both a
+    // miss and an arbitrary pick, so the strip says what the post is and lists
+    // the ones we actually carry.
+    const carried = collections.reduce((n, c) => n + c.count, 0)
+    return (
+      <div className="border-t border-(--line)">
+        <p className="px-4 pt-3 font-mono text-2xs tracking-[0.08em] uppercase text-(--ink-2)">
+          {event.repoCount ? `${event.repoCount} repos mentioned · ` : ''}
+          {collections.length} in the registry, {carried} skills
+        </p>
+        <div className="flex flex-wrap gap-1.5 px-4 pt-2 pb-3">
+          {collections.slice(0, 8).map((c) => (
+            <Link
+              key={c.repo ?? c.author}
+              href={`/${c.author}`}
+              className="rounded-pill border border-(--line) bg-(--card-soft) px-2.5 py-1 font-mono text-2xs hover:border-(--ink-2)"
+            >
+              @{c.repoOwner ?? c.author}
+              <span className="text-(--ink-2)"> · {c.count}</span>
+            </Link>
+          ))}
+          {collections.length > 8 ? (
+            <span className="self-center font-mono text-2xs text-(--ink-2)">
+              +{collections.length - 8} more
+            </span>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
+  if (collections.length === 1) {
+    const only = collections[0]!
+    const owner = only.repoOwner ?? only.author
     return (
       <Link
-        href={`/${event.collection.author}`}
+        href={`/${only.author}`}
         className="group flex items-center gap-3 border-t border-(--line) px-4 py-3 transition-colors hover:bg-(--accent-bg)"
       >
         <Avatar src={null} name={owner} colorKey={owner} size="xs" />
@@ -139,7 +191,7 @@ function SignalAttachment({ event }: { event: FeedSignalEvent }) {
             @{owner}
           </span>
           <span className="block truncate font-mono text-2xs text-(--ink-2)">
-            {event.collection.count} skills in the registry
+            {only.count} skills in the registry
           </span>
         </span>
       </Link>
@@ -291,7 +343,7 @@ function QuoteFooter({ event }: { event: FeedSignalEvent }) {
   return (
     <a
       href={event.url}
-      className="block border-t border-(--line) px-4 py-3 text-xs leading-relaxed text-(--ink-2) hover:text-(--ink)"
+      className="block border-t border-(--line) px-4 py-3 text-xs leading-relaxed whitespace-pre-line text-(--ink-2) hover:text-(--ink)"
     >
       “{readableQuote(event.text, 180)}”
     </a>
