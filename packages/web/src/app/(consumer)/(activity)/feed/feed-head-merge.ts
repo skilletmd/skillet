@@ -4,6 +4,10 @@ import type { FeedEvent } from '@/lib/registry'
 export function feedEventKey(e: FeedEvent): string {
   if (e.kind === 'skill') return `s:${e.skill.author}/${e.skill.slug}:${e.at}`
   if (e.kind === 'subscribe') return `b:${e.actor}:${e.target.href}:${e.at}`
+  // A post's URL is its identity: the same link surfacing from two search nets
+  // is one item, and `at` is the post's own time so it never drifts.
+  if (e.kind === 'signal') return `g:${e.url}`
+  if (e.kind === 'story') return `t:${e.id}`
   return `f:${e.actor}:${e.at}`
 }
 

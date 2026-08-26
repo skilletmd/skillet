@@ -1,0 +1,130 @@
+{
+  "generatedAt": "2026-08-25",
+  "stories": [
+    {
+      "id": "agents-md-shopify",
+      "kind": "debate",
+      "headline": "Shopify's CEO pushed back on Claude Code reading only CLAUDE.md. Anthropic answered the same afternoon.",
+      "summary": "Tobi L\u00fctke said he was considering blocking Claude Code internally until it reads AGENTS.md, and framed it as a team problem rather than a format one: engineers on one repo use different tools and the instructions drift apart. Anthropic replied within hours that Claude Code is becoming more hackable, while defending shipping different system prompts per model.",
+      "at": 1787616000,
+      "sources": [
+        {
+          "network": "x",
+          "handle": "tobi",
+          "label": "Tobi L\u00fctke",
+          "detail": "11K likes \u00b7 621K views",
+          "url": "https://x.com/tobi/status/2092259436538495186",
+          "avatarUrl": "https://unavatar.io/x/tobi"
+        },
+        {
+          "network": "x",
+          "handle": "trq212",
+          "label": "Anthropic's reply",
+          "detail": "685 likes \u00b7 163K views",
+          "url": "https://x.com/trq212/status/2092302273099796842",
+          "avatarUrl": "https://unavatar.io/x/trq212"
+        },
+        {
+          "network": "x",
+          "handle": "kunchenguid",
+          "label": "the best thread reply",
+          "detail": "runs five models",
+          "url": "https://x.com/kunchenguid",
+          "avatarUrl": "https://unavatar.io/x/kunchenguid"
+        }
+      ]
+    },
+    {
+      "id": "nvidia-aces",
+      "kind": "research",
+      "headline": "NVIDIA measured whether security scans predict skill quality. They correlate at \u03c1 = 0.14.",
+      "summary": "A twelve-author paper tested 145 real skills and compared structural scan verdicts against LLM-judge quality scores. The two barely track each other. The proposed alternative, Skill Lift, runs the same task twice under identical conditions with and without the skill and measures the difference in what actually got completed.",
+      "at": 1787529600,
+      "sources": [
+        {
+          "network": "web",
+          "handle": "arXiv",
+          "label": "arXiv 2608.20614",
+          "detail": "ACES, 12 authors",
+          "url": "https://arxiv.org/abs/2608.20614",
+          "avatarUrl": null
+        },
+        {
+          "network": "x",
+          "handle": "omarsar0",
+          "label": "summary thread",
+          "detail": "336 likes \u00b7 30K views",
+          "url": "https://x.com/omarsar0/status/2091869893339812222",
+          "avatarUrl": "https://unavatar.io/x/omarsar0"
+        }
+      ]
+    },
+    {
+      "id": "library-vs-sync",
+      "kind": "debate",
+      "headline": "The library-versus-sync argument got its clearest statement, and its clearest rebuttal two days earlier.",
+      "summary": "Shannon Holmberg argued for git and automatic pulls over UI downloads, sketching a company skills library as a weekend build. Two days before, a widely shared post about non-technical teams put the counterpoint bluntly: they will never use git. Both are describing the same organization.",
+      "at": 1787443200,
+      "sources": [
+        {
+          "network": "x",
+          "handle": "shannholmberg",
+          "label": "the case for git",
+          "detail": "455 likes \u00b7 60K views",
+          "url": "https://x.com/shannholmberg/status/2092137771846844642",
+          "avatarUrl": "https://unavatar.io/x/shannholmberg"
+        },
+        {
+          "network": "x",
+          "handle": "khemaridh",
+          "label": "the counterpoint",
+          "detail": "176K views",
+          "url": "https://x.com/khemaridh/status/2091276785669513354",
+          "avatarUrl": "https://unavatar.io/x/khemaridh"
+        }
+      ]
+    },
+    {
+      "id": "vertical-bundles",
+      "kind": "launch",
+      "headline": "Google shipped vertical skill bundles for legal and finance. Anthropic made enterprise MCP auth generally available.",
+      "summary": "Gemini Enterprise's first plugins combine selected Apps and Skills under purpose-based bundle instructions, starting with legal and finance. Packaging skills by profession rather than by tool is the first time a major platform has organized them around what someone does for a living.",
+      "at": 1787529600,
+      "sources": [
+        {
+          "network": "x",
+          "handle": "testingcatalog",
+          "label": "Gemini plugins",
+          "detail": "129 likes \u00b7 11K views",
+          "url": "https://x.com/testingcatalog/status/2092292577781281244",
+          "avatarUrl": "https://unavatar.io/x/testingcatalog"
+        },
+        {
+          "network": "x",
+          "handle": "ClaudeDevs",
+          "label": "MCP auth GA",
+          "detail": "3.1K likes \u00b7 494K views",
+          "url": "https://x.com/ClaudeDevs/status/2091953609185657251",
+          "avatarUrl": "https://unavatar.io/x/ClaudeDevs"
+        }
+      ]
+    },
+    {
+      "id": "stars-are-not-safety",
+      "kind": "trust",
+      "headline": "A 7,316-star skill was called unsafe by a practitioner. Stars were the only public signal it carried.",
+      "summary": "A security-minded developer advised against installing a popular Android reverse-engineering skill as published: it downloads external binaries and executes them with no SHA256 verification, and the star-to-commit ratio looked wrong. Treat it as one person's read, but the checklist travels.",
+      "at": 1787529600,
+      "sources": [
+        {
+          "network": "x",
+          "handle": "connect24h",
+          "label": "the analysis",
+          "detail": "5,970 followers",
+          "url": "https://x.com/connect24h/status/2092241038144582022",
+          "avatarUrl": "https://unavatar.io/x/connect24h"
+        }
+      ]
+    }
+  ]
+}

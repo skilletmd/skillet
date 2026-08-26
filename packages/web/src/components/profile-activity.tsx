@@ -15,7 +15,11 @@ export function ProfileActivity({ events }: { events: FeedEvent[] }) {
 
   return (
     <ul className="feed-list">
-      {events.map((event, i) => {
+      {events
+        // A profile shows what this person did on Skillet. Off-platform posts
+        // are feed material, not profile activity, so they never render here.
+        .filter((event) => event.kind !== 'signal' && event.kind !== 'story')
+        .map((event, i) => {
         const inner =
           event.kind === 'follow' ? (
             <>

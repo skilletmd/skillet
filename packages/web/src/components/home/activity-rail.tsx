@@ -27,6 +27,10 @@ function eventKey(e: FeedEvent): string {
       return `skill:${e.skill.author}/${e.skill.slug}:${e.at}`
     case 'subscribe':
       return `sub:${e.actor}:${e.target.href}:${e.at}`
+    case 'signal':
+      return `signal:${e.url}`
+    case 'story':
+      return `story:${e.id}`
     case 'follow':
       return `follow:${e.actor}:${e.target}:${e.at}`
   }
@@ -124,6 +128,9 @@ export function ActivityRail({ initial }: { initial: FeedEvent[] }) {
       </div>
       <ul>
         {events.map((e) => {
+          // The homepage rail is registry activity: who published, who added.
+          // Stories and off-platform posts have no actor and belong to the feed.
+          if (e.kind === 'story' || e.kind === 'signal') return null
           const row = activityRow(e)
           if (!row) return null
           const key = eventKey(e)

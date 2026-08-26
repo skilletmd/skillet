@@ -66,7 +66,76 @@ export interface FeedSubscribeEvent {
   }
 }
 
-export type FeedEvent = FeedSkillEvent | FeedFollowEvent | FeedSubscribeEvent
+/**
+ * Something a person said about skills, off-platform. Not a registry event, but
+ * it belongs in the same stream: a feed of only our own publishes reads as a
+ * changelog, and the reason to come back is what other people are saying.
+ * `skills` links it into the catalog when the post resolves to something we
+ * carry; `unknownSkill` names one we do not, which is honest and is also the
+ * mirror-candidate queue.
+ */
+export interface FeedSignalEvent {
+  kind: 'signal'
+  /** Where it was said. */
+  network: 'x' | 'hn' | 'reddit'
+  actor: string
+  actorName: string | null
+  actorAvatarUrl: string | null
+  followers: number | null
+  text: string
+  url: string
+  score: number | null
+  views: number | null
+  at: number
+  context: string | null
+  skills: Array<{ author: string; slug: string }>
+  /** `author` is the handle that holds our copy; `repoOwner` is who actually
+   *  wrote it. Always credit `repoOwner` in the UI — a post about someone's
+   *  plugin is about their work, not about whoever mirrored it. */
+  collection: { author: string; count: number; repo?: string; repoOwner?: string } | null
+  unknownSkill: string | null
+  /** `owner/repo` the post linked, when it linked one. Any repo, resolved or
+   *  not: an unresolved skill with a repo is one click from `/import`. */
+  repo: string | null
+}
+
+/**
+ * A written story about what the ecosystem is doing, with the posts it was
+ * drawn from listed underneath.
+ *
+ * The counterpart to a signal event. A signal is one person saying one thing;
+ * a story is the editorial layer over many of them — a launch, a lab shipping
+ * something, an argument the field is having. Most collected posts are not feed
+ * items on their own; they are the raw material for one of these, and listing
+ * them as sources is what separates reporting from an unattributed summary.
+ */
+export interface FeedStoryEvent {
+  kind: 'story'
+  id: string
+  /** Story type, shown as the kicker: launch, labs, research, debate, trust. */
+  storyKind: string
+  headline: string
+  summary: string
+  at: number
+  sources: Array<{
+    network: 'x' | 'hn' | 'reddit' | 'web'
+    handle: string
+    /** What this source contributes, e.g. "Anthropic's reply". */
+    label: string
+    /** Reach or context, e.g. "621K views". */
+    detail: string | null
+    url: string
+    /** Face for the source row; null falls back to a monogram. */
+    avatarUrl?: string | null
+  }>
+}
+
+export type FeedEvent =
+  | FeedSkillEvent
+  | FeedFollowEvent
+  | FeedSubscribeEvent
+  | FeedSignalEvent
+  | FeedStoryEvent
 
 export type FeedView = 'following' | 'discover' | 'team'
 

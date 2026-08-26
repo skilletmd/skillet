@@ -23,7 +23,7 @@
 
 import { RESERVED_SKILL_SLUGS, SKILL_SLUG_RE } from '@skillet/protocol/reserved-skill-slugs'
 import { PROTECTED_RESOURCE_WELL_KNOWN } from '@skillet/protocol/protected-resource'
-import { CATEGORY_BY_KEY } from './categories'
+import { CATEGORY_BY_KEY, isCategoryKey } from './categories'
 import { DOC_NAV } from './docs-nav'
 
 /**
@@ -77,6 +77,7 @@ export const KNOWN_TOP_LEVEL_SEGMENTS: ReadonlySet<string> = new Set([
   'legal',
   'login',
   'moderation',
+  'news',
   'notifications',
   'privacy',
   'search',
@@ -209,6 +210,18 @@ export function classifyRoute(pathname: string): RouteVerdict {
   if (first === 'browse') {
     if (segments.length === 1) return { kind: 'known' }
     if (segments.length === 2 && browseSegments().has(second!)) return { kind: 'known' }
+    return { kind: 'unknown' }
+  }
+
+  // /news is the Daily; /news/<topic> is one category room. Only real category
+  // keys resolve. Decided here rather than with notFound() in the page because
+  // the PPR shell has already put a 200 on the wire by render time, which turns
+  // an unknown topic into a soft-404 (404 body, 200 status).
+  if (first === 'news') {
+    if (segments.length === 1) return { kind: 'known' }
+    if (segments.length === 2 && (second === 'rss.xml' || isCategoryKey(second))) {
+      return { kind: 'known' }
+    }
     return { kind: 'unknown' }
   }
 

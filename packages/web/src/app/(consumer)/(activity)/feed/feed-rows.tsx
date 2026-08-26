@@ -1,8 +1,19 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { FeedEvent, FeedSkillEvent, FeedSubscribeEvent } from '@/lib/registry'
+import Link from 'next/link'
+import { NetworkIcon, NETWORK_NAME } from '@/components/network-icon'
+import { PendingSkillAttachment } from '@/components/pending-skill-card'
+import type {
+  FeedEvent,
+  FeedSignalEvent,
+  FeedStoryEvent,
+  FeedSkillEvent,
+  FeedSubscribeEvent,
+} from '@/lib/registry'
 import { SkillCard } from '@/components/skill-card'
+import { SkillIcon } from '@/components/directory-card'
+import { Avatar } from '@/components/ui/avatar'
 import { KitCard } from '@/components/kit-card'
 import { SubscribeKitButton } from '@/components/kits/subscribe-kit-button'
 import { EntityHoverCard } from '@/components/entity-hover-card'
@@ -50,6 +61,361 @@ function SkillEventRow({ event, isAuthed }: { event: FeedSkillEvent; isAuthed: b
         </div>
       </div>
     </li>
+  )
+}
+
+function compactCount(n: number | null): string | null {
+  if (!n) return null
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${Math.round(n / 1_000)}K`
+  return String(n)
+}
+
+/** Engagement in each network's own words. Flattening HN points into "likes"
+ *  reads as a mistake to anyone who uses either site. */
+function signalScore(event: FeedSignalEvent): string | null {
+  const n = compactCount(event.score)
+  if (!n) return null
+  if (event.network === 'hn') return `${n} points`
+  if (event.network === 'reddit') return `${n} upvotes`
+  return `${n} likes`
+}
+
+/** Quoted text without the link furniture. A trailing `https://t.co/…` carries
+ *  no meaning for a reader and the card already links the post. */
+function readableQuote(text: string, max = 320): string {
+  const clean = text.replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim()
+  if (clean.length <= max) return clean
+  return `${clean.slice(0, clean.lastIndexOf(' ', max))}…`
+}
+
+/**
+ * The attachment strip inside a post card: what the post points at.
+ *
+ * Lives INSIDE the quote's border rather than as a block beneath it. Two stacked
+ * surfaces read as two objects and, on a warm ground, as a brown smear; one card
+ * with a hairline divider reads as a quote with an unfurl, which is what it is.
+ */
+function SignalAttachment({ event }: { event: FeedSignalEvent }) {
+  const repoOwner = event.collection?.repoOwner ?? null
+
+  if (event.skills.length > 0) {
+    return (
+      <div className="divide-y divide-(--line) border-t border-(--line)">
+        {event.skills.map((sk) => (
+          <Link
+            key={`${sk.author}/${sk.slug}`}
+            href={`/${sk.author}/${sk.slug}`}
+            className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-(--accent-bg)"
+          >
+            <span className="relative h-8 w-8 shrink-0">
+              <SkillIcon seed={`${sk.author}/${sk.slug}`} radius="rounded-lg" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold group-hover:text-(--accent)">
+                {sk.slug}
+              </span>
+              <span className="block truncate font-mono text-2xs text-(--ink-2)">
+                @{sk.author}
+              </span>
+            </span>
+            <span className="shrink-0 font-mono text-2xs text-(--ink-2)">in the registry</span>
+          </Link>
+        ))}
+      </div>
+    )
+  }
+
+  if (event.collection) {
+    const owner = repoOwner ?? event.collection.author
+    return (
+      <Link
+        href={`/${event.collection.author}`}
+        className="group flex items-center gap-3 border-t border-(--line) px-4 py-3 transition-colors hover:bg-(--accent-bg)"
+      >
+        <Avatar src={null} name={owner} colorKey={owner} size="xs" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold group-hover:text-(--accent)">
+            @{owner}
+          </span>
+          <span className="block truncate font-mono text-2xs text-(--ink-2)">
+            {event.collection.count} skills in the registry
+          </span>
+        </span>
+      </Link>
+    )
+  }
+
+  if (event.unknownSkill) {
+    return (
+      <PendingSkillAttachment
+        slug={event.unknownSkill}
+        network={event.network}
+        spottedBy={event.actor}
+        repo={event.repo ?? null}
+      />
+    )
+  }
+
+  return null
+}
+
+/**
+ * Age, pushed to the right edge of a byline.
+ *
+ * Renders nothing when the timestamp is missing. Several sources give no usable
+ * date, and "just now" on a post from last week is worse than no date at all —
+ * a wrong timestamp quietly discredits everything around it.
+ */
+function RelativeTime({ at }: { at: number }) {
+  if (!at) return null
+  return (
+    <time
+      className="feed-time ml-auto shrink-0 tabular-nums"
+      dateTime={new Date(at * 1000).toISOString()}
+    >
+      {timeAgo(at)}
+    </time>
+  )
+}
+
+const STORY_KICKER: Record<string, string> = {
+  launch: 'Launch',
+  labs: 'From the labs',
+  research: 'Research',
+  debate: 'The argument',
+  trust: 'Trust',
+}
+
+/**
+ * A written story with the posts it was drawn from listed underneath.
+ *
+ * The sources block is the point. A summary of what people are saying, with no
+ * way to check it, is the thing this feed exists to be better than; a summary
+ * with five named posts under it is reporting. Sources stay visible rather than
+ * collapsing behind a "show sources" toggle for the same reason.
+ */
+function StoryEventRow({ event }: { event: FeedStoryEvent }) {
+  return (
+    <li className="feed-item">
+      <span className="feed-avatar grid shrink-0 place-items-center overflow-hidden rounded-full border border-(--line) bg-(--card-soft)">
+        {/* The mascot, masked so it takes the ink colour and stays legible in
+            both themes rather than shipping a light-mode-only raster. */}
+        <span
+          aria-hidden="true"
+          className="h-6 w-6 bg-(--ink)"
+          style={{
+            maskImage: 'url(/brand/skillet-mascot-logo.svg)',
+            WebkitMaskImage: 'url(/brand/skillet-mascot-logo.svg)',
+            maskSize: 'contain',
+            WebkitMaskSize: 'contain',
+            maskRepeat: 'no-repeat',
+            WebkitMaskRepeat: 'no-repeat',
+            maskPosition: 'center',
+            WebkitMaskPosition: 'center',
+          }}
+        />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="feed-line flex items-baseline gap-1.5">
+          <span className="font-semibold">Skillet Daily</span>
+          <span className="feed-sep" aria-hidden="true">
+            ·
+          </span>
+          <span className="feed-verb">{STORY_KICKER[event.storyKind] ?? 'Story'}</span>
+          <RelativeTime at={event.at} />
+        </p>
+
+        <div className="mt-2 overflow-hidden rounded-xl border border-(--line) bg-(--surface)">
+          <div className="p-4">
+            <h3 className="text-base leading-snug font-semibold tracking-tight text-pretty text-(--ink)">
+              {event.headline}
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-(--ink-2)">{event.summary}</p>
+          </div>
+
+          <div className="border-t border-(--line)">
+            <p className="px-4 pt-3 font-mono text-2xs tracking-[0.08em] uppercase text-(--ink-2)">
+              {event.sources.length} {event.sources.length === 1 ? 'source' : 'sources'}
+            </p>
+            <ul className="px-4 pt-1 pb-3">
+              {event.sources.map((src) => (
+                <li key={src.url}>
+                  <a
+                    href={src.url}
+                    className="group flex items-center gap-2 py-1.5 text-xs hover:text-(--accent)"
+                  >
+                    {/* Face only. A network badge pinned to a 20px avatar
+                        never sat cleanly on the circle, and the mark reads
+                        better as its own column on the right. */}
+                    <Avatar
+                      src={src.avatarUrl ?? null}
+                      name={src.label || src.handle}
+                      colorKey={src.handle}
+                      size="xxs"
+                    />
+                    <span className="truncate font-medium">@{src.handle}</span>
+                    <span className="truncate text-(--ink-2)">{src.label}</span>
+                    <span className="ml-auto flex shrink-0 items-center gap-2">
+                      {src.detail ? (
+                        <span className="font-mono text-2xs whitespace-nowrap text-(--ink-2)">
+                          {src.detail}
+                        </span>
+                      ) : null}
+                      <span className="text-(--ink-2)">
+                        {src.network === 'web' ? (
+                          <span
+                            aria-hidden="true"
+                            className="grid h-3.5 w-3.5 place-items-center rounded-sm border border-(--line) font-mono text-2xs"
+                          >
+                            W
+                          </span>
+                        ) : (
+                          <NetworkIcon network={src.network} />
+                        )}
+                      </span>
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </li>
+  )
+}
+
+/** The post, demoted to supporting evidence under a skill that leads. */
+function QuoteFooter({ event }: { event: FeedSignalEvent }) {
+  return (
+    <a
+      href={event.url}
+      className="block border-t border-(--line) px-4 py-3 text-xs leading-relaxed text-(--ink-2) hover:text-(--ink)"
+    >
+      “{readableQuote(event.text, 180)}”
+    </a>
+  )
+}
+
+/**
+ * Two row shapes, chosen by whether the post resolved to something we carry.
+ *
+ * Resolved: the skill leads and the quote becomes the reason it is here. That is
+ * a discovery item, and it matches the shape of every other feed row where a
+ * small actor line sits above a card.
+ *
+ * Unresolved: the quote leads, because it IS the item. Most posts are like this
+ * today (61% name no skill at all), and featuring an empty card above them would
+ * be a worse feed, not a more consistent one.
+ */
+function SignalEventRow({ event }: { event: FeedSignalEvent }) {
+  const score = signalScore(event)
+  const resolved = event.skills.length > 0 || Boolean(event.collection)
+
+  const byline = (
+    <p className="feed-line flex items-baseline gap-1.5">
+      <span className="font-semibold">{event.actorName ?? event.actor}</span>
+      <span className="ml-1.5 inline-flex translate-y-[2px] text-(--ink-2)">
+        <NetworkIcon network={event.network} />
+      </span>
+      <span className="sr-only">on {NETWORK_NAME[event.network]}</span>
+      {event.context ? (
+        <>
+          <span className="feed-sep" aria-hidden="true">
+            ·
+          </span>
+          <span className="feed-verb">{event.context}</span>
+        </>
+      ) : null}
+      {score ? (
+        <>
+          <span className="feed-sep" aria-hidden="true">
+            ·
+          </span>
+          <span className="feed-time">{score}</span>
+        </>
+      ) : null}
+      <RelativeTime at={event.at} />
+    </p>
+  )
+
+  return (
+    <li className="feed-item">
+      <FeedAvatar handle={event.actor} avatarUrl={event.actorAvatarUrl} className="feed-avatar" />
+      <div className="min-w-0 flex-1">
+        {byline}
+        <div className="mt-2 overflow-hidden rounded-xl border border-(--line) bg-(--surface)">
+          {resolved ? (
+            <>
+              <ResolvedHeader event={event} />
+              <QuoteFooter event={event} />
+            </>
+          ) : (
+            <>
+              <a href={event.url} className="block p-4 text-sm leading-normal hover:underline">
+                “{readableQuote(event.text)}”
+              </a>
+              <SignalAttachment event={event} />
+            </>
+          )}
+        </div>
+      </div>
+    </li>
+  )
+}
+
+/** The skill (or the author's library) as the card's headline. */
+function ResolvedHeader({ event }: { event: FeedSignalEvent }) {
+  if (event.skills.length > 0) {
+    return (
+      <div className="divide-y divide-(--line)">
+        {event.skills.map((sk) => (
+          <Link
+            key={`${sk.author}/${sk.slug}`}
+            href={`/${sk.author}/${sk.slug}`}
+            className="group flex items-center gap-3 p-4 transition-colors hover:bg-(--accent-bg)"
+          >
+            <span className="relative h-11 w-11 shrink-0">
+              <SkillIcon seed={`${sk.author}/${sk.slug}`} radius="rounded-xl" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-base font-semibold group-hover:text-(--accent)">
+                {sk.slug}
+              </span>
+              <span className="block truncate text-xs text-(--ink-2)">@{sk.author}</span>
+            </span>
+            <span className="shrink-0 font-mono text-2xs text-(--ink-2)">in the registry</span>
+          </Link>
+        ))}
+      </div>
+    )
+  }
+
+  const owner = event.collection!.repoOwner ?? event.collection!.author
+  // When the person posting is the person whose library this is, we already
+  // have their face in the byline; a monogram beside it looks like a stranger.
+  const sameAsPoster = owner.toLowerCase() === event.actor.toLowerCase()
+  return (
+    <Link
+      href={`/${event.collection!.author}`}
+      className="group flex items-center gap-3 p-4 transition-colors hover:bg-(--accent-bg)"
+    >
+      <Avatar
+        src={sameAsPoster ? event.actorAvatarUrl : null}
+        name={owner}
+        colorKey={owner}
+        size="sm"
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-base font-semibold group-hover:text-(--accent)">
+          @{owner}
+        </span>
+        <span className="block truncate text-xs text-(--ink-2)">
+          {event.collection!.count} skills in the registry
+        </span>
+      </span>
+    </Link>
   )
 }
 
@@ -279,6 +645,8 @@ function EventRowSingle({
   viewerHandle: string | null
 }) {
   if (event.kind === 'follow') return null
+  if (event.kind === 'signal') return <SignalEventRow event={event} />
+  if (event.kind === 'story') return <StoryEventRow event={event} />
   if (event.kind === 'subscribe')
     return (
       <GroupedSubscribeRow

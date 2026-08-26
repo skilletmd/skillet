@@ -110,6 +110,8 @@ export async function HomeCatalogShelves({
   // to the drawn default face.
   const avatarByHandle = avatarMapFromPeople(people.items)
   for (const e of discover?.events ?? []) {
+    // Stories have no actor; every other kind carries one.
+    if (e.kind === 'story') continue
     if (e.actorAvatarUrl && !avatarByHandle.get(e.actor)) {
       avatarByHandle.set(e.actor, e.actorAvatarUrl)
     }

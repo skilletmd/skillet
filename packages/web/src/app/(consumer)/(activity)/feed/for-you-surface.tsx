@@ -8,6 +8,8 @@ import {
 } from '@/lib/registry'
 import { WhoToFollow } from '@/components/discovery-rail'
 import { FeedRows } from './feed-rows'
+import { interleaveSignal, resolvedSignalEvents, storyFeedEvents } from '@/lib/news-signal'
+import { FeedFilter } from './feed-filter'
 import { FeedPanel } from './feed-panel'
 import { parseLens, type FeedSurfaceView, type FeedEventType } from './feed-lens'
 import { listMyOrgs } from '@/lib/orgs-server'
@@ -18,6 +20,13 @@ export type { FeedSurfaceView }
 
 // Events per page for the feed's infinite scroll — large enough that the first
 // screen is full, small enough to keep the initial payload light.
+/** Skill posts mixed into one page of Global, alongside every story. Sized so
+ *  the mixed view still reads as activity with news in it rather than the
+ *  reverse; the News filter serves the full set. */
+const SIGNAL_PER_PAGE = 8
+/** News on its own is a page of its own, not the eight that interleave. */
+const SIGNAL_NEWS_PAGE = 40
+
 const FEED_PAGE_SIZE = 30
 
 /** Suggestions for the empty For-you state. Soft-fails to an empty list: a
@@ -76,9 +85,32 @@ export async function ForYouSurface({
   // lowest-signal event and its discovery value already lives in the Who-to-follow
   // rail; inbound follows ("X followed you") live in notifications. `?type=` then
   // narrows what remains to one kind, client-selected in the rail.
-  const events = (feed?.events ?? [])
+  const registryEvents = (feed?.events ?? [])
     .filter((e) => e.kind !== 'follow')
-    .filter((e) => (typeFilter ? e.kind === typeFilter : true))
+    .filter((e) => (typeFilter && typeFilter !== 'signal' ? e.kind === typeFilter : true))
+
+  // Global is the public, logged-out-visible lens, and a stream of only our own
+  // publishes reads as a changelog. Off-platform posts about skills go in here
+  // and nowhere else: For-you is what the viewer chose to follow, and a team
+  // feed is that team's own work.
+  //
+  // `?type=signal` is News on its own, so it gets a full page of posts rather
+  // than the handful that interleave into the mixed view.
+  // Two kinds of news, not one. A **story** is the written item with its sources
+  // listed; a **skill post** is someone naming a skill, with the skill attached.
+  // An unresolved quote is neither: it is raw material for a story, so it does
+  // not stand alone in the feed.
+  let events = registryEvents
+  if (resolved === 'discover') {
+    if (typeFilter === 'signal') {
+      events = [...storyFeedEvents(), ...resolvedSignalEvents(SIGNAL_NEWS_PAGE)]
+    } else if (!typeFilter) {
+      events = interleaveSignal(registryEvents, [
+        ...storyFeedEvents(2),
+        ...resolvedSignalEvents(SIGNAL_PER_PAGE),
+      ])
+    }
+  }
 
   // An empty For-you feed renders its own empty state; it never redirects. Bare
   // /feed IS the For-you tab's href, so redirecting an empty following feed to
@@ -99,6 +131,11 @@ export async function ForYouSurface({
   } else if (events.length > 0) {
     body = (
       <FeedRows
+        // Remount when the lens or filter changes. FeedRows seeds its list with
+        // `useState(initial)`, which only reads the prop on mount, so a
+        // client-side nav between filters swapped the URL and left the previous
+        // events on screen. A key that carries the filter forces a fresh mount.
+        key={`${resolved}:${activeTeam ?? ''}:${typeFilter ?? 'all'}`}
         initial={events}
         isAuthed={isAuthed}
         viewerHandle={viewerHandle}
@@ -106,14 +143,16 @@ export async function ForYouSurface({
         team={activeTeam}
         type={typeFilter ?? null}
         pageSize={FEED_PAGE_SIZE}
-        nextOffset={feed?.nextCursor ?? null}
+        // News is served whole from the seed file, so there is no next page to
+        // fetch; offering a cursor would make the client poll for more forever.
+        nextOffset={typeFilter === 'signal' ? null : (feed?.nextCursor ?? null)}
       />
     )
   } else if (feed && typeFilter) {
     body = (
       <FeedPanel
         title="Nothing of this type yet"
-        body="No activity matches this filter right now. Try a different one, or switch to All."
+        body="Nothing matches this filter right now. Switch to Everything to see the rest."
       />
     )
   } else if (resolved === 'discover') {
@@ -161,5 +200,13 @@ export async function ForYouSurface({
 
   // Just the timeline — the two-column shell + who-to-follow rail live in the
   // feed layout so they don't re-render (or re-fetch) when you switch lenses.
-  return body
+  // Global is the only lens that mixes two kinds of thing, so it is the only one
+  // that needs the News/Activity switch.
+  if (resolved !== 'discover') return body
+  return (
+    <>
+      <FeedFilter />
+      {body}
+    </>
+  )
 }

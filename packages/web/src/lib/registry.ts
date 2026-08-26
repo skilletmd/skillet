@@ -45,7 +45,9 @@ export type {
   FeedFollowTarget,
   FeedResult,
   FeedSkill,
+  FeedSignalEvent,
   FeedSkillEvent,
+  FeedStoryEvent,
   FeedSubscribeEvent,
   FeedView,
 } from './registry-feed-types'

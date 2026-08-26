@@ -20,12 +20,24 @@ export function parseFeedSection(pathname: string): FeedSection {
 
 // The stream mixes event kinds; `?type=` narrows it to one. Kept as a query param
 // (not a path segment) since it layers on top of any lens.
-export type FeedEventType = 'skill' | 'follow' | 'subscribe'
+export type FeedEventType = 'skill' | 'follow' | 'subscribe' | 'signal'
 
 export function parseEventType(value: string | string[] | undefined): FeedEventType | null {
   const v = Array.isArray(value) ? value[0] : value
-  return v === 'skill' || v === 'follow' || v === 'subscribe' ? v : null
+  return v === 'skill' || v === 'follow' || v === 'subscribe' || v === 'signal' ? v : null
 }
+
+/**
+ * The two things Global mixes, as a viewer-facing filter. "News" is what people
+ * said off-platform; "Activity" is what happened in the registry. Kept to those
+ * two because they are the split a reader actually feels — the finer event kinds
+ * (`follow`, `subscribe`) are plumbing, and `follow` never renders anyway.
+ */
+export const FEED_FILTERS = [
+  { key: null, label: 'Everything' },
+  { key: 'signal' as const, label: 'News' },
+  { key: 'skill' as const, label: 'Activity' },
+]
 
 /** The only explicit lens path segment served by /feed/[lens]. For you is the bare
  *  /feed and Global is /feed/global; team lenses have their own /feed/team/<slug>
