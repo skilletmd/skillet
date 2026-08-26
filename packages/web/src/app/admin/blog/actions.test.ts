@@ -87,4 +87,71 @@ describe('blog admin actions', () => {
     await saveBlogPost(slug, '# body', { ...base, seoTitle: '   ' })
     expect(read().seo_title).toBeNull()
   })
+
+  // A story's credibility is its sources, so a malformed one must not publish.
+  // These run through the real save path, not the validator in isolation.
+  const storyFrontmatter = (sourcesJson: string) => ({
+    title: 'A story',
+    description: 'summary',
+    publishedAt: '2026-08-25',
+    status: 'published' as const,
+    tags: ['story'],
+    sourcesJson,
+    storyKind: 'debate',
+  })
+
+  it('stores valid story sources and the kind', async () => {
+    const { saveBlogPost } = await import('./actions')
+    const { getBlogDb } = await import('@/lib/blog-db')
+    const sources = [
+      { network: 'x', handle: 'tobi', label: 'Tobi Lütke', detail: '621K views', url: 'https://x.com/tobi/status/1' },
+    ]
+    const { slug } = await saveBlogPost(null, 'body', storyFrontmatter(JSON.stringify(sources)))
+    const row = getBlogDb()
+      .prepare('SELECT sources_json, story_kind FROM posts WHERE slug = ?')
+      .get(slug) as { sources_json: string; story_kind: string }
+    expect(JSON.parse(row.sources_json)).toEqual(sources)
+    expect(row.story_kind).toBe('debate')
+  })
+
+  it('refuses a source with no url', async () => {
+    const { saveBlogPost } = await import('./actions')
+    await expect(
+      saveBlogPost(null, 'body', storyFrontmatter(JSON.stringify([{ network: 'x', handle: 'tobi' }]))),
+    ).rejects.toThrow(/Source 1 is missing a url/)
+  })
+
+  it('refuses a source with an unknown network', async () => {
+    const { saveBlogPost } = await import('./actions')
+    await expect(
+      saveBlogPost(
+        null,
+        'body',
+        storyFrontmatter(JSON.stringify([{ network: 'mastodon', handle: 'a', url: 'https://x' }])),
+      ),
+    ).rejects.toThrow(/network of x, hn, reddit or web/)
+  })
+
+  it('refuses malformed JSON rather than storing it', async () => {
+    const { saveBlogPost } = await import('./actions')
+    await expect(saveBlogPost(null, 'body', storyFrontmatter('{not json'))).rejects.toThrow(
+      /valid JSON/,
+    )
+  })
+
+  it('leaves an ordinary post with no sources column set', async () => {
+    const { saveBlogPost } = await import('./actions')
+    const { getBlogDb } = await import('@/lib/blog-db')
+    const { slug } = await saveBlogPost(null, 'body', {
+      title: 'Just a post',
+      description: 'd',
+      publishedAt: null,
+      status: 'draft',
+      tags: ['skills'],
+    })
+    const row = getBlogDb()
+      .prepare('SELECT sources_json FROM posts WHERE slug = ?')
+      .get(slug) as { sources_json: string | null }
+    expect(row.sources_json).toBeNull()
+  })
 })

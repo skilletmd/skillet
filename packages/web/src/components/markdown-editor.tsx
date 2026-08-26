@@ -17,6 +17,14 @@ export interface MarkdownEditorFrontmatter {
   publishedAt: string | null
   status: MarkdownEditorStatus
   tags: string[]
+  /**
+   * Cited sources, for a post tagged `story`. Edited as one JSON block rather
+   * than a row builder: a story carries a handful of sources, they are pasted
+   * from the collector's output, and a textarea round-trips that in one step.
+   */
+  sourcesJson?: string
+  /** Story kicker: launch, labs, research, debate, trust. */
+  storyKind?: string
 }
 
 interface MarkdownEditorProps {
@@ -214,6 +222,40 @@ export function MarkdownEditor({
             }}
           />
         </label>
+        {/* Story fields appear only on a post tagged `story`, so ordinary blog
+            authoring is untouched by them. */}
+        {frontmatter.tags.includes('story') ? (
+          <>
+            <label className="block text-sm font-medium">
+              Story kind
+              <select
+                className="mt-1 w-full rounded border border-(--line) bg-(--bg) px-3 py-2 text-sm outline-none transition focus:border-(--accent)"
+                value={frontmatter.storyKind ?? 'story'}
+                onChange={(event) => updateFrontmatter({ storyKind: event.target.value })}
+              >
+                <option value="story">Story</option>
+                <option value="launch">Launch</option>
+                <option value="labs">From the labs</option>
+                <option value="research">Research</option>
+                <option value="debate">The argument</option>
+                <option value="trust">Trust</option>
+              </select>
+            </label>
+            <label className="block text-sm font-medium">
+              Sources
+              <span className="mt-0.5 block text-xs font-normal text-(--ink-2)">
+                A story&rsquo;s credibility is its sources. Every entry needs a network (x, hn,
+                reddit, web), a handle and a url; publishing fails otherwise.
+              </span>
+              <textarea
+                className="mt-1 min-h-32 w-full rounded border border-(--line) bg-(--bg) px-3 py-2 font-mono text-xs outline-none transition focus:border-(--accent)"
+                placeholder={'[\n  {"network":"x","handle":"tobi","label":"Tobi Lütke","detail":"621K views","url":"https://x.com/…"}\n]'}
+                value={frontmatter.sourcesJson ?? ''}
+                onChange={(event) => updateFrontmatter({ sourcesJson: event.target.value })}
+              />
+            </label>
+          </>
+        ) : null}
         <label className="block text-sm font-medium">
           Status
           <select

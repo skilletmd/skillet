@@ -53,6 +53,10 @@ function uniqueSlug(baseSlug: string): string {
 
 function revalidatePost(slug: string): void {
   revalidatePath('/blog')
+  // A story is a post, so publishing one has to refresh the news surfaces too.
+  revalidatePath('/news')
+  revalidatePath(`/news/${slug}`)
+  revalidatePath('/feed/global')
   revalidatePath(`/blog/${slug}`)
   revalidatePath('/admin/blog')
   revalidatePath(`/admin/blog/${slug}`)
@@ -90,6 +94,38 @@ function ensureRow(slug: string): void {
     .run(slug)
 }
 
+/**
+ * Story sources, validated before they can be stored.
+ *
+ * A story's credibility is its sources, so a malformed one must not publish:
+ * every entry needs a network, a handle and a URL. Blank input stores NULL
+ * rather than an empty array, keeping ordinary blog posts untouched.
+ */
+function normalizeSources(raw: string | undefined): string | null {
+  const text = raw?.trim()
+  if (!text) return null
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    throw new Error('Sources must be valid JSON.')
+  }
+  if (!Array.isArray(parsed)) throw new Error('Sources must be a JSON array.')
+  parsed.forEach((entry, i) => {
+    const source = entry as Record<string, unknown>
+    if (!source || typeof source.url !== 'string' || !source.url.trim()) {
+      throw new Error(`Source ${i + 1} is missing a url.`)
+    }
+    if (typeof source.handle !== 'string' || !source.handle.trim()) {
+      throw new Error(`Source ${i + 1} is missing a handle.`)
+    }
+    if (!['x', 'hn', 'reddit', 'web'].includes(String(source.network))) {
+      throw new Error(`Source ${i + 1} needs a network of x, hn, reddit or web.`)
+    }
+  })
+  return JSON.stringify(parsed)
+}
+
 function writePost(slug: string, content: string, frontmatter: MarkdownEditorFrontmatter): void {
   ensureRow(slug)
   getBlogDb()
@@ -102,7 +138,9 @@ function writePost(slug: string, content: string, frontmatter: MarkdownEditorFro
          tags_json = @tags_json,
          status = @status,
          updated_at = @updated_at,
-         content = @content
+         content = @content,
+         sources_json = @sources_json,
+         story_kind = @story_kind
        WHERE slug = @slug`,
     )
     .run({
@@ -116,6 +154,8 @@ function writePost(slug: string, content: string, frontmatter: MarkdownEditorFro
       status: frontmatter.status,
       updated_at: today(),
       content,
+      sources_json: normalizeSources(frontmatter.sourcesJson),
+      story_kind: frontmatter.storyKind?.trim() || null,
     })
 }
 

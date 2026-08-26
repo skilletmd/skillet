@@ -31,6 +31,10 @@ async function EditBlogPostContent({ params }: { params: Promise<{ slug: string 
     publishedAt: post.publishedAt,
     status: post.status,
     tags: post.tags,
+    // Round-trip the stored sources as formatted JSON so an editor can read and
+    // amend them; blank for an ordinary post.
+    sourcesJson: post.sources?.length ? JSON.stringify(post.sources, null, 2) : '',
+    storyKind: post.storyKind ?? '',
   }
 
   return (
