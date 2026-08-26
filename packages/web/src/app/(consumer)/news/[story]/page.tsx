@@ -5,6 +5,7 @@ import { getPost, STORY_TAG, type StorySource } from '@/lib/blog'
 import { PAGE_CONTAINER_CLASS } from '@/lib/page-layout'
 import { NetworkIcon, NETWORK_NAME } from '@/components/network-icon'
 import { Avatar } from '@/components/ui/avatar'
+import { PendingSkillAttachment } from '@/components/pending-skill-card'
 import { NewsKicker, NewsMasthead } from '../news-chrome'
 import { storyKicker } from '@/lib/story-kind.mjs'
 
@@ -103,6 +104,21 @@ export default async function StoryPage({ params }: { params: Promise<{ story: s
           {post.content || post.description}
         </p>
       </article>
+
+      {/* The headline on a skills story says what you get and deliberately does
+          not name the skill, since the card in the feed prints it underneath.
+          On the permalink that row has to be here too, or the page describes
+          something the reader cannot identify or reach. */}
+      {post.subject?.slug || post.subject?.repo ? (
+        <div className="mt-8 max-w-[68ch] overflow-hidden rounded-xl border border-(--line) bg-(--surface)">
+          <PendingSkillAttachment
+            slug={post.subject.slug ?? post.subject.repo!.split('/')[1]!}
+            repo={post.subject.repo}
+            category={post.subject.category}
+            name={post.subject.name}
+          />
+        </div>
+      ) : null}
 
       {sources.length > 0 ? (
         <>

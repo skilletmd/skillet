@@ -45,20 +45,20 @@ export function PendingSkillAttachment({
 }) {
   const owner = repo?.split('/')[0]
   return (
-    <div className="flex items-center gap-3 border-t border-(--line) px-4 py-3">
+    <div className="flex items-center gap-3.5 border-t border-(--line) px-4 py-4">
       {/* With a category we can draw the real cover, since the registry
           prefills from the same signals at import: what the reader sees here is
           what they get. Without one, hollow, because we do not have this skill.
           SkillIcon paints into `absolute inset-0`, so it needs a sized
           positioned parent or it covers the whole row. */}
       {category ? (
-        <span className="relative h-8 w-8 shrink-0">
-          <SkillIcon seed={repo ?? slug} category={category} radius="rounded-lg" />
+        <span className="relative h-11 w-11 shrink-0">
+          <SkillIcon seed={repo ?? slug} category={category} radius="rounded-xl" />
         </span>
       ) : (
         <span
           aria-hidden="true"
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-dashed border-(--line) font-mono text-xs text-(--ink-2)"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-dashed border-(--line) font-mono text-sm text-(--ink-2)"
         >
           {slug.slice(0, 1).toUpperCase()}
         </span>
@@ -68,10 +68,10 @@ export function PendingSkillAttachment({
         {/* The skill's name leads, the way it would on its own page. The repo
             path is provenance and belongs underneath: a reader recognises
             "Scandinavian Design" and has to parse owner/slug. */}
-        <span className="block truncate text-sm font-semibold text-(--ink)">
+        <span className="block truncate text-base font-semibold text-(--ink)">
           {name ?? humanizeSlug(slug)}
         </span>
-        <span className="flex items-center gap-1.5 truncate font-mono text-2xs text-(--ink-2)">
+        <span className="mt-0.5 flex items-center gap-1.5 truncate font-mono text-xs text-(--ink-2)">
           {network && spottedBy ? (
             <>
               <NetworkIcon network={network} />
@@ -94,7 +94,7 @@ export function PendingSkillAttachment({
       {repo ? (
         <Link
           href={`/github.com/${repo}`}
-          className="shrink-0 rounded-md border border-(--line) bg-(--surface) px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors hover:border-(--ink) hover:bg-(--card-pop)"
+          className="shrink-0 rounded-lg border border-(--line) bg-(--surface) px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-colors hover:border-(--ink) hover:bg-(--card-pop)"
         >
           Import
         </Link>

@@ -37,7 +37,11 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { storyCandidates, reach, normalizeHandles } from '../src/lib/story-cluster.mjs'
 import { SKILL_KIND, NEWS_KIND } from '../src/lib/story-kind.mjs'
-import { guessCategory } from '@skillet/protocol'
+import {
+  guessCategory,
+  isExcludedDiscoveryPath,
+  isMoreCanonicalSkillDir,
+} from '@skillet/protocol'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const SEED = path.join(HERE, '..', 'src', 'lib', 'news-signal-seed.json')
@@ -59,8 +63,8 @@ const MAX_NEWS = Number(process.env.STORY_MAX_NEWS ?? 6)
  * where one is rejected and rewritten, and the gap between them is what stops a
  * good card dying over punctuation.
  */
-const BODY_TARGET = 320
-const MAX_BODY = 420
+const BODY_TARGET = 220
+const MAX_BODY = 330
 
 
 const MODEL = 'claude-opus-5'
@@ -103,7 +107,16 @@ async function firstRaw(repo, paths) {
   return null
 }
 
-/** Nested SKILL.md paths, when a token makes the tree API available. */
+/**
+ * Nested SKILL.md paths, most canonical first, when a token makes the tree API
+ * available.
+ *
+ * Order and filtering both matter, because the first hit names and categorises
+ * the card. Taking the tree's own order gave transitions.dev the name
+ * `refine-live`, from `refine/.agents/skills/refine-live/SKILL.md`, which is an
+ * unrelated skill in the same repo. These are the importer's own rules, so the
+ * card reads the file the import would.
+ */
 async function nestedSkillPaths(repo) {
   if (!GH_TOKEN) return []
   const res = await fetch(`https://api.github.com/repos/${repo}/git/trees/HEAD?recursive=1`, {
@@ -116,9 +129,15 @@ async function nestedSkillPaths(repo) {
   if (!res.ok) return []
   const tree = await res.json()
   return (tree?.tree ?? [])
-    .filter((n) => n.type === 'blob' && /(^|\/)SKILL\.md$/i.test(n.path) && n.path.includes('/'))
-    .slice(0, 2)
+    .filter(
+      (n) =>
+        n.type === 'blob' &&
+        /(^|\/)SKILL\.md$/i.test(n.path) &&
+        n.path.includes('/') &&
+        !isExcludedDiscoveryPath(n.path),
+    )
     .map((n) => n.path)
+    .sort((a, b) => (isMoreCanonicalSkillDir(a, b) ? -1 : 1))
 }
 
 /**
@@ -138,12 +157,16 @@ async function repoContext(repo) {
   const skills = []
   const rootSkill = await raw(repo, 'SKILL.md')
   if (rootSkill) skills.push({ path: 'SKILL.md', body: rootSkill.slice(0, 2500) })
-  for (const path of await nestedSkillPaths(repo)) {
+  const nested = await nestedSkillPaths(repo)
+  for (const path of nested.slice(0, 2)) {
     const body = await raw(repo, path)
     if (body) skills.push({ path, body: body.slice(0, 2500) })
   }
   if (!readme && !skills.length) return null
-  return { repo, readme: readme?.slice(0, 4000) ?? null, skills }
+  // How many skills the repo actually ships, not how many we fetched. A pack of
+  // 160 and a repo of one are different subjects and get named differently.
+  const skillCount = (rootSkill ? 1 : 0) + nested.length
+  return { repo, readme: readme?.slice(0, 4000) ?? null, skills, skillCount }
 }
 
 /** Context for every repo a cluster points at, in one pass. */
@@ -267,9 +290,9 @@ const NEWS_HEADLINES = [
  *  as the one to add to your harness" is the failure this exists to prevent:
  *  every word about the pitch, none about what the thing does. */
 const SKILL_HEADLINES = [
-  '/scandinavian-design cleans up any site to look as tidy as an IKEA catalogue',
-  'Ponytail makes an agent reach for the platform before a dependency and write the short version',
-  'transitions.dev replaces hand-written CSS animation with 32 ready transitions',
+  'Clean up any site to look as tidy as an IKEA catalogue',
+  'Get the one-line version of a feature instead of a library and three dependencies',
+  'Swap hand-written CSS animation for 32 transitions that already handle reduced motion',
 ]
 
 /**
@@ -288,9 +311,12 @@ const HEADLINE_CALIBRATION = [
   '      a point of view.',
   'WHY:  A hook. After two sentences the reader still does not know what the',
   '      skill is or what it works on. Never make them wait for it.',
-  'GOOD: /scandinavian-design cleans up any site to look as tidy as an IKEA',
+  'ALSO BAD: /scandinavian-design cleans up any site to look as tidy as an IKEA',
   '      catalogue',
-  'WHY:  Says what it is in words someone would use out loud. A reference the',
+  'WHY:  Right idea, but the name is printed twice directly underneath. Those',
+  '      characters are the only ones that can sell the thing.',
+  'GOOD: Clean up any site to look as tidy as an IKEA catalogue',
+  'WHY:  Pure outcome, in words someone would use out loud. A reference the',
   '      reader already holds does more work than an accurate adjective.',
   '      Reach for one when it fits; never force one that does not.',
   '',
@@ -321,7 +347,8 @@ const HEADLINE_CALIBRATION = [
  * to a link the reader could have found on X themselves.
  */
 const CARD_SHAPE = [
-  'SHAPE. Three sentences. Not four, not six. Each one does a different job:',
+  'SHAPE. Two or three sentences. Each one does a different job, and if you can',
+  'only fit two, drop the middle one:',
   '  1. WHAT IT IS and what you get. Plain and complete: name the kind of thing',
   '     it is, what it works on, and what changes. A reader should be able to',
   '     repeat this sentence to a colleague and have them understand it.',
@@ -356,11 +383,11 @@ function promptFor(posts, isSkill, context = []) {
     (isSkill
       ? `This is a SKILL post: it is about a specific skill a reader could ` +
         `install or use.\n\nHEADLINE:\n` +
-        `- Lead with the skill and what it DOES. The reader is deciding whether ` +
-        `to install it; answer that and nothing else.\n` +
-        `- The person who posted is NOT the subject. "X pitched a skill called ` +
-        `Y" spends the whole headline on the pitch and none on the thing. They ` +
-        `are credited in the sources underneath; you do not need to name them.\n` +
+        `- Say what the reader GETS. The skill's name and its repo are both ` +
+        `printed directly beneath this headline, so naming it here spends the ` +
+        `one line that could sell it on an identifier they can already see.\n` +
+        `- Do NOT name the skill, and do NOT name the person who posted it. ` +
+        `Both appear on the card already. Write the outcome and only that.\n` +
         `- Write the OUTCOME, not the mechanism. What is different about my ` +
         `project after I use this? Someone chooses a skill for what they get, ` +
         `never for how it works inside.\n` +
@@ -401,8 +428,9 @@ function promptFor(posts, isSkill, context = []) {
     `- ONE subject. If the material covers several unrelated things, pick the ` +
     `single most newsworthy one and ignore the rest. A body that lists three ` +
     `things is a list, and a reader skips a list.\n` +
-    `- Body: THREE SENTENCES, around ${BODY_TARGET} characters. This is a card ` +
-    `in a scanned feed. A fourth sentence means you did not choose.\n` +
+    `- Body: TWO OR THREE SHORT SENTENCES, around ${BODY_TARGET} characters. ` +
+    `This is a card in a scanned feed, and the skill sits right underneath it. ` +
+    `A fourth sentence means you did not choose.\n` +
     `- STRUCTURE. Length is earned by organisation, not tolerated in spite of ` +
     `it. A long block of undifferentiated fact is worse than a short one:\n` +
     `    * The first sentence carries the single most concrete, most surprising ` +
@@ -630,7 +658,12 @@ function subjectFor(posts, context) {
   // repo's own name and README. Feeding our copy in instead pushed everything
   // toward `agents`, because every sentence we write says skill and agent, and
   // transitions.dev came back as an agents skill rather than a frontend one.
-  const skillFile = context[0]?.skills?.[0]?.body ?? null
+  // A repo of one skill IS that skill, so it takes that skill's name and is
+  // classified from it. A repo of many is a pack: naming it after whichever
+  // member sorts first called a 160-skill DevOps bundle "jenkins", so those
+  // fall back to the repo's own name and its README.
+  const single = context[0]?.skillCount === 1
+  const skillFile = single ? (context[0]?.skills?.[0]?.body ?? null) : null
   const fm = frontmatter(skillFile)
   const category = guessCategory({
     slug: fm.name ?? slug ?? repo?.split('/')[1] ?? '',
