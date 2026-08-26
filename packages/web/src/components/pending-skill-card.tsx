@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { GitHubIcon } from '@/components/auth-provider-icons'
 import { NetworkIcon, NETWORK_NAME, type Network } from '@/components/network-icon'
 
 /**
@@ -23,9 +24,12 @@ export function PendingSkillAttachment({
 }: {
   /** The skill name as written, e.g. `scandinavian-design`. */
   slug: string
-  network: Network
-  /** Handle of the person whose post named it. */
-  spottedBy: string
+  /** Where it was spotted. Omit on a card that already lists its sources: the
+   *  attribution is right above, and repeating it spends the one line this row
+   *  has on something the reader just read. */
+  network?: Network | null
+  /** Handle of the person whose post named it. Omit alongside `network`. */
+  spottedBy?: string | null
   /** `owner/repo` the post linked, when it linked one. */
   repo?: string | null
 }) {
@@ -46,10 +50,21 @@ export function PendingSkillAttachment({
           {slug}
         </span>
         <span className="flex items-center gap-1.5 truncate font-mono text-2xs text-(--ink-2)">
-          <NetworkIcon network={network} />
-          <span className="truncate">
-            via @{spottedBy} on {NETWORK_NAME[network]}
-          </span>
+          {network && spottedBy ? (
+            <>
+              <NetworkIcon network={network} />
+              <span className="truncate">
+                via @{spottedBy} on {NETWORK_NAME[network]}
+              </span>
+            </>
+          ) : repo ? (
+            <>
+              <GitHubIcon className="h-3 w-3 shrink-0" />
+              {/* Not the repo path: that is the line directly above. What the
+                  reader does not know is why this says Import and not Add. */}
+              <span className="truncate">on GitHub, not in the registry yet</span>
+            </>
+          ) : null}
         </span>
       </span>
 

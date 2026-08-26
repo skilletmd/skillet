@@ -335,12 +335,8 @@ function StoryEventRow({ event }: { event: FeedStoryEvent }) {
           {event.subject?.slug || event.subject?.repo ? (
             <PendingSkillAttachment
               slug={event.subject.slug ?? event.subject.repo!.split('/')[1]!}
-              // Sources can be 'web', which is not a Network the badge knows.
-              // Where it was spotted is incidental on a story card anyway.
-              network={
-                event.sources[0]?.network === 'web' ? 'x' : (event.sources[0]?.network ?? 'x')
-              }
-              spottedBy={event.sources[0]?.handle ?? ''}
+              // No "via @handle on X": the sources sit directly above in the
+              // same card, so this row spends its one line on the repo instead.
               repo={event.subject.repo}
             />
           ) : null}
