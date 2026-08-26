@@ -9,7 +9,6 @@ import {
 import { WhoToFollow } from '@/components/discovery-rail'
 import { FeedRows } from './feed-rows'
 import { interleaveSignal, resolvedSignalEvents, storyFeedEvents } from '@/lib/news-signal'
-import { FeedFilter } from './feed-filter'
 import { FeedPanel } from './feed-panel'
 import { parseLens, type FeedSurfaceView, type FeedEventType } from './feed-lens'
 import { listMyOrgs } from '@/lib/orgs-server'
@@ -49,10 +48,12 @@ export async function ForYouSurface({
   lens,
   teamParam,
   typeFilter,
+  newsOff = false,
 }: {
   lens?: string
   teamParam?: string
   typeFilter?: FeedEventType | null
+  newsOff?: boolean
 }) {
   // Identity for the feed lens comes from the request-cached session (a JWT
   // decode), not a live /whoami round-trip — same isAuthed/handle facts, no fetch.
@@ -101,22 +102,28 @@ export async function ForYouSurface({
   // An unresolved quote is neither: it is raw material for a story, so it does
   // not stand alone in the feed.
   let events = registryEvents
-  if (resolved === 'discover') {
-    if (typeFilter === 'signal') {
-      events = [...storyFeedEvents(), ...resolvedSignalEvents(SIGNAL_NEWS_PAGE)]
-    } else if (!typeFilter) {
-      events = interleaveSignal(registryEvents, [
-        ...storyFeedEvents(2),
-        ...resolvedSignalEvents(SIGNAL_PER_PAGE),
-      ])
-    }
+  // News rides on every lens now, not just Global. A following feed is thin on
+  // the days nobody you follow published, and the toggle is on the shared lens
+  // row, so it would read as broken if it did nothing on the lens you are on.
+  if (!newsOff && !typeFilter) {
+    events = interleaveSignal(registryEvents, [
+      ...storyFeedEvents(2),
+      ...resolvedSignalEvents(SIGNAL_PER_PAGE),
+    ])
+  } else if (resolved === 'discover' && typeFilter === 'signal') {
+    events = [...storyFeedEvents(), ...resolvedSignalEvents(SIGNAL_NEWS_PAGE)]
   }
 
   // An empty For-you feed renders its own empty state; it never redirects. Bare
   // /feed IS the For-you tab's href, so redirecting an empty following feed to
   // Global made the tab impossible to open and left no way to learn why. The empty
   // state below carries the fix instead (who to follow, right there).
-  const emptyFollowing = resolved === 'following' && isAuthed && !typeFilter && events.length === 0
+  // Emptiness is about YOUR follows, not the mixed list. Once news rides on
+  // this lens too, `events` is never empty, and someone following nobody would
+  // get a feed full of strangers' news and never be told to follow anyone —
+  // which is the one job this state has.
+  const emptyFollowing =
+    resolved === 'following' && isAuthed && !typeFilter && registryEvents.length === 0
   const suggestions = emptyFollowing ? await loadFollowSuggestions() : []
 
   let body: React.ReactNode
@@ -128,6 +135,12 @@ export async function ForYouSurface({
         cta={{ href: loginHref(feedHref()), label: 'Sign in' }}
       />
     )
+  } else if (emptyFollowing) {
+    // Before the rows check, not after. News rides on this lens now, so `events`
+    // is never empty and the rows branch would swallow this state: someone
+    // following nobody would get a feed of strangers and never be told to follow
+    // anyone, which is the one thing this state exists to say.
+    body = emptyFollowingPanel(suggestions)
   } else if (events.length > 0) {
     body = (
       <FeedRows
@@ -167,46 +180,43 @@ export async function ForYouSurface({
       />
     )
   } else {
-    // The one empty state a viewer can act on from where they stand: follow rows
-    // inline (the right rail that normally carries them is hidden below lg, which
-    // is exactly where an empty feed feels most like a dead end), with Global as
-    // the way out for anyone who would rather browse first.
-    body = (
-      <FeedPanel
-        title="Your feed is empty"
-        body="Follow people and their activity lands here."
-        cta={{ href: feedGlobalHref(), label: 'Browse the global feed' }}
-        illustration={
-          <Image
-            src="/illustrations/empty-feed.png"
-            alt=""
-            width={170}
-            height={240}
-            className="empty-illo h-24 w-auto"
-          />
-        }
-      >
-        {/* lg:hidden — at lg and up the right rail already carries this exact
-            list, and two copies on one screen is just noise. Below lg the rail is
-            gone, which is where an empty feed reads as a dead end. */}
-        {suggestions.length > 0 ? (
-          <div className="lg:hidden">
-            <WhoToFollow suggestions={suggestions} />
-          </div>
-        ) : null}
-      </FeedPanel>
-    )
+    body = emptyFollowingPanel(suggestions)
   }
 
   // Just the timeline — the two-column shell + who-to-follow rail live in the
   // feed layout so they don't re-render (or re-fetch) when you switch lenses.
-  // Global is the only lens that mixes two kinds of thing, so it is the only one
-  // that needs the News/Activity switch.
-  if (resolved !== 'discover') return body
+  // The News switch sits on the lens row in the layout, not here.
+  return body
+}
+
+/** The one empty state a viewer can act on from where they stand: follow rows
+ *  inline (the right rail that normally carries them is hidden below lg, which
+ *  is exactly where an empty feed feels most like a dead end), with Global as
+ *  the way out for anyone who would rather browse first. */
+function emptyFollowingPanel(suggestions: FollowSuggestion[]) {
   return (
-    <>
-      <FeedFilter />
-      {body}
-    </>
+    <FeedPanel
+      title="Your feed is empty"
+      body="Follow people and their activity lands here."
+      cta={{ href: feedGlobalHref(), label: 'Browse the global feed' }}
+      illustration={
+        <Image
+          src="/illustrations/empty-feed.png"
+          alt=""
+          width={170}
+          height={240}
+          className="empty-illo h-24 w-auto"
+        />
+      }
+    >
+      {/* lg:hidden — at lg and up the right rail already carries this exact
+          list, and two copies on one screen is just noise. Below lg the rail is
+          gone, which is where an empty feed reads as a dead end. */}
+      {suggestions.length > 0 ? (
+        <div className="lg:hidden">
+          <WhoToFollow suggestions={suggestions} />
+        </div>
+      ) : null}
+    </FeedPanel>
   )
 }

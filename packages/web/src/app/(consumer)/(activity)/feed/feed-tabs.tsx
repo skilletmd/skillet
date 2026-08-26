@@ -9,6 +9,7 @@ import { useUnreadNotifications } from '@/components/notifications/use-unread-no
 import { CountBadge } from '@/components/ui/count-badge'
 import { feedHref, feedGlobalHref, feedNotificationsHref, feedUpdatesHref } from '@/lib/urls'
 import { parseLens, parseFeedSection, feedPathState } from './feed-lens'
+import { NewsToggle } from './news-toggle'
 
 type FeedTeam = { slug: string; name: string }
 
@@ -102,6 +103,9 @@ export function FeedControls({
       {section === 'activity' && (
         <div className="mt-2 mb-6 hidden flex-wrap items-center gap-x-3 border-b border-(--line) md:flex">
           <FeedTabs teamTabs={teamTabsDesktop} />
+          {/* Right of the lenses, because it is not a lens: it says what goes in
+              whichever one you are on. */}
+          <NewsToggle />
         </div>
       )}
     </>
@@ -173,6 +177,7 @@ export function FeedMobileBar({ teamTabs }: { teamTabs?: ReactNode }) {
             </Link>
           )}
         </nav>
+        <NewsToggle />
       </div>
     </div>
   )

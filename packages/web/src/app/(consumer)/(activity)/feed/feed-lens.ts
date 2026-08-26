@@ -28,16 +28,19 @@ export function parseEventType(value: string | string[] | undefined): FeedEventT
 }
 
 /**
- * The two things Global mixes, as a viewer-facing filter. "News" is what people
- * said off-platform; "Activity" is what happened in the registry. Kept to those
- * two because they are the split a reader actually feels — the finer event kinds
- * (`follow`, `subscribe`) are plumbing, and `follow` never renders anyway.
+ * Whether news is mixed into the feed. On by default: it is the reason to come
+ * back, and a feed of your own follows' publishes is thin most days.
+ *
+ * Its own param rather than reusing `?type=skill`, which was the old
+ * Activity-only filter. That one also drops follow and subscribe events, so
+ * unchecking News would have quietly hidden things that are not news.
  */
-export const FEED_FILTERS = [
-  { key: null, label: 'Everything' },
-  { key: 'signal' as const, label: 'News' },
-  { key: 'skill' as const, label: 'Activity' },
-]
+export function parseNewsOff(value: string | string[] | undefined): boolean {
+  const v = Array.isArray(value) ? value[0] : value
+  return v === '0'
+}
+
+export const NEWS_OFF_PARAM = 'news'
 
 /** The only explicit lens path segment served by /feed/[lens]. For you is the bare
  *  /feed and Global is /feed/global; team lenses have their own /feed/team/<slug>
