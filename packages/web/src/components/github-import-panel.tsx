@@ -34,6 +34,7 @@ export function GithubImportPanel({
   busy = false,
   error = null,
   connectReturn = '/import',
+  initialUrl,
 }: {
   githubLinked?: boolean
   /** Repos you own that aren't syncing yet. */
@@ -46,9 +47,13 @@ export function GithubImportPanel({
   error?: string | null
   /** Where GitHub returns after connecting (the page hosting this panel). */
   connectReturn?: string
+  /** Repo the page was opened for, e.g. from /import?url=owner/repo. The field
+   *  is what tells the reader which repo is being imported; arriving from an
+   *  Import link to an empty box reads as if the link lost the repo. */
+  initialUrl?: string | null
 }) {
   const router = useRouter()
-  const [url, setUrl] = useState('')
+  const [url, setUrl] = useState(initialUrl ?? '')
   const [navigating, setNavigating] = useState(false)
   const isBusy = busy || navigating
 

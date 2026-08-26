@@ -300,6 +300,7 @@ export function RepoImportWizard({
             }}
             busy={busy}
             error={error}
+            initialUrl={initialUrl}
             connectReturn="/import"
           />
         </Panel>
