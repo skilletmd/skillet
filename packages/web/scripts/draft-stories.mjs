@@ -36,13 +36,18 @@ import { DatabaseSync } from 'node:sqlite'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { storyCandidates, reach, normalizeHandles } from '../src/lib/story-cluster.mjs'
+import { SKILL_KIND, NEWS_KIND, STORY_KINDS } from '../src/lib/story-kind.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const SEED = path.join(HERE, '..', 'src', 'lib', 'news-signal-seed.json')
 const DB = process.env.BLOG_DB_PATH ?? path.join(HERE, '..', 'content', 'blog.db')
 const API_KEY = process.env.ANTHROPIC_API_KEY
 const DRAFT_ONLY = process.env.STORY_DRAFT_ONLY === '1'
-const MAX_STORIES = Number(process.env.STORY_MAX ?? 8)
+/** Slots per queue. Separate, because skill posts out-like news posts and one
+ *  shared pool ranked news off the page entirely: a real day produced fourteen
+ *  skills and zero news. */
+const MAX_SKILLS = Number(process.env.STORY_MAX_SKILLS ?? 8)
+const MAX_NEWS = Number(process.env.STORY_MAX_NEWS ?? 6)
 /** A story is one post in the feed, so it is sized like one. Six subjects in a
  *  single body read as a list and got skipped; each subject gets its own card. */
 const MAX_BODY = 280
@@ -51,19 +56,77 @@ const MAX_BODY = 280
 const MODEL = 'claude-opus-5'
 const DRY_RUN = process.argv.includes('--dry-run')
 
+// ----------------------------------------------------------------- classify
+
+/**
+ * Sort the day's posts into the skills queue and the news queue.
+ *
+ * One call for the whole day, before anything is ranked or written, because
+ * ranking has to know the queue and a per-post call would be 50 requests to
+ * answer a yes/no question.
+ *
+ * This is not a regex job. "This Claude Code skill decompiles Android APKs" and
+ * "OpenClaw vs Hermes vs Grok Bot, all three let you set up skills" share
+ * almost every surface feature: both say "skill", both name a runtime, neither
+ * carries an install line. The first is a skill someone can install, the second
+ * is a comparison of three products. Only reading them apart works.
+ *
+ * A failed classification is not fatal. Everything falls back to news, which
+ * costs a day of skill cards sitting in the wrong queue and nothing else.
+ */
+async function classifyPosts(posts) {
+  const listed = posts
+    .map((p, i) => `[${i}] @${p.handle}: ${p.text.replace(/\s+/g, ' ').slice(0, 300)}`)
+    .join('\n')
+  const prompt =
+    `Sort each post into one of two buckets.\n\n` +
+    `  skill - it is about a specific agent skill someone can install or use. ` +
+    `Shipping one, installing one, recommending one, reviewing one, or a pack ` +
+    `of them.\n` +
+    `  news  - anything else in the field. Labs, models, runtimes, agents, ` +
+    `papers, funding, arguments, comparisons of products, career talk.\n\n` +
+    `A post that merely mentions the word "skill" while comparing runtimes is ` +
+    `news. A post about one installable skill is skill, even with no install ` +
+    `line.\n\n` +
+    `Reply with ONLY a JSON object mapping each index to "skill" or "news": ` +
+    `{"0": "skill", "1": "news", ...}. Every index below must appear.\n\n` +
+    listed
+  const body = await callModel(prompt, 'low')
+  const parsed = body && firstJsonObject(body)
+  if (!parsed) {
+    console.warn('  ! classification failed; treating every post as news')
+    return posts.map((p) => ({ ...p, isSkill: false }))
+  }
+  const out = posts.map((p, i) => ({ ...p, isSkill: parsed[String(i)] === 'skill' }))
+  const skills = out.filter((p) => p.isSkill).length
+  console.log(`classified ${skills} skill / ${out.length - skills} news`)
+  return out
+}
+
 // -------------------------------------------------------------------- write
 
 /** Real headlines from the feed, as calibration. Told only to be "specific",
  *  the model returns category labels ("Skill authors ship packs..."), which sit
  *  next to these in one feed and read as the filler between the real stories.
  *  Examples move it further than any adjective in the instruction did. */
-const HOUSE_HEADLINES = [
+const NEWS_HEADLINES = [
   "Shopify's CEO pushed back on Claude Code reading only CLAUDE.md. Anthropic answered the same afternoon.",
   'NVIDIA measured whether security scans predict skill quality. They correlate at p = 0.14.',
   'A 7,316-star skill was called unsafe by a practitioner. Stars were the only public signal it carried.',
 ]
 
-function promptFor(posts) {
+/** A skill headline answers "would I install this", so it leads with the skill
+ *  and what it does. Leading with the person who mentioned it answers "who is
+ *  talking", which no reader asked. "@MiaAI_lab pitched a skill called Ponytail
+ *  as the one to add to your harness" is the failure this exists to prevent:
+ *  every word about the pitch, none about what the thing does. */
+const SKILL_HEADLINES = [
+  'Ponytail makes an agent delete fifty lines and write one instead of explaining itself',
+  '/scandinavian-design restyles any site as Nordic minimalism from a single slash command',
+  'transitions.dev reads the motion already in a codebase and proposes replacements for it',
+]
+
+function promptFor(posts, isSkill) {
   const rendered = posts
     .map(
       (p, i) =>
@@ -79,7 +142,31 @@ function promptFor(posts) {
       ? `is one post collected today.\n\n`
       : `are ${posts.length} posts collected today about the same event.\n\n`) +
     `Write one short post about it. This is a card in a feed, not an article.\n\n` +
-    `Rules:\n` +
+    (isSkill
+      ? `This is a SKILL post: it is about a specific skill a reader could ` +
+        `install or use.\n\nHEADLINE:\n` +
+        `- Lead with the skill and what it DOES. The reader is deciding whether ` +
+        `to install it; answer that and nothing else.\n` +
+        `- The person who posted is NOT the subject. "X pitched a skill called ` +
+        `Y" spends the whole headline on the pitch and none on the thing. They ` +
+        `are credited in the sources underneath; you do not need to name them.\n` +
+        `- Concrete capability beats category. "restyles any site as Nordic ` +
+        `minimalism" beats "a design skill". Name the behaviour, not the field.\n` +
+        `- Under 110 chars. Examples of the bar:\n` +
+        SKILL_HEADLINES.map((h) => `    ${h}\n`).join('') +
+        `- Body: the detail the headline left out. How it installs, what it ` +
+        `costs the reader, what it does not do. Not who posted it.\n` +
+        `- Set kind to "${SKILL_KIND}".\n`
+      : `This is a NEWS post: a lab, model, runtime, company, paper or argument ` +
+        `in the field.\n\nHEADLINE:\n` +
+        `- Name the actor and what they did. Specific nouns and real numbers ` +
+        `beat abstractions; "skill authors ship packs" is a category, not a ` +
+        `headline. Two short sentences with a turn are welcome. Under 110 ` +
+        `chars. No colon-prefix labels, no "and also" clause bolted on the ` +
+        `end. Examples:\n` +
+        NEWS_HEADLINES.map((h) => `    ${h}\n`).join('') +
+        `- Set kind to "${NEWS_KIND}".\n`) +
+    `\nRules:\n` +
     `- ONE subject. If the material covers several unrelated things, pick the ` +
     `single most newsworthy one and ignore the rest. A body that lists three ` +
     `things is a list, and a reader skips a list.\n` +
@@ -93,19 +180,12 @@ function promptFor(posts) {
     `- These are real people who will read this. Name them by handle or by what ` +
     `they built. Never by a label that sizes them up ("a tinkerer", "a hobbyist", ` +
     `"some guy"), and never with a compliment either; we report, we do not rate.\n` +
-    `- Headline: name the actor and what they did. Specific nouns and real ` +
-    `numbers beat abstractions; "skill authors ship packs" is a category, not ` +
-    `a headline. Two short sentences with a turn are welcome. Under 110 chars. ` +
-    `No colon-prefix labels, and no "and also" clause bolted on the end. ` +
-    `The house style, for calibration:\n` +
-    HOUSE_HEADLINES.map((h) => `    ${h}\n`).join('') +
     `- The headline carries the claim; the body must not restate it in other ` +
     `words. Give the body the detail the headline left out.\n` +
     `- No bullet points, no em-dashes, no hype, no throat-clearing.\n` +
     `- A number inside a post is that poster's claim, not a fact we checked. ` +
     `Star counts, benchmarks and model names from a post get attributed ("the ` +
     `roundup lists...") or left out. Never restate one in our own voice.\n` +
-    `- kind: one of launch, labs, research, debate, trust.\n` +
     `- If there is no story here worth a reader's attention, return ` +
     `{"skip": true} and nothing else. Skipping is cheap; a dull card is not.\n\n` +
     `Reply with ONLY a JSON object: ` +
@@ -127,7 +207,9 @@ function firstJsonObject(text) {
   }
 }
 
-async function writeStory(posts) {
+/** One Messages call, returning the reply text or null. Effort is a knob per
+ *  caller: classification is a sorting task, writing is not. */
+async function callModel(prompt, effort) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -139,8 +221,8 @@ async function writeStory(posts) {
       model: MODEL,
       max_tokens: 16000,
       thinking: { type: 'adaptive' },
-      output_config: { effort: 'medium' },
-      messages: [{ role: 'user', content: promptFor(posts) }],
+      output_config: { effort },
+      messages: [{ role: 'user', content: prompt }],
     }),
   })
   if (!res.ok) {
@@ -151,13 +233,18 @@ async function writeStory(posts) {
   // A policy decline arrives as HTTP 200 with stop_reason "refusal", so the
   // content array must not be read before checking it.
   if (body.stop_reason === 'refusal') {
-    console.warn('  ! model declined this cluster; skipping')
+    console.warn('  ! model declined; skipping')
     return null
   }
-  const text = (body.content ?? [])
+  return (body.content ?? [])
     .filter((block) => block.type === 'text')
     .map((block) => block.text)
     .join('')
+}
+
+async function writeStory(posts, isSkill) {
+  const text = await callModel(promptFor(posts, isSkill), 'medium')
+  if (!text) return null
   const parsed = firstJsonObject(text)
   if (!parsed || parsed.skip) return null
   if (typeof parsed.headline !== 'string' || typeof parsed.summary !== 'string') return null
@@ -180,9 +267,7 @@ async function writeStory(posts) {
   return {
     headline: parsed.headline.trim(),
     summary: parsed.summary.trim(),
-    kind: ['launch', 'labs', 'research', 'debate', 'trust'].includes(parsed.kind)
-      ? parsed.kind
-      : 'story',
+    kind: STORY_KINDS.includes(parsed.kind) ? parsed.kind : 'story',
   }
 }
 
@@ -219,12 +304,14 @@ async function main() {
   // Posts that already resolve to a skill are their own feed item; stories are
   // built from the rest, which is what the unresolved majority is FOR.
   const material = items.filter((i) => i.match === 'none' && i.text.length > 80)
-  const clusters = storyCandidates(material, MAX_STORIES)
+  const classified = await classifyPosts(material)
+  const clusters = storyCandidates(classified, { skills: MAX_SKILLS, news: MAX_NEWS })
   console.log(`${material.length} unclustered posts → ${clusters.length} candidate stories`)
 
   if (DRY_RUN) {
     clusters.forEach((posts, i) => {
-      console.log(`\ncluster ${i + 1} — ${posts.length} posts, ${reach(posts)} likes`)
+      const queue = posts.filter((p) => p.isSkill).length * 2 >= posts.length ? 'skill' : 'news'
+      console.log(`\n${queue} ${i + 1} — ${posts.length} posts, ${reach(posts)} likes`)
       for (const p of posts) {
         console.log(`  @${p.handle.padEnd(18)} ${p.text.replace(/\s+/g, ' ').slice(0, 74)}`)
       }
@@ -250,7 +337,7 @@ async function main() {
 
   let written = 0
   for (const posts of clusters) {
-    const story = await writeStory(posts)
+    const story = await writeStory(posts, posts.filter((p) => p.isSkill).length * 2 >= posts.length)
     if (!story) continue
     const sources = sourcesFrom(posts)
     story.headline = normalizeHandles(story.headline, sources)

@@ -6,14 +6,7 @@ import { PAGE_CONTAINER_CLASS } from '@/lib/page-layout'
 import { NetworkIcon, NETWORK_NAME } from '@/components/network-icon'
 import { Avatar } from '@/components/ui/avatar'
 import { NewsKicker, NewsMasthead } from '../news-chrome'
-
-const STORY_KICKER: Record<string, string> = {
-  launch: 'Launch',
-  labs: 'From the labs',
-  research: 'Research',
-  debate: 'The argument',
-  trust: 'Trust',
-}
+import { storyKicker } from '@/lib/story-kind.mjs'
 
 /** A published story, or null. Drafts are not found: an unpublished story must
  *  404 for everyone, not render for anyone holding the URL. */
@@ -99,7 +92,7 @@ export default async function StoryPage({ params }: { params: Promise<{ story: s
     <div className={PAGE_CONTAINER_CLASS}>
       <NewsMasthead
         dateLabel={dateLabel}
-        standfirst={STORY_KICKER[post.storyKind ?? ''] ?? 'Story'}
+        standfirst={storyKicker(post.storyKind)}
       />
 
       <article className="mt-8 max-w-[68ch]">

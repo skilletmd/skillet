@@ -84,17 +84,43 @@ export function cluster(posts) {
 
 export const reach = (posts) => posts.reduce((n, p) => n + (p.likes ?? 0), 0)
 
+/** Majority rules, so one stray post cannot move a cluster to the other queue.
+ *  `isSkill` is set per post by the classification pass in the drafting script;
+ *  a pattern match cannot do this job. "This Claude Code skill decompiles APKs"
+ *  and "OpenClaw vs Hermes, all three let you set up skills" share almost every
+ *  surface feature and belong in different queues. */
+const isSkillCluster = (posts) => posts.filter((p) => p.isSkill).length * 2 >= posts.length
+
 /**
- * The day's stories, best first.
+ * The day's stories, best first within each queue.
  *
- * Every post is a candidate, so selection rather than grouping decides what runs.
- * Ranking by the loudest post rather than by summed reach keeps a genuine
- * three-source event from outranking a bigger single one purely on arithmetic.
+ * Skills and news are ranked SEPARATELY and then merged. In one pool skill
+ * posts simply out-like news posts, and a real day produced fourteen skills and
+ * zero news: the brief lost half its subject matter to an arithmetic accident.
+ * Each queue gets its own slots and its own ordering.
+ *
+ * The queue is decided here, before generation, because ranking has to happen
+ * before anything is written. The writer still picks the final kind on its own;
+ * a disagreement costs nothing, since the queue only decides which stories
+ * compete with each other for slots.
+ *
+ * Ranking inside a queue is by the loudest post rather than summed reach, which
+ * keeps a genuine three-source event from outranking a bigger single one purely
+ * on arithmetic.
  */
-export function storyCandidates(posts, limit) {
-  return cluster(posts)
-    .sort((a, b) => loudest(b) - loudest(a) || reach(b) - reach(a))
-    .slice(0, limit)
+export function storyCandidates(posts, { skills = 8, news = 6 } = {}) {
+  const byReach = (a, b) => loudest(b) - loudest(a) || reach(b) - reach(a)
+  const groups = cluster(posts)
+  const skillQueue = groups.filter(isSkillCluster).sort(byReach).slice(0, skills)
+  const newsQueue = groups.filter((g) => !isSkillCluster(g)).sort(byReach).slice(0, news)
+  // Interleaved rather than concatenated, so a reader scrolling the feed does
+  // not hit a block of one type followed by a block of the other.
+  const out = []
+  for (let i = 0; i < Math.max(skillQueue.length, newsQueue.length); i++) {
+    if (skillQueue[i]) out.push(skillQueue[i])
+    if (newsQueue[i]) out.push(newsQueue[i])
+  }
+  return out
 }
 
 const loudest = (posts) => Math.max(...posts.map((p) => p.likes ?? 0))

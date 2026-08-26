@@ -27,6 +27,7 @@ import {
 import { timeAgo } from '@/lib/feed-format'
 import type { FeedSurfaceView } from './feed-lens'
 import { feedEventKey, mergeFeedHead } from './feed-head-merge'
+import { storyKicker } from '@/lib/story-kind.mjs'
 
 const HEAD_POLL_MS = 30_000
 
@@ -231,14 +232,6 @@ function RelativeTime({ at }: { at: number }) {
   )
 }
 
-const STORY_KICKER: Record<string, string> = {
-  launch: 'Launch',
-  labs: 'From the labs',
-  research: 'Research',
-  debate: 'The argument',
-  trust: 'Trust',
-}
-
 /**
  * A written story with the posts it was drawn from listed underneath.
  *
@@ -274,7 +267,7 @@ function StoryEventRow({ event }: { event: FeedStoryEvent }) {
           <span className="feed-sep" aria-hidden="true">
             ·
           </span>
-          <span className="feed-verb">{STORY_KICKER[event.storyKind] ?? 'Story'}</span>
+          <span className="feed-verb">{storyKicker(event.storyKind)}</span>
           <RelativeTime at={event.at} />
         </p>
 

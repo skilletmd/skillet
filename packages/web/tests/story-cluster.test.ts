@@ -13,6 +13,7 @@ import {
 
 const post = (text: string, extra: Record<string, unknown> = {}) => ({
   text,
+  isSkill: false,
   handle: 'someone',
   likes: 10,
   match: 'none',
@@ -108,14 +109,28 @@ describe('storyCandidates', () => {
         post(`${quiet} c`, { likes: 400 }),
         post('permissions sandboxing capability revocation auditing', { likes: 900 }),
       ],
-      5,
+      { skills: 5, news: 5 },
     )
     expect(groups[0]![0]!.text).toContain('permissions')
   })
 
-  it('caps the day at the limit', () => {
+  it('ranks the two queues separately so skills cannot crowd out news', () => {
+    // In one pool skill posts out-like news posts, and a real day produced
+    // fourteen skills and zero news: the brief lost half its subject matter.
+    const loudSkill = (i: number) =>
+      post(`installable packaged distribution variant ${i} shipped`, { isSkill: true, likes: 900 })
+    const quietNews = post('permissions sandboxing capability revocation auditing', { likes: 5 })
+    const groups = storyCandidates([...Array.from({ length: 6 }, (_, i) => loudSkill(i)), quietNews], {
+      skills: 2,
+      news: 2,
+    })
+    expect(groups.some((g) => g[0]!.text.includes('permissions'))).toBe(true)
+    expect(groups.filter((g) => g[0]!.isSkill)).toHaveLength(2)
+  })
+
+  it('caps each queue at its own limit', () => {
     const many = Array.from({ length: 20 }, (_, i) => post(`unrelated subject number ${i} here`))
-    expect(storyCandidates(many, 8)).toHaveLength(8)
+    expect(storyCandidates(many, { skills: 8, news: 8 })).toHaveLength(8)
   })
 })
 
