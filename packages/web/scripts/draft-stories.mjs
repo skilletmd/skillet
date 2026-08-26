@@ -290,9 +290,9 @@ const NEWS_HEADLINES = [
  *  as the one to add to your harness" is the failure this exists to prevent:
  *  every word about the pitch, none about what the thing does. */
 const SKILL_HEADLINES = [
-  'Clean up any site to look as tidy as an IKEA catalogue',
-  'Get the one-line version of a feature instead of a library and three dependencies',
-  'Swap hand-written CSS animation for 32 transitions that already handle reduced motion',
+  "Improve your app's animations and motion",
+  'Make any site look as tidy as an IKEA catalogue',
+  'Stop your agent reaching for a library when one line would do',
 ]
 
 /**
@@ -354,6 +354,9 @@ const CARD_SHAPE = [
   '     repeat this sentence to a colleague and have them understand it.',
   '     NOT a hook. NOT a scene ("Ask an agent for X and you get Y..."). NOT a',
   '     riddle the next sentence solves. Say the thing.',
+  '     Do NOT open on the author\'s handle. "@X ships two skills together:"',
+  '     makes the sentence about who made it. Start with the thing: "Two skills',
+  '     that scan your project for motion and improve duration, easing and blur."',
   '  2. THE ONE DETAIL that decides it, plus what evidence exists. Tests, a',
   '     benchmark with its conditions, real usage. If the repo shows none, say',
   '     so: most ship none, and a reader choosing between two needs to know.',
@@ -386,8 +389,15 @@ function promptFor(posts, isSkill, context = []) {
         `- Say what the reader GETS. The skill's name and its repo are both ` +
         `printed directly beneath this headline, so naming it here spends the ` +
         `one line that could sell it on an identifier they can already see.\n` +
+        `- SHORT. Aim for UNDER 55 CHARACTERS. Plain verb, plain object, stop. ` +
+        `"Improve your app's animations and motion" is the length and the ` +
+        `register. Detail goes in the body; the headline only has to make ` +
+        `someone want to read it.\n` +
         `- Do NOT name the skill, and do NOT name the person who posted it. ` +
         `Both appear on the card already. Write the outcome and only that.\n` +
+        `- No cleverness. "Point an agent at your app and have it retime the ` +
+        `animations you already wrote" is a sentence showing off; "Improve your ` +
+        `app's animations and motion" is the same thing said plainly.\n` +
         `- Write the OUTCOME, not the mechanism. What is different about my ` +
         `project after I use this? Someone chooses a skill for what they get, ` +
         `never for how it works inside.\n` +
