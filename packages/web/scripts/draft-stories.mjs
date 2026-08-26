@@ -32,6 +32,7 @@
  *              is worth inspecting on its own before spending tokens.
  */
 import { readFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -44,7 +45,11 @@ import {
 } from '@skillet/protocol'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
-const SEED = path.join(HERE, '..', 'src', 'lib', 'news-signal-seed.json')
+// Prefer what the collector just wrote; fall back to the committed seed so a
+// fresh checkout can draft before the first collection has ever run.
+const LIVE_SEED = path.join(HERE, '..', 'content', 'news-signal.json')
+const BUNDLED_SEED = path.join(HERE, '..', 'src', 'lib', 'news-signal-seed.json')
+const SEED = existsSync(LIVE_SEED) ? LIVE_SEED : BUNDLED_SEED
 const DB = process.env.BLOG_DB_PATH ?? path.join(HERE, '..', 'content', 'blog.db')
 const API_KEY = process.env.ANTHROPIC_API_KEY
 const DRAFT_ONLY = process.env.STORY_DRAFT_ONLY === '1'

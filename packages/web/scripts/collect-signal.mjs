@@ -7,7 +7,7 @@
  *   - X timelines    — a watched set, for people whose posts matter regardless
  *   - Hacker News    — where people argue about whether a skill is any good
  *
- * Writes `src/lib/news-signal-seed.json`. That file is the contract the page
+ * Writes `content/news-signal.json`. That file is the contract the page
  * reads; when this grows a `signal_mentions` table, the page does not change.
  *
  * Env:
@@ -23,7 +23,10 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
-const OUT = path.join(HERE, '..', 'src', 'lib', 'news-signal-seed.json')
+// Runtime state, gitignored alongside blog.db. Writing the tracked seed instead
+// left the deploy checkout dirty every morning, so `git pull` on the next deploy
+// either conflicted or discarded the night's collection.
+const OUT = path.join(HERE, '..', 'content', 'news-signal.json')
 const DAYS = Number(process.env.SIGNAL_DAYS ?? 7)
 const REGISTRY = (process.env.REGISTRY_URL ?? 'http://127.0.0.1:3481').replace(/\/+$/, '')
 const X_KEY = process.env.TWITTERAPI_IO_KEY

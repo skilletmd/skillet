@@ -5,5 +5,8 @@ node_modules/
 
 # blog sqlite store (seeded from blog-seed.json)
 content/blog.db
+# Nightly collector output. Runtime state like blog.db: the committed
+# news-signal-seed.json is the fallback a fresh checkout renders from.
+content/news-signal.json
 content/blog.db-wal
 content/blog.db-shm

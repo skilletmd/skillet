@@ -24,7 +24,32 @@
  *
  * Attribution rule: link and short-quote, always name the account, never rehost.
  */
-import seed from './news-signal-seed.json'
+import fs from 'node:fs'
+import path from 'node:path'
+import bundledSeed from './news-signal-seed.json'
+
+/**
+ * The collector's output, or the committed seed.
+ *
+ * The nightly job writes `content/news-signal.json`, which is gitignored like
+ * blog.db: it is runtime state, and having it overwrite a TRACKED file meant
+ * every morning's run left the deploy checkout dirty and the next `git pull`
+ * either conflicted or threw the day's collection away.
+ *
+ * The bundled copy stays as the fallback so a fresh checkout renders a real
+ * page before the first collection ever runs.
+ */
+function loadSeed(): typeof bundledSeed {
+  try {
+    const live = path.join(process.cwd(), 'content', 'news-signal.json')
+    if (fs.existsSync(live)) return JSON.parse(fs.readFileSync(live, 'utf8'))
+  } catch {
+    // A malformed or unreadable collection costs freshness, never the page.
+  }
+  return bundledSeed
+}
+
+const seed = loadSeed()
 
 export interface SignalSkillRef {
   author: string
