@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { GitHubIcon } from '@/components/auth-provider-icons'
+import { SkillIcon } from '@/components/directory-card'
+import { humanizeSlug } from '@skillet/protocol/humanize'
 import { NetworkIcon, NETWORK_NAME, type Network } from '@/components/network-icon'
 
 /**
@@ -21,6 +23,8 @@ export function PendingSkillAttachment({
   network,
   spottedBy,
   repo,
+  category,
+  name,
 }: {
   /** The skill name as written, e.g. `scandinavian-design`. */
   slug: string
@@ -32,22 +36,40 @@ export function PendingSkillAttachment({
   spottedBy?: string | null
   /** `owner/repo` the post linked, when it linked one. */
   repo?: string | null
+  /** Prefilled category, when we could guess one. Draws the cover the skill
+   *  will actually get once imported, instead of a placeholder initial. */
+  category?: string | null
+  /** Display name from the skill's own frontmatter, when we read it. Falls
+   *  back to humanizing the slug. */
+  name?: string | null
 }) {
   const owner = repo?.split('/')[0]
   return (
     <div className="flex items-center gap-3 border-t border-(--line) px-4 py-3">
-      {/* Hollow, because there is no cover: we do not have this skill. */}
-      <span
-        aria-hidden="true"
-        className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-dashed border-(--line) font-mono text-xs text-(--ink-2)"
-      >
-        {slug.slice(0, 1).toUpperCase()}
-      </span>
+      {/* With a category we can draw the real cover, since the registry
+          prefills from the same signals at import: what the reader sees here is
+          what they get. Without one, hollow, because we do not have this skill.
+          SkillIcon paints into `absolute inset-0`, so it needs a sized
+          positioned parent or it covers the whole row. */}
+      {category ? (
+        <span className="relative h-8 w-8 shrink-0">
+          <SkillIcon seed={repo ?? slug} category={category} radius="rounded-lg" />
+        </span>
+      ) : (
+        <span
+          aria-hidden="true"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-dashed border-(--line) font-mono text-xs text-(--ink-2)"
+        >
+          {slug.slice(0, 1).toUpperCase()}
+        </span>
+      )}
 
       <span className="min-w-0 flex-1">
+        {/* The skill's name leads, the way it would on its own page. The repo
+            path is provenance and belongs underneath: a reader recognises
+            "Scandinavian Design" and has to parse owner/slug. */}
         <span className="block truncate text-sm font-semibold text-(--ink)">
-          {owner ? <span className="font-normal text-(--ink-2)">{owner}/</span> : null}
-          {slug}
+          {name ?? humanizeSlug(slug)}
         </span>
         <span className="flex items-center gap-1.5 truncate font-mono text-2xs text-(--ink-2)">
           {network && spottedBy ? (
@@ -60,9 +82,10 @@ export function PendingSkillAttachment({
           ) : repo ? (
             <>
               <GitHubIcon className="h-3 w-3 shrink-0" />
-              {/* Not the repo path: that is the line directly above. What the
-                  reader does not know is why this says Import and not Add. */}
-              <span className="truncate">on GitHub, not in the registry yet</span>
+              <span className="truncate">
+                <span className="text-(--ink-2)">{owner}/</span>
+                {repo.split('/')[1]}
+              </span>
             </>
           ) : null}
         </span>

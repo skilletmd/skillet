@@ -37,6 +37,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { storyCandidates, reach, normalizeHandles } from '../src/lib/story-cluster.mjs'
 import { SKILL_KIND, NEWS_KIND } from '../src/lib/story-kind.mjs'
+import { guessCategory } from '@skillet/protocol'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const SEED = path.join(HERE, '..', 'src', 'lib', 'news-signal-seed.json')
@@ -607,11 +608,36 @@ const sourcesFrom = (posts) =>
  * The repo is the half the import path can actually resolve, so when the two do
  * not corroborate each other the name is dropped and the repo names the card.
  */
+/** `name` and `description` out of a SKILL.md's YAML frontmatter. These are the
+ *  two fields the registry classifies on at import, so using them here is what
+ *  makes this the same guess rather than a similar one. */
+function frontmatter(body) {
+  const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(body ?? '')
+  if (!m) return {}
+  const read = (key) => {
+    const hit = new RegExp(`^${key}:\\s*(.+)$`, 'im').exec(m[1])
+    return hit ? hit[1].trim().replace(/^["']|["']$/g, '') : null
+  }
+  return { name: read('name'), description: read('description') }
+}
+
 function subjectFor(posts, context) {
   const repo = context[0]?.repo ?? posts.flatMap(reposFor)[0] ?? null
   const named = posts.find((p) => p.unknownSkill)?.unknownSkill ?? null
   const corroborated = named && (!repo || repo.toLowerCase().includes(named.toLowerCase()))
-  return { slug: corroborated ? named : null, repo }
+  const slug = corroborated ? named : null
+  // The same guess the registry makes at import time, from the SAME text: the
+  // repo's own name and README. Feeding our copy in instead pushed everything
+  // toward `agents`, because every sentence we write says skill and agent, and
+  // transitions.dev came back as an agents skill rather than a frontend one.
+  const skillFile = context[0]?.skills?.[0]?.body ?? null
+  const fm = frontmatter(skillFile)
+  const category = guessCategory({
+    slug: fm.name ?? slug ?? repo?.split('/')[1] ?? '',
+    description: fm.description,
+    body: skillFile ?? context[0]?.readme ?? null,
+  })
+  return { slug, repo, category, name: fm.name ?? null }
 }
 
 async function main() {

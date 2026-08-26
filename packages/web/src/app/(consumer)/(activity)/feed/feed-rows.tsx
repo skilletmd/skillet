@@ -338,6 +338,8 @@ function StoryEventRow({ event }: { event: FeedStoryEvent }) {
               // No "via @handle on X": the sources sit directly above in the
               // same card, so this row spends its one line on the repo instead.
               repo={event.subject.repo}
+              category={event.subject.category}
+              name={event.subject.name}
             />
           ) : null}
         </div>

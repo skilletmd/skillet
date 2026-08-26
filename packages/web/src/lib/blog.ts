@@ -9,6 +9,11 @@ export type PostStatus = 'draft' | 'published'
 export interface StorySubject {
   slug: string | null
   repo: string | null
+  /** Prefilled the way the registry prefills it at import, so the cover shown
+   *  here is the cover the skill gets. */
+  category: string | null
+  /** Display name from the skill's own frontmatter, when we read it. */
+  name: string | null
 }
 
 export interface StorySource {
@@ -119,7 +124,9 @@ function parseSubject(raw: string | null): StorySubject | undefined {
     if (!parsed || typeof parsed !== 'object') return undefined
     const slug = typeof parsed.slug === 'string' ? parsed.slug : null
     const repo = typeof parsed.repo === 'string' ? parsed.repo : null
-    return slug || repo ? { slug, repo } : undefined
+    const category = typeof parsed.category === 'string' ? parsed.category : null
+    const name = typeof parsed.name === 'string' ? parsed.name : null
+    return slug || repo ? { slug, repo, category, name } : undefined
   } catch {
     return undefined
   }
