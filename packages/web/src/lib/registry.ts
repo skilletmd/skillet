@@ -905,18 +905,66 @@ export async function getScanReportsBatch(
 ): Promise<Map<string, BatchScanEntry>> {
   const out = new Map<string, BatchScanEntry>()
   if (members.length === 0) return out
-  const raw = members.map((m) => `${m.author}/${m.slug}/${m.hash}`).join(',')
-  const path = `/skills/scan/batch?members=${encodeURIComponent(raw)}`
-  const body = await fetchLiveSoft<BatchScanResponse>(path, options)
-  if (!body || !Array.isArray(body.reports)) return out
-  for (const entry of body.reports) {
-    out.set(`${entry.author}/${entry.slug}/${entry.hash}`, {
-      capabilities: mapCapabilities(entry.report),
-      findings: mapFindings(entry.report),
-      blindSpots: entry.report.capabilities_blind_spots ?? [],
-    })
-  }
+  await Promise.all(
+    scanBatchChunks(members).map(async (chunk) => {
+      const raw = chunk.map((m) => `${m.author}/${m.slug}/${m.hash}`).join(',')
+      const path = `/skills/scan/batch?members=${encodeURIComponent(raw)}`
+      const body = await fetchLiveSoft<BatchScanResponse>(path, options)
+      if (!body || !Array.isArray(body.reports)) return
+      for (const entry of body.reports) {
+        out.set(`${entry.author}/${entry.slug}/${entry.hash}`, {
+          capabilities: mapCapabilities(entry.report),
+          findings: mapFindings(entry.report),
+          blindSpots: entry.report.capabilities_blind_spots ?? [],
+        })
+      }
+    }),
+  )
   return out
+}
+
+/** Encoded characters of `members` one request may carry. A member ref is
+ *  `handle/slug/sha256:<64 hex>` — ~115 chars once encoded — so a 168-skill kit
+ *  built a ~19KB query string and the registry answered **431**: Node caps the
+ *  request line + headers at 16KB, so that request could never succeed, at any
+ *  member count. 1800 keeps a chunk's whole URL inside every proxy's line limit
+ *  with room for the origin prefix. */
+const SCAN_BATCH_QUERY_BUDGET = 1800
+/** The registry's own per-request cap (`MAX_SCAN_BATCH_MEMBERS`, a 422). The
+ *  length budget binds long before this — it's here so a shorter ref shape can
+ *  never quietly walk a chunk past the server's limit. */
+const SCAN_BATCH_MAX_MEMBERS = 100
+
+/**
+ * Split a member set into request-sized chunks. Each chunk is its own tokenless,
+ * individually CDN-cacheable GET, so a big kit costs a handful of parallel reads
+ * that all succeed rather than one oversized read that always 431s. Chunking is
+ * order-preserving and deterministic, which keeps the chunk URLs — and their
+ * cache entries — stable across requests for the same kit.
+ */
+function scanBatchChunks<T extends { author: string; slug: string; hash: string }>(
+  members: T[],
+): T[][] {
+  const chunks: T[][] = []
+  let current: T[] = []
+  let encodedLen = 0
+  for (const m of members) {
+    const refLen = encodeURIComponent(`${m.author}/${m.slug}/${m.hash}`).length
+    // Every ref after the first also carries the encoded comma joiner (`%2C`).
+    const cost = current.length === 0 ? refLen : refLen + 3
+    const full =
+      current.length > 0 &&
+      (encodedLen + cost > SCAN_BATCH_QUERY_BUDGET || current.length >= SCAN_BATCH_MAX_MEMBERS)
+    if (full) {
+      chunks.push(current)
+      current = []
+      encodedLen = 0
+    }
+    encodedLen += current.length === 0 ? refLen : refLen + 3
+    current.push(m)
+  }
+  if (current.length > 0) chunks.push(current)
+  return chunks
 }
 
 export async function getAuthorProfile(
