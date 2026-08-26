@@ -31,10 +31,11 @@ export function HeaderFollowButton({
   const { data: session, status } = useSession()
   // Teams aren't followable — same gate the profile header uses.
   if (isTeam) return null
-  // Unknown viewer: render nothing rather than risk flashing Follow on an owner's
-  // own page. Logged-out visitors resolve to `unauthenticated` and do get the
-  // chip (it routes them to login), matching how Add greets logged-out users.
-  if (status === 'loading') return null
+  // Signed-in viewers only. `loading` is excluded so Follow never flashes on an
+  // owner's own page before the session resolves; `unauthenticated` is excluded
+  // because the hero already asks a stranger exactly one question (Add), and a
+  // second follow-then-login path beside it splits that ask in two.
+  if (status !== 'authenticated') return null
   if (session?.handle && session.handle === owner) return null
   return (
     <FollowButton

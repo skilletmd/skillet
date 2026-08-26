@@ -5,6 +5,7 @@ import { Suspense } from 'react'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { SiteAuthNav } from '@/components/site-auth-nav'
+import { SiteNavMenu } from '@/components/site-nav-menu'
 import { Button } from '@/components/ui/button'
 import { FinishSetupPill } from '@/components/finish-setup-pill'
 import { UniversalSearch } from '@/components/search/search-lazy'
@@ -56,7 +57,7 @@ export function SiteNav({ transparentAtTop = false }: { transparentAtTop?: boole
           <span className="site-logo-mark" aria-hidden="true" />
           Skillet
         </Link>
-        <nav className="flex min-w-0 shrink-0 items-center gap-5 text-sm md:gap-6">
+        <nav className="hidden min-w-0 shrink-0 items-center gap-5 text-sm sm:flex md:gap-6">
           {PRIMARY_LINKS.map((link) => {
             const active = pathname === link.href || pathname.startsWith(`${link.href}/`)
             return (
@@ -86,6 +87,9 @@ export function SiteNav({ transparentAtTop = false }: { transparentAtTop?: boole
           >
             <SiteAuthNav />
           </Suspense>
+          {/* Phone widths: Home / Browse / Docs live in here so the tray keeps
+              its room instead of wrapping. Inline links return at sm. */}
+          <SiteNavMenu className="sm:hidden" />
         </div>
       </div>
     </header>

@@ -24,10 +24,10 @@ describe('HeaderFollowButton', () => {
     expect(screen.getByRole('button', { name: 'Follow' })).toBeInTheDocument()
   })
 
-  it('renders a sign-in Follow link for a logged-out visitor', () => {
+  it('hides for a logged-out visitor (the hero asks one question: Add)', () => {
     session('unauthenticated')
-    render(<HeaderFollowButton owner="thiago" />)
-    expect(screen.getByRole('link', { name: /sign in to follow @thiago/i })).toBeInTheDocument()
+    const { container } = render(<HeaderFollowButton owner="thiago" />)
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('hides on your own object (you cannot follow yourself)', () => {

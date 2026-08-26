@@ -780,6 +780,35 @@ select:focus-visible {
   outline: none;
 }
 
+/* iOS Safari zooms the whole viewport when a field is focused whose font-size is
+   under 16px — and it never zooms back out, so the reader is left on a page that
+   no longer fits, with the header off-screen. Every field we ship is under that
+   line (.ui-input 15px, .search-input-field 14px, .skill-kit-menu-input 13px,
+   plus the Tailwind `text-sm` fields in the editors and admin), so this is one
+   rule rather than a per-field fix that the next field would miss.
+
+   Coarse pointers only: desktop keeps every designed size, and on a phone the
+   fields that matter (the full-screen search sheet, the editors, settings) all
+   have the room for 16px. That is why this is a plain size bump and NOT the
+   scale()-down trick going around — that one paints the text at one size and
+   lays it out at another, which costs crisp glyph rendering and puts the hit
+   area a few px off the painted box unless the negative margins are exact, per
+   field, forever.
+
+   `!important` because these sizes come from Tailwind utility classes, and a
+   class outranks an element selector no matter where this rule sits in the file.
+   `max(…, 1em)` leaves a field alone whose surrounding type is already larger.
+   Checkboxes and radios are excluded — no text to zoom to, and some engines size
+   the box itself from font-size. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']),
+  textarea,
+  select,
+  [contenteditable]:not([contenteditable='false']) {
+    font-size: max(16px, 1em) !important;
+  }
+}
+
 @layer base {
   button {
     font: inherit;
@@ -2342,6 +2371,27 @@ select.ui-input {
   box-shadow: 0 1px 2px rgba(63, 49, 38, 0.08);
 }
 
+/* Bare variant: no track, no pill — just text, with weight and ink carrying the
+   selection. For a control that sits ON the page rather than inside a settings
+   row: the browse type filter sat directly above the results it filters, and
+   the chrome around it read as a second card competing with the grid. The
+   track is worth its weight where a control needs to look like a switch
+   (System/Light/Dark); it is not worth it where the control IS the page nav. */
+.seg--bare {
+  padding: 0;
+  border: 0;
+  background: none;
+  gap: 2px;
+}
+.seg--bare .seg-item {
+  padding: 5px 10px;
+}
+.seg--bare .seg-item.is-active {
+  background: none;
+  box-shadow: none;
+  color: var(--ink);
+}
+
 /* Profile main-column tab bar (Skills / Kits) with a trailing create action. */
 /* No border-bottom of its own: the masthead rule above the body is the page's
    one rule; the active tab's accent underline is the only marker here. */
@@ -3071,6 +3121,40 @@ select.ui-input {
   position: static;
   flex-shrink: 0;
 }
+/* The row and its remove control share one hover target, so the × lights up
+   with the row rather than asking to be found. It is always PRESENT on touch
+   (no hover to reveal it) and always in the tab order; only its ink changes. */
+.search-recent-item {
+  display: flex;
+  align-items: center;
+}
+.search-recent-item:hover .search-recent-row {
+  background: var(--accent-bg);
+}
+.search-recent-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  margin-left: 2px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: color-mix(in srgb, var(--ink-2) 55%, transparent);
+  cursor: pointer;
+  transition:
+    color 150ms var(--ease),
+    background 150ms var(--ease);
+}
+.search-recent-item:hover .search-recent-remove {
+  color: var(--ink-2);
+}
+.search-recent-remove:hover {
+  background: var(--accent-bg);
+  color: var(--ink);
+}
 .search-hint-line {
   padding: 10px;
   font-size: 13px;
@@ -3131,15 +3215,25 @@ select.ui-input {
     transform: translateY(0);
   }
 }
+/* NOT flex, and deliberately unpositioned. The result list renders INSIDE
+   .universal-search-box (the sheet flattens .search-dropdown into the flow), so
+   a flex sibling is laid out against input + results together: `align-items:
+   center` dropped the close button halfway down the result list, and the
+   `border-bottom` drew a rule under the results instead of under the input row.
+   Being unpositioned also means the close button resolves against .search-sheet
+   (position: fixed) rather than this box, so it stays put while the list
+   scrolls. */
 .search-sheet-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--line);
-}
-.search-sheet-header .universal-search-box {
   flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 14px;
+}
+/* The close button's column is reserved on the INPUT ROW only — margin here,
+   not padding on the box — so the result list below still runs the full width
+   of the sheet. 46px = the 36px button + a 10px gap. */
+.search-sheet-header .search-input {
+  margin-right: 46px;
 }
 .search-sheet-header .search-dropdown {
   position: static;
@@ -3151,6 +3245,9 @@ select.ui-input {
   animation: none;
 }
 .search-sheet-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

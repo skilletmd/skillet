@@ -12,6 +12,8 @@ import {
   TYPEAHEAD_PER_GROUP,
 } from '@/lib/search-view'
 import { SearchResultRow } from './search-result-row'
+import { CATEGORIES_BY_SECTION, SECTION_GLYPH_COLOR } from '@/lib/categories'
+import { CategoryIcon } from '@/components/category-icons'
 import type { AsyncStatus } from '@/lib/types'
 
 const DEBOUNCE_MS = 200
@@ -33,16 +35,26 @@ function readRecents(): string[] {
   }
 }
 
-function pushRecent(q: string): string[] {
-  const trimmed = q.trim()
-  if (!trimmed) return readRecents()
-  const next = [trimmed, ...readRecents().filter((r) => r !== trimmed)].slice(0, MAX_RECENTS)
+function writeRecents(next: string[]): string[] {
   try {
     window.localStorage.setItem(RECENTS_KEY, JSON.stringify(next))
   } catch {
     // localStorage may be unavailable (private mode); recents are best-effort.
   }
   return next
+}
+
+function pushRecent(q: string): string[] {
+  const trimmed = q.trim()
+  if (!trimmed) return readRecents()
+  return writeRecents([trimmed, ...readRecents().filter((r) => r !== trimmed)].slice(0, MAX_RECENTS))
+}
+
+/** Drop one past search. Recents are a convenience, not a log — anything you
+ *  typed once and would rather not see suggested back at you should be one tap
+ *  from gone, without clearing the rest. */
+function removeRecent(q: string): string[] {
+  return writeRecents(readRecents().filter((r) => r !== q))
 }
 
 function SearchGlyph() {
@@ -289,24 +301,88 @@ export function SearchBox({
                 <span>Recent</span>
               </div>
               {recents.map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  className="search-recent-row"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    setQuery(r)
-                    resolvedInputRef.current?.focus()
-                  }}
-                >
-                  <SearchGlyph />
-                  <span>{r}</span>
-                </button>
+                // Two sibling buttons, not one nested in the other: a button
+                // inside a button is invalid, and the whole row still has to
+                // stay pressable for the common case (run it again).
+                <div key={r} className="search-recent-item">
+                  <button
+                    type="button"
+                    className="search-recent-row"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setQuery(r)
+                      resolvedInputRef.current?.focus()
+                    }}
+                  >
+                    <SearchGlyph />
+                    <span>{r}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="search-recent-remove"
+                    aria-label={`Remove ${r} from recent searches`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setRecents(removeRecent(r))
+                      resolvedInputRef.current?.focus()
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                      <path
+                        d="M3.5 3.5 10.5 10.5M10.5 3.5 3.5 10.5"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
               ))}
               <div className="search-group-divider" />
             </>
           )}
-          <p className="search-hint-line">Try: skills, kit names, @handles</p>
+          {/* The phone sheet owns the whole screen, and below the recents it was
+              empty — so someone who opened search without a word in mind got a
+              blank page and a hint. Every category, one tap away, turns that
+              dead space into the browse surface the phone header no longer has
+              room for. Desktop keeps the compact popover: a 15-chip grid
+              hanging off the header bar would be a menu, not a hint. */}
+          {variant === 'sheet' ? (
+            <>
+              <div className="search-section-header" role="presentation">
+                <span>Browse</span>
+              </div>
+              {/* Grouped by section, alphabetical inside it — the same order and
+                  the same three colors as the browse rail. Flat `CATEGORIES` is
+                  raw declaration order, which put Design between AI and
+                  Strategy and scattered the red and green chips through the
+                  teal ones, so the color said "section" while the order said
+                  nothing. */}
+              <div className="flex flex-wrap gap-2 p-2.5 pt-1">
+                {CATEGORIES_BY_SECTION.flatMap((g) => g.categories).map((c) => (
+                  <Link
+                    key={c.key}
+                    href={`/browse/${c.key}`}
+                    onClick={onNavigate}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-(--line) px-3 py-2 text-sm text-(--ink) transition-colors hover:border-(--accent) hover:bg-(--accent-bg)"
+                  >
+                    {/* Section color, the same key the browse rail and the
+                        mobile strip use, so a category looks the same wherever
+                        you meet it. */}
+                    <span
+                      className="grid size-4 shrink-0 place-items-center text-base"
+                      style={{ color: SECTION_GLYPH_COLOR[c.section] }}
+                    >
+                      <CategoryIcon cat={c.key} />
+                    </span>
+                    {c.label}
+                  </Link>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="search-hint-line">Try: skills, kit names, @handles</p>
+          )}
         </div>
       )
     }

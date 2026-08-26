@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { signOutFromWeb } from '@/lib/sign-out-action'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { SKILLET_EVENTS } from '@/lib/events'
 import { Avatar } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { NotificationBell } from '@/components/notifications/notification-bell'
 import { AttentionToast } from '@/components/notifications/attention-toast'
 import { registryGetJson } from '@/lib/registry-proxy'
+import { browseHref } from '@/lib/urls'
 import type { MyOrgEntry } from '@/lib/orgs'
 
 interface ProfileUpdatedEvent extends Event {
@@ -21,6 +22,15 @@ interface ProfileUpdatedEvent extends Event {
     avatarUrl?: string
   }
 }
+
+// The nav destinations a phone header can't show inline. Signed in they ride in
+// the account menu (below); signed out they are the hamburger's whole content.
+// No Home row: the wordmark is the home entry at every width, and a menu item
+// pointing at the logo two inches away is a row that teaches nothing.
+export const NAV_LINKS: { href: string; label: string; icon: ReactNode }[] = [
+  { href: browseHref(), label: 'Browse', icon: <BrowseGlyph /> },
+  { href: '/docs', label: 'Docs', icon: <DocsGlyph className="h-4 w-4" /> },
+]
 
 // Primary action — accent-tinted so it reads as the main verb in the tray. The
 // active page gets the same warm-tint pill the rest of the nav uses for "you are here".
@@ -33,10 +43,52 @@ function CreateButton() {
       aria-label="Create"
       aria-current={active ? 'page' : undefined}
       data-tip="Create"
-      className={`nav-tip relative flex h-9 w-9 items-center justify-center rounded-full transition-colors ${active ? 'bg-(--accent-bg) text-(--ink)' : 'text-(--ink-2) hover:bg-(--accent-bg) hover:text-(--ink)'}`}
+      // max-sm:hidden — authoring is a desk activity; nobody writes a SKILL.md on
+      // a phone, and the glyph was costing a tray slot on the width that has the
+      // least of it. It moves into the account menu there.
+      className={`nav-tip relative flex h-9 w-9 items-center justify-center rounded-full transition-colors max-sm:hidden ${active ? 'bg-(--accent-bg) text-(--ink)' : 'text-(--ink-2) hover:bg-(--accent-bg) hover:text-(--ink)'}`}
     >
       <Plus className="text-xl" />
     </Link>
+  )
+}
+
+/** Open book — Docs, in the tray glyph and in the menu row. */
+export function DocsGlyph({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M2 3.5h6a3 3 0 0 1 3 3V20a2.5 2.5 0 0 0-2.5-2.5H2z" />
+      <path d="M22 3.5h-6a3 3 0 0 0-3 3V20a2.5 2.5 0 0 1 2.5-2.5H22z" />
+    </svg>
+  )
+}
+
+/** Compass — Browse. Deliberately not a magnifier: search is its own control two
+ *  slots away, and the two would read as the same door. */
+export function BrowseGlyph({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="m15.5 8.5-2 5-5 2 2-5z" />
+    </svg>
   )
 }
 
@@ -53,19 +105,7 @@ function HelpLink({ className = '' }: { className?: string }) {
       data-tip="Docs"
       className={`nav-tip relative h-9 w-9 items-center justify-center rounded-full transition-colors ${active ? 'bg-(--accent-bg) text-(--ink)' : 'text-(--ink-2) hover:bg-(--accent-bg) hover:text-(--ink)'} ${className || 'flex'}`}
     >
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-5 w-5"
-        aria-hidden="true"
-      >
-        <path d="M2 3.5h6a3 3 0 0 1 3 3V20a2.5 2.5 0 0 0-2.5-2.5H2z" />
-        <path d="M22 3.5h-6a3 3 0 0 0-3 3V20a2.5 2.5 0 0 1 2.5-2.5H22z" />
-      </svg>
+      <DocsGlyph />
     </Link>
   )
 }
@@ -107,8 +147,8 @@ export function SiteAuthNav() {
     return (
       <span className="inline-flex items-center gap-1">
         <CreateButton />
-        {/* Docs is secondary — hidden below sm so the authed tray (search, create,
-            bell, avatar) plus the inline Browse link fit small-phone widths. */}
+        {/* Docs is secondary — below sm it lives in the phone menu, so the authed
+            tray (search, create, bell, avatar) fits small-phone widths. */}
         <HelpLink className="hidden sm:flex" />
         <AttentionToast />
         <NotificationBell />
@@ -126,11 +166,22 @@ export function SiteAuthNav() {
 
   return (
     <div className="flex items-center gap-2">
-      <HelpLink />
-      <Button href="/login" variant="tertiary" size="sm" className="px-2">
+      {/* Below sm, Docs and Log in both live in the phone menu — the header keeps
+          exactly one filled control (Join) instead of asking a stranger to weigh
+          three. `max-sm:` (not `hidden sm:flex`) because these variants carry
+          their own display, and only a media-query variant reliably beats it.
+          Join is bumped to the 36px tray target there so search, Join, and the
+          menu button share one height. */}
+      <HelpLink className="hidden sm:flex" />
+      <Button href="/login" variant="tertiary" size="sm" className="px-2 max-sm:hidden">
         Log in
       </Button>
-      <Button href="/login?mode=signup" variant="primary" size="sm" className="text-sm">
+      <Button
+        href="/login?mode=signup"
+        variant="primary"
+        size="sm"
+        className="text-sm max-sm:h-9"
+      >
         Join
       </Button>
     </div>
@@ -255,6 +306,38 @@ function AccountMenu({
               </span>
             </span>
           </Link>
+          {/* Phone only: the nav links the header has no room for. The
+              hamburger that used to carry them is signed-out-only now — with an
+              avatar menu already in the tray, a second menu beside it split
+              "where can I go" across both. Gone from sm up, where the inline
+              Browse link and the Docs glyph come back. */}
+          <div className="sm:hidden">
+            <div className="-mx-1.5 my-1 border-t border-(--line)" />
+            {/* Create leads the group — it is the one verb among destinations,
+                and it is the tray glyph this menu absorbed. Not in NAV_LINKS:
+                that list is also the signed-out hamburger's, where there is
+                nothing to create until you have an account. */}
+            <Link
+              href="/create"
+              className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-(--ink) transition-colors hover:bg-(--accent-bg)"
+            >
+              <span className="flex w-9 shrink-0 justify-center text-(--ink-2)">
+                <Plus className="h-4 w-4" />
+              </span>
+              Create
+            </Link>
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-(--ink) transition-colors hover:bg-(--accent-bg)"
+              >
+                <span className="flex w-9 shrink-0 justify-center text-(--ink-2)">{link.icon}</span>
+                {link.label}
+              </Link>
+            ))}
+            <div className="-mx-1.5 my-1 border-t border-(--line)" />
+          </div>
           <Link
             href="/settings"
             className="mt-0.5 flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm text-(--ink) transition-colors hover:bg-(--accent-bg)"
