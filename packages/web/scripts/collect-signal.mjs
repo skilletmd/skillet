@@ -18,6 +18,7 @@
  * Usage: node scripts/collect-signal.mjs
  */
 import { writeFile } from 'node:fs/promises'
+import { buildIndex, resolvePost } from '../src/lib/signal-resolve.mjs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -147,13 +148,9 @@ async function collectHN() {
 
 // --------------------------------------------------------------- resolution
 /**
- * The public `/skills` list API does not return `source_repo`, and that field is
- * the only precise join between "a post links github.com/owner/repo" and "we
- * carry that repo's skills". Without it only slug matching works, which resolves
- * almost nothing. Two ways to close it, in preference order:
- *   1. add `source_repo` to the list API response, or
- *   2. run this collector inside packages/registry where Prisma is available.
- * Until then this returns the slug corpus and repo matching stays dark.
+ * The corpus, with `source_repo` on every row (registry U1). That field is the
+ * join that makes repo matching possible; the resolver itself lives in
+ * src/lib/signal-resolve.mjs so its precision is unit-tested without a network.
  */
 async function loadCorpus() {
   const skills = []
@@ -165,57 +162,29 @@ async function loadCorpus() {
     if (page.length < 100) break
   }
   if (skills.length && !('source_repo' in skills[0])) {
-    console.warn('  ! list API omits source_repo: repo-to-skill matching disabled')
+    console.warn('  ! list API omits source_repo: repo matching disabled, update the registry')
   }
   return skills
 }
 
-const REPO_RE = /github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)/gi
-const NAME_RE = /\/([a-z][a-z0-9-]{3,34})\b|\b([a-z][a-z0-9-]{3,30}-skill)\b/gi
 const ABOUT = /\b(skill|skills|SKILL\.md)\b/i
 const LINK_ONLY = /^\s*(https?:\/\/\S+\s*)+$/
 const NOT_SKILL = /\b(inference|quantiz|fine-?tun|token\/s|drum|sequencer)\b/i
-const GENERIC = new Set(['skills', 'skill', 'claude', 'agents', 'agent', 'codex', 'cursor', 'status', 'search', 'docs', 'blog', 'item', 'comments'])
 
 const clean = (t) => (t ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 /** A retweet is not the retweeter's statement, and the name, avatar, follower
  *  count and permalink on the record all belong to whoever reposted it. There is
  *  no faithful way to render one, so they never enter the feed. */
 const IS_RETWEET = /^RT @[A-Za-z0-9_]+:/
-/** URL paths match the slash-command pattern, so strip them before extraction. */
-const stripUrls = (t) => t.replace(/https?:\/\/\S+/g, ' ')
 
-function namedSkill(text) {
-  const bare = stripUrls(text).toLowerCase()
-  for (const m of stripUrls(text).matchAll(NAME_RE)) {
-    const c = (m[1] ?? m[2] ?? '').toLowerCase()
-    if (!c || c.length <= 3 || GENERIC.has(c)) continue
-    if (c.includes('-') || bare.includes(`/${c}`)) return c
-  }
-  return null
-}
-
-function buildIndex(corpus) {
-  const bySlug = new Map()
-  for (const s of corpus) {
-    const slug = String(s.slug).toLowerCase()
-    if (slug.length < 6) continue
-    bySlug.set(slug, [...(bySlug.get(slug) ?? []), s])
-  }
-  return { bySlug }
-}
-
-function resolve(text, urls, index) {
-  const blob = [text, ...urls].join(' ')
-  for (const m of blob.matchAll(REPO_RE)) void m // repo→skill needs source_repo, absent from the public list API
-  for (const m of stripUrls(text).matchAll(NAME_RE)) {
-    const c = (m[1] ?? m[2] ?? '').toLowerCase()
-    const hit = index.bySlug.get(c)
-    if (hit && new Set(hit.map((s) => s.author)).size === 1) {
-      return { match: 'named', skills: hit.slice(0, 2).map((s) => ({ author: s.author, slug: s.slug })), collection: null }
-    }
-  }
-  return { match: 'none', skills: [], collection: null }
+/** Long-body sources (a Reddit post carries title + full body) pass ABOUT on one
+ *  incidental "skill" buried in paragraph six, which lets career and vibe posts
+ *  in. Require it up front, where a title lives, or repeated. */
+function aboutSkills(text) {
+  if (!ABOUT.test(text)) return false
+  if (text.length <= 400) return true
+  const head = text.slice(0, 140)
+  return ABOUT.test(head) || (text.match(new RegExp(ABOUT.source, 'gi')) ?? []).length >= 3
 }
 
 // --------------------------------------------------------------------- main
@@ -230,17 +199,21 @@ async function main() {
   for (const raw of [...xs, ...hns]) {
     const text = clean(raw.text)
     if (!text || IS_RETWEET.test(text)) continue
-    if (LINK_ONLY.test(text) || !ABOUT.test(text) || NOT_SKILL.test(text)) continue
+    if (LINK_ONLY.test(text) || !aboutSkills(text) || NOT_SKILL.test(text)) continue
     const key = text.slice(0, 90).toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
-    const { match, skills, collection } = resolve(text, raw.urls ?? [], index)
+    const { match, skills, collection, repo, unknownSkill } = resolvePost(
+      { text, urls: raw.urls ?? [] },
+      index,
+    )
     rows.push({
       handle: raw.handle, name: raw.name, followers: raw.followers,
       text, url: raw.url, likes: raw.likes, views: raw.views, createdAt: raw.createdAt,
       source: raw.source, context: raw.context,
       match, skills, collection,
-      unknownSkill: match === 'none' ? namedSkill(text) : null,
+      unknownSkill,
+      githubRepo: repo,
       topics: [],
     })
   }
