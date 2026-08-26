@@ -52,6 +52,16 @@ vi.mock('@/components/file-diff', () => ({ FileDiff: () => <div data-testid="fil
 const { mockDecrement } = vi.hoisted(() => ({ mockDecrement: vi.fn() }))
 vi.mock('./use-unread-notifications', () => ({ decrementPendingUpdates: mockDecrement }))
 
+// The group asks who you are so it can tell "a kit someone published to you"
+// from "a bag you filled yourself".
+const { mockSession } = vi.hoisted(() => ({
+  mockSession: vi.fn(() => ({ data: null }) as { data: { handle?: string } | null }),
+}))
+vi.mock('next-auth/react', () => ({
+  useSession: () => mockSession(),
+  SessionProvider: ({ children }: { children: React.ReactNode }) => children,
+}))
+
 const { toastSpy } = vi.hoisted(() => ({ toastSpy: vi.fn() }))
 vi.mock('@/components/ui/toast', async (importActual) => ({
   ...(await importActual<typeof import('@/components/ui/toast')>()),
@@ -91,9 +101,21 @@ const fourKitItems = (): UpdateItem[] => [
   item({ ref: 'serp/analyzer', skill_id: 'serp:analyzer', to_hash: 'h-serp' }),
 ]
 
-afterEach(() => vi.clearAllMocks())
+afterEach(() => {
+  vi.clearAllMocks()
+  mockSession.mockReturnValue({ data: null })
+})
 
 describe('KitUpdateGroup', () => {
+  // The bug: an update to somebody else's skill, sitting in your own Saved kit,
+  // rendered under "Saved @you" with your face — as if you had shipped it.
+  it('does not attribute your own kit to you', () => {
+    mockSession.mockReturnValue({ data: { handle: 'test-team' } })
+    render(<KitUpdateGroup kit={KIT} items={fourKitItems()} onResolved={vi.fn()} />)
+    expect(screen.getByText('Team Kit')).toBeInTheDocument()
+    expect(screen.queryByText('@test-team')).not.toBeInTheDocument()
+  })
+
   it('renders the kit name, owner, and "N new skills"', () => {
     render(<KitUpdateGroup kit={KIT} items={fourKitItems()} onResolved={vi.fn()} />)
     expect(screen.getByText('Team Kit')).toBeInTheDocument()

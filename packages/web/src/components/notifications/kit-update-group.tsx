@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import { Avatar } from '@/components/ui/avatar'
+import { KitStackIcon } from '@/components/directory-card'
 import { Button } from '@/components/ui/button'
 import { ChevronDown } from '@/components/ui/icons'
 import { useToast } from '@/components/ui/toast'
@@ -42,6 +44,13 @@ export function KitUpdateGroup({
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState<null | 'approve' | 'reject'>(null)
   const toast = useToast()
+  const { data: session } = useSession()
+  // Your OWN kit — Saved, or one you made — is a container you filled, not
+  // something you subscribe to from someone. Stamping it with your handle and
+  // your face read as "@you shipped this update", when the thing that actually
+  // changed is somebody else's skill sitting in your bag. The author lives on
+  // each child row instead (see UpdateCard), where it is true.
+  const isOwnKit = session?.handle != null && session.handle === kit.owner
 
   const count = items.length
   // Groups are formed by source kit, not by kind, so a kit can deliver first
@@ -89,13 +98,20 @@ export function KitUpdateGroup({
       <div className="flex items-start gap-3">
         {/* Cover links to the kit, like everywhere else. */}
         <Link href={kitHref} aria-label={kit.name} className="shrink-0">
-          <Avatar
-            src={kit.avatar_url}
-            name={kit.name}
-            colorKey={kit.owner}
-            kind="team"
-            size="md"
-          />
+          {isOwnKit ? (
+            // A kit mark, not a face: nobody published this to you.
+            <span className="relative block size-10">
+              <KitStackIcon seed={kit.id} radius="rounded-lg" />
+            </span>
+          ) : (
+            <Avatar
+              src={kit.avatar_url}
+              name={kit.name}
+              colorKey={kit.owner}
+              kind="team"
+              size="md"
+            />
+          )}
         </Link>
 
         <div className="min-w-0 flex-1">
@@ -106,12 +122,14 @@ export function KitUpdateGroup({
             >
               {kit.name}
             </Link>
-            <Link
-              href={profileHref(kit.owner)}
-              className="shrink-0 truncate font-mono text-xs text-(--ink-2) hover:text-(--accent)"
-            >
-              @{kit.owner}
-            </Link>
+            {!isOwnKit && (
+              <Link
+                href={profileHref(kit.owner)}
+                className="shrink-0 truncate font-mono text-xs text-(--ink-2) hover:text-(--accent)"
+              >
+                @{kit.owner}
+              </Link>
+            )}
           </div>
           {/* The count IS the disclosure — "5 new skills" expands to the list.
               No separate "What changed" line; for a group of new skills the count

@@ -25,7 +25,7 @@ import {
   type UpdateItem,
 } from '@/lib/account-updates'
 import type { ProposalFileDiff, SkillSecurity } from '@/lib/types'
-import { skillHref } from '@/lib/urls'
+import { profileHref, skillHref } from '@/lib/urls'
 
 /** One-line summary for the list row — no diff fetch required. */
 export function updateChangeHint(item: UpdateItem): string {
@@ -172,6 +172,16 @@ export function UpdateCard({
               className="truncate text-sm font-semibold text-(--ink) hover:text-(--accent)"
             >
               {name}
+            </Link>
+            {/* WHO changed it. Without this the row said only "Break v1 -> v1.1",
+                and inside a kit group the only handle on screen was the kit
+                owner's — so an update to someone else's skill read as one the
+                kit's owner had shipped. */}
+            <Link
+              href={profileHref(author)}
+              className="shrink-0 truncate font-mono text-xs text-(--ink-2) hover:text-(--accent)"
+            >
+              @{author}
             </Link>
             <span className="shrink-0 font-mono text-xs text-(--ink-2)">{versionLabel}</span>
           </div>
