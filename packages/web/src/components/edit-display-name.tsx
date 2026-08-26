@@ -294,14 +294,19 @@ export function EditDisplayName({
                         aria-pressed={active}
                         onClick={(e) => {
                           const { clientX, clientY } = e
-                          circularReveal(() => {
-                            flushSync(() => {
-                              setHue(h)
-                              if (isDefaultAvatar(value.avatarUrl)) {
-                                setField('avatarUrl', withAvatarHue(value.avatarUrl, h))
-                              }
-                            })
-                          }, clientX, clientY, 800)
+                          circularReveal(
+                            () => {
+                              flushSync(() => {
+                                setHue(h)
+                                if (isDefaultAvatar(value.avatarUrl)) {
+                                  setField('avatarUrl', withAvatarHue(value.avatarUrl, h))
+                                }
+                              })
+                            },
+                            clientX,
+                            clientY,
+                            800,
+                          )
                         }}
                         style={{ background: avatarTintGradientForHue(h) }}
                         className={cn(
@@ -363,28 +368,32 @@ export function EditDisplayName({
               </button>
               {/* Preset illustrated characters are for people; a team uploads its
                   own logo (or keeps the initials monogram). */}
-              {!isTeam && defaultAvatarUrls().map((url) => {
-                const tinted = withAvatarHue(url, hue)
-                const selected = value.avatarUrl.split('?')[0] === url
-                return (
-                  <button
-                    key={url}
-                    type="button"
-                    aria-label="Use this character"
-                    aria-pressed={selected}
-                    onClick={() => setField('avatarUrl', tinted)}
-                    className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-(--ink) focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
-                  >
-                    <Avatar
-                      src={tinted}
-                      name={displayName}
-                      colorKey={author}
-                      size="lg"
-                      className={cn('h-14 w-14 sm:h-14 sm:w-14', selected && 'ring-[3px] ring-(--accent)')}
-                    />
-                  </button>
-                )
-              })}
+              {!isTeam &&
+                defaultAvatarUrls().map((url) => {
+                  const tinted = withAvatarHue(url, hue)
+                  const selected = value.avatarUrl.split('?')[0] === url
+                  return (
+                    <button
+                      key={url}
+                      type="button"
+                      aria-label="Use this character"
+                      aria-pressed={selected}
+                      onClick={() => setField('avatarUrl', tinted)}
+                      className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-(--ink) focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)"
+                    >
+                      <Avatar
+                        src={tinted}
+                        name={displayName}
+                        colorKey={author}
+                        size="lg"
+                        className={cn(
+                          'h-14 w-14 sm:h-14 sm:w-14',
+                          selected && 'ring-[3px] ring-(--accent)',
+                        )}
+                      />
+                    </button>
+                  )
+                })}
             </div>
             {error && (
               <p role="alert" className="mt-2 px-1 text-sm leading-relaxed text-(--danger)">
@@ -416,7 +425,9 @@ export function EditDisplayName({
               value={value.bio}
               onChange={(e) => setField('bio', e.target.value)}
               disabled={status === 'saving'}
-              placeholder={isTeam ? 'What does this team build?' : 'What should people know about you?'}
+              placeholder={
+                isTeam ? 'What does this team build?' : 'What should people know about you?'
+              }
               className="min-h-[72px] resize-y leading-relaxed"
             />
             {value.bio.length > 0 && (
@@ -457,8 +468,8 @@ export function EditDisplayName({
             <div>
               <FieldLabel className="mb-1.5 block">Agents</FieldLabel>
               <p className="mb-3 text-sm text-(--ink-2)">
-                Pick which agents show on your public profile. Ones detected on a connected
-                device are marked verified.
+                Pick which agents show on your public profile. Ones detected on a connected device
+                are marked verified.
               </p>
               <AgentsVisibilitySelect
                 handle={author}
@@ -475,10 +486,20 @@ export function EditDisplayName({
         <div className="sticky bottom-4 z-10 mt-4 flex items-center justify-between gap-3 rounded-xl border border-(--line) bg-(--surface) px-4 py-3 shadow-(--shadow-md)">
           <span className="text-sm text-(--ink-2)">Unsaved changes</span>
           <div className="flex items-center gap-2">
-            <Button type="button" variant="secondary" onClick={discard} disabled={status === 'saving'}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={discard}
+              disabled={status === 'saving'}
+            >
               Discard
             </Button>
-            <Button type="button" variant="primary" onClick={() => void persist()} disabled={status === 'saving'}>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => void persist()}
+              disabled={status === 'saving'}
+            >
               {status === 'saving' ? 'Saving…' : 'Save'}
             </Button>
           </div>
@@ -502,48 +523,55 @@ export function EditDisplayName({
   // page's identity line. Click Edit to reveal the form.
   const summary = (
     <Panel padding="md">
-      <div className="flex items-start gap-4">
-        <Avatar
-          src={saved.avatarUrl.trim() || null}
-          name={savedDisplayName}
-          colorKey={author}
-          kind={kind}
-          size="lg"
-        />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-semibold leading-tight text-(--ink)">
-            {savedDisplayName}
-          </p>
-          <p className="mt-1 truncate font-mono text-sm text-(--accent)">@{author}</p>
-          {email && <p className="mt-0.5 truncate text-sm text-(--ink-2)">{email}</p>}
-          {saved.bio.trim() && (
-            <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-(--ink-2)">
-              {saved.bio.trim()}
+      {/* The two buttons drop to their own row on a phone. Beside the identity
+          they took ~200px of a 340px card, which squeezed the name, handle, and
+          email to single-letter ellipses and wrapped "+ Add the agents you use"
+          one word per line. */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <div className="flex min-w-0 flex-1 items-start gap-4">
+          <Avatar
+            src={saved.avatarUrl.trim() || null}
+            name={savedDisplayName}
+            colorKey={author}
+            kind={kind}
+            size="lg"
+            className="shrink-0"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-base font-semibold leading-tight text-(--ink)">
+              {savedDisplayName}
             </p>
-          )}
-          {showAgents &&
-            (orderedAgents.length > 0 ? (
-              <div className="mt-3 flex flex-wrap items-center gap-2.5">
-                {orderedAgents.map((key) => (
-                  <span
-                    key={key}
-                    title={runtimeLabel(key)}
-                    aria-label={runtimeLabel(key)}
-                    className="flex h-5 w-5 items-center justify-center text-(--ink-2)"
-                  >
-                    <AgentGlyph runtime={key} className="h-[18px] w-[18px]" />
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="mt-3 text-sm text-(--ink-3) transition-colors hover:text-(--ink)"
-              >
-                + Add the agents you use
-              </button>
-            ))}
+            <p className="mt-1 truncate font-mono text-sm text-(--accent)">@{author}</p>
+            {email && <p className="mt-0.5 truncate text-sm text-(--ink-2)">{email}</p>}
+            {saved.bio.trim() && (
+              <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-(--ink-2)">
+                {saved.bio.trim()}
+              </p>
+            )}
+            {showAgents &&
+              (orderedAgents.length > 0 ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2.5">
+                  {orderedAgents.map((key) => (
+                    <span
+                      key={key}
+                      title={runtimeLabel(key)}
+                      aria-label={runtimeLabel(key)}
+                      className="flex h-5 w-5 items-center justify-center text-(--ink-2)"
+                    >
+                      <AgentGlyph runtime={key} className="h-[18px] w-[18px]" />
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="mt-3 text-sm text-(--ink-3) transition-colors hover:text-(--ink)"
+                >
+                  + Add the agents you use
+                </button>
+              ))}
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {kind === 'person' && (
