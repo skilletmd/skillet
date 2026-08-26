@@ -833,10 +833,16 @@ describe('sync() — post-sync edited-set report wiring (clear-by-absence)', () 
     // transition-to-empty clearing case.
     await sync(cwd, [], { skipPull: true, fetchImpl })
     // The report is best-effort (fire-and-forget); let its promise settle.
-    await vi.waitFor(() =>
-      expect(calls.some((c) => c.url.includes('/materializations') && c.method === 'PUT')).toBe(
-        true,
-      ),
+    // vi.waitFor defaults to a 1s budget, which testTimeout does NOT raise, so
+    // these two waits need their own: on a loaded machine (the pre-commit hook
+    // runs every package's suite at once) a fire-and-forget round-trip does not
+    // reliably land inside a second, and the suite goes red for timing alone.
+    await vi.waitFor(
+      () =>
+        expect(calls.some((c) => c.url.includes('/materializations') && c.method === 'PUT')).toBe(
+          true,
+        ),
+      { timeout: 10_000 },
     )
 
     const report = calls.find((c) => c.url.includes('/materializations') && c.method === 'PUT')
@@ -847,12 +853,15 @@ describe('sync() — post-sync edited-set report wiring (clear-by-absence)', () 
     expect(body.edited).toEqual([]) // present + empty → registry reconciles-to-empty
 
     // Marker cleared in state.json once the empty set reached the registry.
-    await vi.waitFor(async () => {
-      const persisted = JSON.parse(await readFile(join(skilletDir, 'state.json'), 'utf8')) as {
-        edited_reported?: boolean
-      }
-      expect(persisted.edited_reported).toBeUndefined()
-    })
+    await vi.waitFor(
+      async () => {
+        const persisted = JSON.parse(await readFile(join(skilletDir, 'state.json'), 'utf8')) as {
+          edited_reported?: boolean
+        }
+        expect(persisted.edited_reported).toBeUndefined()
+      },
+      { timeout: 10_000 },
+    )
   })
 
   it('does NOT fire a materializations report on an idle sync that never reported edits', async () => {
