@@ -27,6 +27,28 @@ npx skilletmd          # run it once, or install globally:
 npm install -g skilletmd && skillet
 ```
 
+### On Windows, PowerShell may refuse to run these
+
+Windows PowerShell ships with script execution turned off, so both commands above stop before Skillet starts:
+
+```text
+npx : File C:\...\npx.ps1 cannot be loaded because running scripts is disabled
+on this system.
+```
+
+That is PowerShell declining to load npm's `.ps1` shim. It is not a problem with the package, and nothing has been installed wrongly. Either way past it works:
+
+- **Use the `.cmd` shims**, which the policy does not gate: `npx.cmd skilletmd`, or `skillet.cmd sync` after a global install.
+- **Allow local scripts once**, then use the normal commands. This needs no admin rights and only affects your account:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+`RemoteSigned` still requires a valid signature on anything downloaded from the internet; it only trusts scripts already on your machine. Check it took with `Get-ExecutionPolicy -List`, which should show `RemoteSigned` for `CurrentUser`.
+
+PowerShell 7 (`pwsh`) and `cmd.exe` are unaffected, and so is the tray app: it bundles the CLI and needs neither Node nor npm.
+
 1. **Sign in** at [skillet.md](https://skillet.md). Your kits live there.
 2. **Connect this machine.** On [Settings → Devices](https://skillet.md/settings/devices), generate a pairing code, then run `skillet connect ABCD-2345`. Running bare `skillet` walks the whole flow (sign in, connect, sync) and can import skills you already have.
 3. **Sync and confirm:**

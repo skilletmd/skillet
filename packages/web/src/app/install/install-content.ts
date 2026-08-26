@@ -106,7 +106,11 @@ const CLI_COPY: InstallCopy = {
     {
       n: '01',
       title: 'Run the wizard',
-      body: 'Paste the command in PowerShell, Windows Terminal, or your shell. Node 22+ required.',
+      // Windows PowerShell defaults to Restricted, which refuses npm's .ps1
+      // shims before any of our code runs, so we cannot catch it and say this
+      // ourselves. Naming the .cmd fallback here is the only warning a user
+      // gets. Full fix (Set-ExecutionPolicy) is in /docs/install.
+      body: 'Paste the command in PowerShell, Windows Terminal, or your shell. Node 22+ required. If PowerShell says scripts are disabled, run npx.cmd skilletmd instead.',
     },
     {
       n: '02',

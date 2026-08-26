@@ -20,6 +20,10 @@ Yes to start. Sign up (passwordless, takes seconds), pair your machine with one 
 
 Usually the tool was already open when the skill landed; start a new chat or session. If Skillet couldn't find where your tool keeps skills, it tells you in plain language and points to the fix. See [Runtimes](/docs/runtimes) for where each tool expects skills.
 
+## Windows says "running scripts is disabled on this system". What now?
+
+That is Windows PowerShell refusing to load npm's `.ps1` shim, so `npx` and `npm` stop before Skillet runs. Nothing is broken and nothing installed wrongly. Either use the `.cmd` shims the policy doesn't gate (`npx.cmd skilletmd`), or allow local scripts once with `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, which needs no admin rights. The tray app avoids it entirely: it bundles the CLI, so it needs neither Node nor npm. See [Install](/docs/install).
+
 ## How do I remove a skill?
 
 Remove it from your kit and run `skillet sync`. It stops being written to your tools. Files already on your machine stay in place; Skillet doesn't delete them out from under you.
