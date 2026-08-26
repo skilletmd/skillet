@@ -4,6 +4,14 @@
 @theme {
   --text-2xs: 0.625rem;
   --text-2xs--line-height: 1;
+
+  /* Tailwind ships no `pill` radius, so this is what makes `rounded-pill`
+     exist as a utility. It has to live in @theme, not in :root below: a custom
+     property there is readable from CSS but generates nothing, and six
+     `rounded-pill` classes across the app were silently rendering square. The
+     rest of the radius scale below is deliberately :root-only, because those
+     names match Tailwind's own defaults and the utilities already exist. */
+  --radius-pill: 999px;
 }
 
 /* Skillet web tokens — design/00-foundations.md. Both palettes designed, not inverted. */
@@ -43,7 +51,6 @@
   --radius-lg: 8px;
   --radius-xl: 12px;
   --radius-2xl: 16px;
-  --radius-pill: 999px;
 
   color-scheme: light;
 }

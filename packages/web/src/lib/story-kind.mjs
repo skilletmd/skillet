@@ -11,6 +11,8 @@
  * Research, The argument, Trust); they read as taxonomy rather than orientation
  * and told a scanning reader nothing the headline did not already say.
  *
+ * Singular, because the label sits on one card and describes that card.
+ *
  * Kept as .mjs so the drafting script and the React tree read the same list; a
  * second copy in the script would drift, and a drifted kind renders as a bare
  * fallback with nothing erroring.
@@ -19,7 +21,7 @@ export const SKILL_KIND = 'skill'
 export const NEWS_KIND = 'news'
 
 export const STORY_KICKER = {
-  [SKILL_KIND]: 'Skills',
+  [SKILL_KIND]: 'Skill',
   [NEWS_KIND]: 'News',
 }
 

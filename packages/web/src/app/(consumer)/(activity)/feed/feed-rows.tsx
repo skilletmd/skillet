@@ -264,10 +264,12 @@ function StoryEventRow({ event }: { event: FeedStoryEvent }) {
       <div className="min-w-0 flex-1">
         <p className="feed-line flex items-baseline gap-1.5">
           <span className="font-semibold">Skillet Daily</span>
-          <span className="feed-sep" aria-hidden="true">
-            ·
+          {/* A pill, not a word in the byline: this is the one label that says
+              which of the two things the card is, and it has to be findable
+              while scrolling rather than read. */}
+          <span className="rounded-pill border border-(--line) bg-(--card-soft) px-2 py-0.5 font-mono text-2xs font-medium tracking-[0.08em] uppercase text-(--ink-2)">
+            {storyKicker(event.storyKind)}
           </span>
-          <span className="feed-verb">{storyKicker(event.storyKind)}</span>
           <RelativeTime at={event.at} />
         </p>
 
