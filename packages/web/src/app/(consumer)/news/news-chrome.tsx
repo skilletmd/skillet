@@ -8,13 +8,24 @@
  * fights the product's near-black accent. Grammar travels, color does not.
  */
 
-export function NewsMasthead({ dateLabel, standfirst }: { dateLabel: string; standfirst: string }) {
+export function NewsMasthead({
+  dateLabel,
+  standfirst,
+}: {
+  /** The edition's date. Null when there is no edition to date — see
+   *  `editionDate` in ../news/page.tsx; the slot collapses rather than printing
+   *  today's date over an empty page. */
+  dateLabel?: string | null
+  standfirst: string
+}) {
   return (
     <header>
       <div className="flex flex-wrap items-baseline justify-between gap-4 border-b-2 border-(--ink) pb-3">
         <h1 className="text-xl font-bold tracking-[0.03em] uppercase">Skillet Daily</h1>
         <div className="flex items-baseline gap-4">
-          <span className="font-mono text-xs text-(--ink-2) tabular-nums">{dateLabel}</span>
+          {dateLabel && (
+            <span className="font-mono text-xs text-(--ink-2) tabular-nums">{dateLabel}</span>
+          )}
           <a
             href="/news/rss.xml"
             className="border-b border-(--line) pb-px font-mono text-xs tracking-[0.1em] uppercase text-(--ink-2) hover:border-(--ink-2) hover:text-(--ink)"

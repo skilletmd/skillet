@@ -39,9 +39,20 @@ function latestEdition(): Post | null {
  *  collection width; more than this and the day stops feeling curated. */
 const FEED_POSTS = 24
 
-function editionDate(post: Post | null): string {
+/**
+ * The EDITION's date, never today's.
+ *
+ * With no edition this used to fall back to `new Date()`, which under
+ * cacheComponents is a prerender error — "used `new Date()` before accessing
+ * either uncached data or Request data" — and it took the whole build down. It
+ * only ever fired where no `daily`-tagged post exists, so a machine with one
+ * built fine and production did not. Stamping today's date on a page with no
+ * edition was also just wrong: the date labels the edition, so with no edition
+ * there is nothing to date and the masthead drops the slot.
+ */
+function editionDate(post: Post | null): string | null {
   const iso = post?.publishedAt
-  if (!iso) return new Date().toLocaleDateString('en-US', dateStyle)
+  if (!iso) return null
   // `new Date('2026-08-25')` parses as UTC midnight, which renders as the 24th
   // anywhere west of Greenwich. Split the date-only string and build a local date.
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number)
