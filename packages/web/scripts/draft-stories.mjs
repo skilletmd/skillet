@@ -230,9 +230,39 @@ const NEWS_HEADLINES = [
  *  as the one to add to your harness" is the failure this exists to prevent:
  *  every word about the pitch, none about what the thing does. */
 const SKILL_HEADLINES = [
-  'Ponytail makes an agent delete fifty lines and write one instead of explaining itself',
-  '/scandinavian-design gives a site the quiet, expensive look of a Copenhagen studio',
-  'transitions.dev replaces hand-rolled animation with motion that feels considered',
+  '/scandinavian-design restyles a site in monochrome. It rejects edits whose only argument is that they look Nordic.',
+  'Ponytail answers a date-picker request with a native input. Correctness and security are out of scope.',
+  'transitions.dev ships 32 CSS transitions and rewrites the ad-hoc ones already in the project.',
+]
+
+/**
+ * The register, taken from what Skillet already publishes.
+ *
+ * Two failures put this here. Without the repo the writer wrote install
+ * mechanics; with the repo it transcribed the spec. Fixing the second pushed it
+ * into a third: a design-blog register, straining for a line. "strips a page
+ * back to black, white and air until the product shots carry it" is a
+ * copywriter writing, not a reporter reporting, and it sits in a feed next to
+ * "NVIDIA measured whether security scans predict skill quality. They correlate
+ * at p = 0.14."
+ *
+ * The house voice is plainer than any of those attempts. It is trade press: the
+ * information carries the sentence, and the writing gets out of the way.
+ */
+const VOICE = [
+  'VOICE. Skillet Daily is a trade brief. Closer to Bloomberg than to a design blog.',
+  '- Plain declarative sentences. The verb does the work: shipped, measured, rejects,',
+  '  cuts, pulls. Never reach for a better-sounding word than the accurate one.',
+  '- Two short sentences with a turn beat one long clever one.',
+  '- NO lyricism. No metaphor, no cadence for its own sake, no lists of three that',
+  '  exist because three sounds good. "black, white and air", "until the product',
+  '  shots carry it", "the quiet, expensive look of a Copenhagen studio" are all',
+  '  banned. If a phrase would please a copywriter, cut it.',
+  '- No adjective doing emotional work: quiet, expensive, beautiful, elegant,',
+  '  powerful, seamless, delightful. Say what it does instead.',
+  '- Numbers exact and attributed. Never rounded up for effect.',
+  '- Never sell. We publish Skillet and we cover everyone, including work that',
+  '  competes with us. Report it; do not rate it.',
 ]
 
 /** The failure that repo access introduced. Reading the README gave the writer
@@ -247,13 +277,16 @@ const SPEC_TRANSCRIPTION = [
   '      the expression while the interface around it stays quiet."',
   'WHY:  That is the README in different words. It describes a colour technique.',
   '      Nobody installs a skill because of how it derives midtones.',
-  'GOOD: /scandinavian-design gives a site the quiet, expensive look of a',
-  '      Copenhagen studio',
-  '      "Point it at a page and it strips the noise: monochrome, a lot of air,',
-  '      and your product shots doing all the talking. It pushes back when a',
-  '      change is style for its own sake, and it can review without touching',
-  '      code. Built and tested on marketing pages, so it has less to say about',
-  '      dense app UI."',
+  'ALSO BAD: /scandinavian-design strips a page back to black, white and air',
+  '      until the product shots carry it',
+  'WHY:  Right subject, wrong register. That is a copywriter reaching for a',
+  '      line. Trade press does not do cadence.',
+  'GOOD: /scandinavian-design restyles a site in monochrome. It rejects edits',
+  '      whose only argument is that they look Nordic.',
+  '      "Point it at a page and it cuts the palette back and opens up the',
+  '      spacing, rewriting layout too when that is the problem. A review mode',
+  '      returns findings and changes nothing. It was built against marketing',
+  '      pages, so it has little to say about dense app UI."',
 ]
 
 /** Mechanics every skill shares. A card that spends its body on these has said
@@ -279,6 +312,8 @@ function promptFor(posts, isSkill, context = []) {
       ? `is one post collected today.\n\n`
       : `are ${posts.length} posts collected today about the same event.\n\n`) +
     `Write one short post about it. This is a card in a feed, not an article.\n\n` +
+    VOICE.map((line) => `${line}\n`).join('') +
+    `\n` +
     (isSkill
       ? `This is a SKILL post: it is about a specific skill a reader could ` +
         `install or use.\n\nHEADLINE:\n` +
