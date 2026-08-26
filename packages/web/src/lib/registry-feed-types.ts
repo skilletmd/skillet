@@ -99,6 +99,9 @@ export interface FeedSignalEvent {
   /** How many GitHub repos the post referenced in total, carried or not. */
   repoCount?: number
   unknownSkill: string | null
+  /** Prefilled category for that unknown skill, so its cover matches the one it
+   *  gets on import. */
+  unknownCategory?: string | null
   /** `owner/repo` the post linked, when it linked one. Any repo, resolved or
    *  not: an unresolved skill with a repo is one click from `/import`. */
   repo: string | null

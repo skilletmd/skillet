@@ -26,6 +26,7 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
+import { guessCategory } from '@skillet/protocol'
 import bundledSeed from './news-signal-seed.json'
 
 /**
@@ -138,6 +139,12 @@ export function signalFeedEvents(limit: number): import('./registry-feed-types')
     collections: item.collections ?? [],
     repoCount: item.repos?.length ?? 0,
     unknownSkill: item.unknownSkill,
+    // Same prefill the registry makes at import, so a skill we do not carry yet
+    // still shows the cover it will get. From the skill's own name and the
+    // author's words about it, never our copy.
+    unknownCategory: item.unknownSkill
+      ? guessCategory({ slug: item.unknownSkill, body: item.text })
+      : null,
     repo: item.githubRepo ?? item.collection?.repo ?? null,
   }))
 }

@@ -15,6 +15,15 @@
  */
 
 export const REPO_RE = /github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)/gi
+
+/**
+ * An install line naming a repo without linking it: `npx skills add owner/name`.
+ *
+ * The most common shape for a skill announcement, and it carried no repo, so
+ * the card offered "not in the registry" and no way to get it. The repo is
+ * right there in the text the author asked people to copy.
+ */
+export const INSTALL_REPO_RE = /\bskills?\s+add\s+([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)/gi
 /**
  * A slash-command skill name, or a `*-skill` name.
  *
@@ -91,7 +100,7 @@ export function findRepos(text, urls = []) {
   const blob = [String(text ?? ''), ...urls.filter(Boolean)].join(' ')
   const seen = new Set()
   const out = []
-  for (const match of blob.matchAll(REPO_RE)) {
+  for (const match of [...blob.matchAll(REPO_RE), ...blob.matchAll(INSTALL_REPO_RE)]) {
     const repo = normalizeRepo(match[1])
     if (!repo) continue
     const key = repo.toLowerCase()

@@ -206,6 +206,7 @@ function SignalAttachment({ event }: { event: FeedSignalEvent }) {
         network={event.network}
         spottedBy={event.actor}
         repo={event.repo ?? null}
+        category={event.unknownCategory ?? null}
       />
     )
   }
