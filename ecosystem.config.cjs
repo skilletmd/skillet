@@ -235,6 +235,20 @@ apps.push({
     // rather than copying a secret into a second file, where the two would
     // drift and this job would no-op for a day before anyone noticed.
     ANTHROPIC_API_KEY: webDotEnv.ANTHROPIC_API_KEY ?? registryDotEnv.ANTHROPIC_API_KEY,
+    // Optional. Skill cards are written from the skill's own README, fetched
+    // over raw.githubusercontent, which needs no token. A token only adds the
+    // tree API, which is what finds SKILL.md nested under a directory.
+    GITHUB_TOKEN:
+      webDotEnv.GITHUB_TOKEN ??
+      registryDotEnv.SKILLET_MIRROR_GITHUB_TOKEN ??
+      registryDotEnv.GITHUB_TOKEN,
+    // Optional. Skill cards are written from the skill's own README, fetched
+    // over raw.githubusercontent, which needs no token. A token only adds the
+    // tree API, which is what finds SKILL.md nested under a directory.
+    GITHUB_TOKEN:
+      webDotEnv.GITHUB_TOKEN ??
+      registryDotEnv.SKILLET_MIRROR_GITHUB_TOKEN ??
+      registryDotEnv.GITHUB_TOKEN,
   },
   // An hour after mirror-nightly, so the day's newly mirrored skills are in the
   // registry before the collector tries to resolve posts against them. Keep in
