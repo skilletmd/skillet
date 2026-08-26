@@ -8,6 +8,41 @@ describe('isExcludedDiscoveryPath', () => {
     assert.equal(isExcludedDiscoveryPath('SKILL.md'), false)
   })
 
+  it('excludes course and tutorial lesson artifacts', () => {
+    // rohitg00/ai-engineering-from-scratch is a 503-lesson curriculum. Six of
+    // the fourteen SKILL.md files it offered were outputs a *student* produces
+    // doing a lesson, not skills the author publishes.
+    assert.equal(
+      isExcludedDiscoveryPath(
+        'phases/13-tools-and-protocols/27-skill-evals-packaging-and-portability/outputs/skill-release-gate/SKILL.md',
+      ),
+      true,
+    )
+    assert.equal(
+      isExcludedDiscoveryPath(
+        'certifications/claude/lessons/19-claude-code-memory-rules-skills-and-ci/outputs/migration-review-skill/SKILL.md',
+      ),
+      true,
+    )
+  })
+
+  it('leaves that same repo\'s real skills alone', () => {
+    assert.equal(isExcludedDiscoveryPath('skills/check-understanding/SKILL.md'), false)
+    assert.equal(isExcludedDiscoveryPath('skills/claude-certification/SKILL.md'), false)
+  })
+
+  it('matches whole segments, so a skill named for one survives', () => {
+    // The rule is segment equality, never substring: a skill about writing
+    // lesson plans or reviewing solutions keeps its place.
+    assert.equal(isExcludedDiscoveryPath('skills/lesson-planner/SKILL.md'), false)
+    assert.equal(isExcludedDiscoveryPath('skills/solutions-architect/SKILL.md'), false)
+    assert.equal(isExcludedDiscoveryPath('skills/output-formatter/SKILL.md'), false)
+  })
+
+  it('keeps examples/, where eleven real skills live', () => {
+    assert.equal(isExcludedDiscoveryPath('examples/skills/cognee-mcp/SKILL.md'), false)
+  })
+
   it('excludes any dot-prefixed segment (tool mirrors, VCS/CI)', () => {
     assert.equal(isExcludedDiscoveryPath('.claude/skills/foo/SKILL.md'), true)
     assert.equal(isExcludedDiscoveryPath('.github/foo/SKILL.md'), true)

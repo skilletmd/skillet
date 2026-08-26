@@ -45,6 +45,21 @@ const EXCLUDED_DISCOVERY_SEGMENTS = new Set([
   // neither can plausibly be where a real skill lives.
   'testdata',
   '__snapshots__',
+  // Course and tutorial artifacts. A curriculum repo ships SKILL.md files that
+  // are the *output a student produces* while doing a lesson, not skills the
+  // author publishes: rohitg00/ai-engineering-from-scratch offered fourteen, of
+  // which six lived under `phases/13-.../27-skill-evals/outputs/` and
+  // `certifications/claude/lessons/19-.../outputs/`. Its eight real skills sit
+  // under `skills/` and are untouched by this.
+  //
+  // Checked against the corpus before adding, the same bar the segments above
+  // were held to: zero of 1,209 skills with a recorded source_url live under
+  // any of these segments, so none of them costs a real skill. `examples` is
+  // still deliberately absent — eleven live skills sit under `examples/`.
+  'outputs',
+  'lessons',
+  'certifications',
+  'solutions',
 ]);
 
 /**
