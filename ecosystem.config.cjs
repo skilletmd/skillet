@@ -212,4 +212,35 @@ apps.push({
   max_memory_restart: "512M",
 });
 
+apps.push({
+  // Nightly Skillet Daily: collect the day's external signal, then write the
+  // stories from it. One-shot process relaunched by cron — autorestart stays
+  // OFF so a finished run doesn't loop. Plain node (these are .mjs, no tsx).
+  // Needs TWITTERAPI_IO_KEY and ANTHROPIC_API_KEY in packages/web/.env.
+  // NOTE: `pm2 reload` does NOT pick up a new app — use `pm2 startOrReload`,
+  // and PM2 runs a cron app once immediately on first start.
+  name: "news-nightly",
+  cwd: webRoot,
+  script: path.join(webRoot, "scripts/nightly-news.mjs"),
+  instances: 1,
+  exec_mode: "fork",
+  interpreter: "node",
+  env: {
+    ...webDotEnv,
+    NODE_ENV: "production",
+    // The collector resolves posts against the registry running beside it.
+    REGISTRY_URL: webDotEnv.REGISTRY_URL ?? `http://127.0.0.1:${registryPort}`,
+  },
+  // An hour after mirror-nightly, so the day's newly mirrored skills are in the
+  // registry before the collector tries to resolve posts against them. Keep in
+  // lockstep with SCHEDULED_HOUR in packages/web/scripts/nightly-news.mjs.
+  cron_restart: "0 7 * * *",
+  autorestart: false,
+  error_file: path.join(root, "logs/news-nightly-error.log"),
+  out_file: path.join(root, "logs/news-nightly-out.log"),
+  time: true,
+  watch: false,
+  max_memory_restart: "512M",
+});
+
 module.exports = { apps };
