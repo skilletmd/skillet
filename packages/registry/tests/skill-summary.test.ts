@@ -91,3 +91,40 @@ describe('toSkillSummary: deprecated flag', () => {
     assert.equal(toSkillSummary(row({ deprecated_at: 1_700_000_000 })).deprecated, true);
   });
 });
+
+// Provenance on the summary. `source_repo` is the only precise join between a
+// post that links github.com/owner/repo and the skills we carry from it, so the
+// news collector cannot resolve anything without it on the list response. It is
+// already public on the skill page; exposing it here adds no disclosure.
+describe('toSkillSummary: source provenance', () => {
+  it('carries the repo and directory for an imported skill', () => {
+    const summary = toSkillSummary(
+      row({ source_repo: 'everyinc/compound-engineering-plugin', source_url: 'https://github.com/everyinc/compound-engineering-plugin/tree/main/skills/ce-debug' }),
+    );
+    assert.equal(summary.source_repo, 'everyinc/compound-engineering-plugin');
+    assert.match(summary.source_url ?? '', /skills\/ce-debug$/);
+  });
+
+  it('is null, not undefined, for a directly published skill', () => {
+    const summary = toSkillSummary(row());
+    assert.equal(summary.source_repo, null);
+    assert.equal(summary.source_url, null);
+    // A consumer branching on `'source_repo' in summary` must see the key.
+    assert.ok('source_repo' in summary);
+  });
+
+  it('maps an explicit null through unchanged', () => {
+    const summary = toSkillSummary(row({ source_repo: null, source_url: null }));
+    assert.equal(summary.source_repo, null);
+    assert.equal(summary.source_url, null);
+  });
+
+  it('leaves every other summary field untouched', () => {
+    const withRepo = toSkillSummary(row({ source_repo: 'owner/repo' }));
+    const without = toSkillSummary(row());
+    for (const key of Object.keys(without) as (keyof typeof without)[]) {
+      if (key === 'source_repo' || key === 'source_url') continue;
+      assert.deepEqual(withRepo[key], without[key], `field ${key} drifted`);
+    }
+  });
+});

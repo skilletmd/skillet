@@ -74,6 +74,17 @@ export interface SkillSummary {
   /** Auto-assigned browse category (taxonomy key); null when private or unclassified. */
   category: string | null;
   /**
+   * Provenance for an imported skill: the `owner/repo` it came from, and the
+   * directory within it. Null for a skill published directly.
+   *
+   * Public on purpose. It is already shown on the skill page, and it is the
+   * only precise join between "a post links github.com/owner/repo" and "we
+   * carry that repo's skills" — without it on the list, a consumer can only
+   * match on slug, which collides across authors.
+   */
+  source_repo: string | null;
+  source_url: string | null;
+  /**
    * Whether the owner has unlisted (deprecated) this skill. Only ever `true` on
    * an owner/manager-authenticated summary — the public list filters deprecated
    * skills out entirely. Lets the owner's profile badge and sort them.
@@ -103,6 +114,8 @@ export interface SkillSummaryRow {
   scan_status: string | null;
   moderation_status: string | null;
   category: string | null;
+  source_repo?: string | null;
+  source_url?: string | null;
   /**
    * `deprecated_at` epoch, or null. Optional on the row: only owner-scoped
    * callers (the author profile) select it; everyone else leaves it undefined,
@@ -132,6 +145,8 @@ export const SKILL_SUMMARY_SELECT = `
          s.install_count        AS install_count,
          s.created_at           AS created_at,
          s.category             AS category,
+         s.source_repo          AS source_repo,
+         s.source_url           AS source_url,
          sv.signature_b64       AS signature_b64,
          sv.signature_key_id    AS signature_key_id,
          u.author_key_id        AS registered_key_id,
@@ -206,6 +221,8 @@ export function toSkillSummary(row: SkillSummaryRow): SkillSummary {
     scanStatus: scanBadgeOf(row),
     moderationStatus: moderationOf(row),
     category: row.category ?? null,
+    source_repo: row.source_repo ?? null,
+    source_url: row.source_url ?? null,
     deprecated: row.deprecated_at != null,
   };
 }

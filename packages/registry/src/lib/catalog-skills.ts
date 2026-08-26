@@ -27,6 +27,9 @@ export interface PublicCatalogSkillRow {
   install_count: number
   created_at: number
   category: string | null
+  /** Import provenance; see SkillSummary.source_repo for why it is on the list. */
+  source_repo: string | null
+  source_url: string | null
   moderation_status: string
   is_featured: number
 }
@@ -123,6 +126,8 @@ export async function listPublicCatalogSkillsPrisma(
       category: true,
       moderation_status: true,
       is_featured: true,
+      source_repo: true,
+      source_url: true,
     },
   })
   return rows
@@ -227,6 +232,8 @@ export async function listPublicCatalogSkillSummariesPrisma(
         : null,
       moderation_status: s.moderation_status,
       category: s.category,
+      source_repo: s.source_repo,
+      source_url: s.source_url,
     }
   })
 }
@@ -252,6 +259,8 @@ export async function findPublicCatalogSkillPrisma(
       category: true,
       moderation_status: true,
       is_featured: true,
+      source_repo: true,
+      source_url: true,
     },
   })
 }
