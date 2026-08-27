@@ -44,6 +44,7 @@ import {
   heroCardState,
   accessibilityActionLabel,
   permissionRows,
+  onboardingFolderNote,
   heroStatusOverride,
   humanizeAppError,
   palettePhaseFrom,
@@ -3178,9 +3179,19 @@ async function renderOnboarding() {
     } else {
       const permNeeded = onboardingPermissionNeededBody(obShortcut)
       const permFine = onboardingPermissionFine(obShortcut)
+      // Only for the people who will actually meet the folder dialog. No new
+      // step and no extra dot: the step count is part of onboarding's shape,
+      // and a conditional step would make the dots lie.
+      const folderNote = onboardingFolderNote({
+        isMac: isMacOsDesktop(),
+        agents: found,
+      })
+      const folderHtml = folderNote
+        ? `<div class="ob-folder-note"><b>${escapeHtml(folderNote.title)}</b><span>${escapeHtml(folderNote.detail)}</span></div>`
+        : ''
       body = granted
-        ? `<div class="ob-card center"><div class="ob-big" style="color:var(--success)">✓</div><b>You're all set</b><span class="ob-sub2">Press ${escapeHtml(prettyAccel(obShortcut))} in any app to drop a skill.</span></div><button class="ob-cta" id="done">Done</button>`
-        : `<div class="ob-card center"><div class="ob-big" style="color:var(--accent)">⌨</div><b>Let Skillet paste for you</b><span class="ob-sub2">${escapeHtml(permNeeded)}</span></div><button class="ob-cta" id="allow">${escapeHtml(accessibilityActionLabel(asked))}</button><button class="ob-skip" id="skip">Skip for now</button><div class="ob-fine">${escapeHtml(permFine)}</div>`
+        ? `<div class="ob-card center"><div class="ob-big" style="color:var(--success)">✓</div><b>You're all set</b><span class="ob-sub2">Press ${escapeHtml(prettyAccel(obShortcut))} in any app to drop a skill.</span></div>${folderHtml}<button class="ob-cta" id="done">Done</button>`
+        : `<div class="ob-card center"><div class="ob-big" style="color:var(--accent)">⌨</div><b>Let Skillet paste for you</b><span class="ob-sub2">${escapeHtml(permNeeded)}</span></div><button class="ob-cta" id="allow">${escapeHtml(accessibilityActionLabel(asked))}</button><button class="ob-skip" id="skip">Skip for now</button><div class="ob-fine">${escapeHtml(permFine)}</div>${folderHtml}`
     }
 
     const stepChanged = lastPaintedStep !== step
