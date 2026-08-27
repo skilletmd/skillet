@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { activityGateTarget } from '@/lib/activity-gate'
 import { adminProxyGate } from '@/lib/admin'
 import { isBrowsePathname } from '@/lib/browse-pathname'
+import { isCategoryKey } from '@/lib/categories'
 import {
   BROWSE_SSR_RID_HEADER,
   isBrowseSsrProbeEnabled,
@@ -127,6 +128,23 @@ export default auth(async (req) => {
   if (aliasTarget) {
     const url = req.nextUrl.clone()
     url.pathname = aliasTarget
+    return withSecurityHeaders(NextResponse.redirect(url, 308))
+  }
+
+  // `/news/topic/<category>` was a second, worse `/browse/<category>`, and the
+  // redirect has to happen HERE rather than in the page. A `redirect()` in the
+  // route body has the same problem `notFound()` does under `cacheComponents`:
+  // the shell and its 200 are already on the wire by the time the body runs, so
+  // the page degrades to a streamed client redirect. A person still lands on
+  // /browse, but a crawler sees 200 and an empty document — a duplicate URL
+  // indexed instead of consolidated, which is the whole reason for the redirect.
+  // 308 so the mapping is permanent and the link equity moves.
+  const newsTopic = pathname.match(/^\/news\/topic\/([^/]+)\/?$/)
+  if (newsTopic) {
+    const url = req.nextUrl.clone()
+    const topic = decodeURIComponent(newsTopic[1]!)
+    url.pathname = isCategoryKey(topic) ? `/browse/${topic}` : '/browse'
+    url.search = ''
     return withSecurityHeaders(NextResponse.redirect(url, 308))
   }
 
