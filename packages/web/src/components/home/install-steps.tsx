@@ -134,15 +134,37 @@ function seedPerson(person: Person, startId: number): Message[] {
 // thing you're looking at, not text you read through. Reduced-motion shows a
 // static pair of exchanges.
 /**
+ * Replies for a generated cast, rotated so the thread does not read as one
+ * template repeated down the page.
+ *
+ * The hardcoded entries name the object of the work ("to check your Core Web
+ * Vitals", "through your PR"), which is what makes them feel like a real agent
+ * answering. A generated reply cannot: it knows the skill, not what the skill
+ * is about. So these vary the opener and the rhythm and stop there, rather than
+ * substituting enthusiasm for the specificity they cannot have.
+ *
+ * Deliberately no "10x you" / "level you up" / "make you smarter" register.
+ * A reply that promises an outcome the skill has not produced yet is the one
+ * thing this widget cannot afford, since its whole job is being true about real
+ * people's work.
+ */
+const GENERATED_REPLIES: ReadonlyArray<{ pre: string; post: string }> = [
+  { pre: 'On it, using my ', post: ' skill.' },
+  { pre: 'Sure, my ', post: ' skill covers this.' },
+  { pre: 'Let me take that through my ', post: ' skill.' },
+  { pre: 'Got it. Running my ', post: ' skill now.' },
+  { pre: 'On it, my ', post: ' skill is built for this.' },
+  { pre: 'Happy to. My ', post: ' skill handles it.' },
+]
+
+/**
  * Turn stored suggestions into the hero's cast.
  *
- * `reply` has no generated equivalent: the hardcoded entries carry hand-written
- * sentences precisely so the script does not read as one template. That charm
- * is the cost of being true about real authors, and it is worth paying — a
- * hand-written line can claim something an author does not actually do, and the
- * current script does exactly that.
- *
  * `specialty` is the link text, so it is the slug read back as words.
+ *
+ * The reply rotates by position rather than at random: the cast is stable
+ * across renders, so a random pick would reshuffle the same person's line
+ * between visits and could hand two people in a row the same sentence.
  */
 export interface SuggestionRow {
   handle: string
@@ -152,13 +174,13 @@ export interface SuggestionRow {
 }
 
 export function peopleFromSuggestions(rows: SuggestionRow[]): Person[] {
-  return rows.map((r) => ({
+  return rows.map((r, i) => ({
     handle: r.handle,
     name: r.name,
     specialty: r.slug.replace(/[-_]+/g, ' '),
     task: r.task,
     slug: r.slug,
-    reply: { pre: 'On it, using my ', post: ' skill.' },
+    reply: GENERATED_REPLIES[i % GENERATED_REPLIES.length]!,
   }))
 }
 

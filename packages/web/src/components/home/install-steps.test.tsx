@@ -25,11 +25,29 @@ describe('peopleFromSuggestions', () => {
     expect(p!.specialty).toBe('azure cost analysis')
   })
 
-  it('gives every generated person the same reply template', () => {
-    // The hand-written replies vary on purpose so the script does not read as
-    // one template. That charm is the cost of being true about real authors.
+  it('varies the reply so the thread does not read as one template', () => {
     const people = peopleFromSuggestions([row('a', 't', 's'), row('b', 't', 's')])
-    expect(people[0]!.reply).toEqual(people[1]!.reply)
+    expect(people[0]!.reply).not.toEqual(people[1]!.reply)
+  })
+
+  it('is stable for the same cast across renders', () => {
+    // Rotated by position, not at random: a random pick would reshuffle the
+    // same person's line between visits.
+    const rows = [row('a', 't', 's'), row('b', 't', 's'), row('c', 't', 's')]
+    expect(peopleFromSuggestions(rows).map((p) => p.reply)).toEqual(
+      peopleFromSuggestions(rows).map((p) => p.reply),
+    )
+  })
+
+  it('promises no outcome the skill has not produced', () => {
+    // The widget's whole job is being true about real people's work.
+    const people = peopleFromSuggestions(
+      Array.from({ length: 8 }, (_, i) => row(`a${i}`, 't', 's')),
+    )
+    const copy = people.map((p) => `${p.reply.pre}${p.reply.post}`).join(' ').toLowerCase()
+    for (const hype of ['10x', 'level you up', 'smarter', 'supercharge', 'unlock']) {
+      expect(copy).not.toContain(hype)
+    }
   })
 
   it('maps an empty list to an empty cast', () => {
