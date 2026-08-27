@@ -118,11 +118,34 @@ describe('the closing ladder', () => {
     // Title, body, button, five times. One rung carrying a command block
     // instead of a button made the row read as two things, and its wrapped
     // URL broke mid-handle.
-    expect(html).toContain('How summoning works')
-    expect(html).toContain('See the feed')
-    expect(html).toContain('See the runtimes')
+    expect(html).toContain('How routing works')
+    expect(html).toContain('How ranking works')
+    expect(html).toContain('How syncing works')
     expect(html).toContain('Start publishing')
     expect(html).toContain('Set up teams')
+  })
+
+  it('sends the unsold rungs to the tour and the how-to rungs to docs', async () => {
+    const html = await renderHome()
+
+    // The first three rungs make a case a stranger has not accepted yet, so
+    // they land on the page that argues it; publish and teams are how-do-I
+    // questions from someone already sold.
+    expect(html).toContain('/tour/routing')
+    expect(html).toContain('/tour/discovery')
+    expect(html).toContain('/tour/skills')
+    expect(html).toContain('/docs/publish')
+    expect(html).toContain('/docs/teams')
+  })
+
+  it('never sends a logged-out visitor to the feed login wall', async () => {
+    const html = await renderHome()
+
+    // This page renders only for logged-out visitors (middleware redirects
+    // signed-in ones to /feed before they reach it), so a rung pointing at
+    // /feed asked for a signup before giving a reason for one.
+    expect(html).not.toContain('See the feed')
+    expect(html).not.toContain('href="/feed"')
   })
 
   it('scrolls rather than shrinking to fit five rungs', async () => {

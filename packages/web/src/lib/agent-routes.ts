@@ -25,6 +25,7 @@ import { RESERVED_SKILL_SLUGS, SKILL_SLUG_RE } from '@skillet/protocol/reserved-
 import { PROTECTED_RESOURCE_WELL_KNOWN } from '@skillet/protocol/protected-resource'
 import { CATEGORY_BY_KEY, isCategoryKey } from './categories'
 import { DOC_NAV } from './docs-nav'
+import { TOUR_SLUGS } from './tour'
 
 /**
  * The registry's claim-gate handle grammar. Kept as a literal rather than
@@ -84,6 +85,7 @@ export const KNOWN_TOP_LEVEL_SEGMENTS: ReadonlySet<string> = new Set([
   'settings',
   'skills',
   'stats',
+  'tour',
   'updates',
   'setup',
   // Machine-readable surfaces. `.well-known` covers every RFC 8615 suffix we
@@ -232,6 +234,15 @@ export function classifyRoute(pathname: string): RouteVerdict {
     if (segments.length === 3 && second === 'topic' && isCategoryKey(third)) {
       return { kind: 'known' }
     }
+    return { kind: 'unknown' }
+  }
+
+  // /tour is three static stops. Enumerated here rather than left to the
+  // KNOWN_TOP_LEVEL_SEGMENTS catch-all so /tour/anything-else is a real 404
+  // instead of a 200 carrying the 404 body.
+  if (first === 'tour') {
+    if (segments.length === 1) return { kind: 'known' }
+    if (segments.length === 2 && TOUR_SLUGS.has(second!)) return { kind: 'known' }
     return { kind: 'unknown' }
   }
 

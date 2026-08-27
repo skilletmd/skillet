@@ -256,6 +256,13 @@ function PrivateKitMotif() {
   )
 }
 
+// Rung destinations split on purpose. The first three make an argument a
+// stranger has not accepted yet, so they land on the tour, which argues it;
+// publish and teams are how-do-I questions from someone already sold, so they
+// stay on docs. Rung 2 pointed at /feed, which is a login wall for the only
+// audience that sees this page (signed-in visitors are redirected to /feed by
+// middleware before they get here), so it was asking for a signup before it had
+// given a reason for one.
 const LADDER: ReadonlyArray<{
   title: string
   body: string
@@ -266,22 +273,22 @@ const LADDER: ReadonlyArray<{
   {
     title: 'Try anyone, install nothing',
     body: 'Paste one line naming a handle. Your agent fetches their skills and picks the one that fits the task.',
-    href: '/docs/summon',
-    cta: 'How summoning works',
+    href: '/tour/routing',
+    cta: 'How routing works',
     Motif: SummonMotif,
   },
   {
     title: 'Follow people you trust',
     body: 'Their new skills land in your feed. One click adds one to your kit.',
-    href: '/feed',
-    cta: 'See the feed',
+    href: '/tour/discovery',
+    cta: 'How ranking works',
     Motif: PeopleMotif,
   },
   {
     title: 'One kit, every agent',
     body: 'Claude Code, Cursor, Codex, ChatGPT and six more. Add a skill once and it is there in all of them, on every machine.',
-    href: '/docs/runtimes',
-    cta: 'See the runtimes',
+    href: '/tour/skills',
+    cta: 'How syncing works',
     Motif: AgentsMotif,
   },
   {

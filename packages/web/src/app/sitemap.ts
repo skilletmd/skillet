@@ -7,6 +7,7 @@ import {
 import { getAllPosts } from '@/lib/blog'
 import { CATEGORY_BY_KEY } from '@/lib/categories'
 import { DOC_NAV } from '@/lib/docs-nav'
+import { TOUR_STOPS, tourHref } from '@/lib/tour'
 import { skillHref, kitHref, profileHref, browseHref, browseAllHref, blogHref } from '@/lib/urls'
 
 // Public catalog sitemap. Crawlers are always logged-out, so the auth-aware root
@@ -52,6 +53,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       blogHref(),
       '/about',
       '/contact',
+      '/tour',
+      ...TOUR_STOPS.map((stop) => tourHref(stop.slug)),
       ...docRoutes,
     ]),
   ].map((path) => ({
