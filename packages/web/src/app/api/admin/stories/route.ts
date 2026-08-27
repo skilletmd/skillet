@@ -1,8 +1,8 @@
-import { createHash, timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { getBlogDb } from '@/lib/blog-db'
 import { STORY_TAG } from '@/lib/blog'
 import { STORY_KINDS } from '@/lib/story-kind.mjs'
+import { requirePublishToken } from '@/lib/publish-auth'
 
 /**
  * Publish drafted Skillet Daily stories from a machine.
@@ -24,26 +24,6 @@ import { STORY_KINDS } from '@/lib/story-kind.mjs'
  * Writes drafts by default. `?publish=1` goes straight to the feed, which is for
  * when the caller has already reviewed them.
  */
-
-/** Constant-time compare over digests, so it is length-safe as well. */
-function tokenMatches(presented: string, expected: string): boolean {
-  const a = createHash('sha256').update(presented).digest()
-  const b = createHash('sha256').update(expected).digest()
-  return timingSafeEqual(a, b)
-}
-
-function authorize(req: Request): NextResponse | null {
-  const expected = process.env.SKILLET_STORY_PUBLISH_TOKEN
-  if (!expected) {
-    return NextResponse.json({ error: 'publishing_not_configured' }, { status: 503 })
-  }
-  const header = req.headers.get('authorization') ?? ''
-  const presented = header.startsWith('Bearer ') ? header.slice(7).trim() : ''
-  if (!presented || !tokenMatches(presented, expected)) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-  }
-  return null
-}
 
 interface StoryInput {
   slug: string
@@ -78,7 +58,7 @@ function readStory(raw: unknown): { story: StoryInput } | { error: string } {
 }
 
 export async function POST(req: Request) {
-  const denied = authorize(req)
+  const denied = requirePublishToken(req)
   if (denied) return denied
 
   let body: unknown

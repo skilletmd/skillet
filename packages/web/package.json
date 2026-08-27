@@ -12,7 +12,8 @@
     "lint:css": "stylelint \"src/**/*.css\"",
     "test": "pnpm --filter \"@skillet/web^...\" build && vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "daily": "bash scripts/skillet-daily.sh"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.17",

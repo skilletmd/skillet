@@ -32,25 +32,34 @@ import bundledSeed from './news-signal-seed.json'
 /**
  * The collector's output, or the committed seed.
  *
- * The nightly job writes `content/news-signal.json`, which is gitignored like
- * blog.db: it is runtime state, and having it overwrite a TRACKED file meant
- * every morning's run left the deploy checkout dirty and the next `git pull`
- * either conflicted or threw the day's collection away.
+ * The sweep runs off-box, where the API keys are, and uploads its collection to
+ * `content/news-signal.json` — gitignored like blog.db, because it is runtime
+ * state. Having it overwrite the TRACKED seed instead left the deploy checkout
+ * dirty every run, so the next `git pull` either conflicted or discarded the
+ * night's work.
  *
  * The bundled copy stays as the fallback so a fresh checkout renders a real
- * page before the first collection ever runs.
+ * page before the first collection ever arrives.
+ *
+ * Re-read when the file changes rather than once at module load. An upload has
+ * to show up without bouncing every Next worker, and a deploy is not something
+ * the publisher can trigger.
  */
+let cached: { mtimeMs: number; seed: typeof bundledSeed } | null = null
+
 function loadSeed(): typeof bundledSeed {
   try {
     const live = path.join(process.cwd(), 'content', 'news-signal.json')
-    if (fs.existsSync(live)) return JSON.parse(fs.readFileSync(live, 'utf8'))
+    const { mtimeMs } = fs.statSync(live)
+    if (cached?.mtimeMs === mtimeMs) return cached.seed
+    const seed = JSON.parse(fs.readFileSync(live, 'utf8'))
+    cached = { mtimeMs, seed }
+    return seed
   } catch {
-    // A malformed or unreadable collection costs freshness, never the page.
+    // Missing, malformed or unreadable: costs freshness, never the page.
+    return bundledSeed
   }
-  return bundledSeed
 }
-
-const seed = loadSeed()
 
 export interface SignalSkillRef {
   author: string
@@ -96,16 +105,17 @@ interface SignalSeed {
   items: SignalItem[]
 }
 
-const signal = seed as SignalSeed
+const signal = () => loadSeed() as SignalSeed
 
 /** Ranked feed items. Already ordered by reach at build time. */
 export function getSignalItems(limit?: number, topic?: string): SignalItem[] {
-  const rows = topic ? signal.items.filter((i) => i.topics.includes(topic)) : signal.items
+  const all = signal()
+  const rows = topic ? all.items.filter((i) => i.topics.includes(topic)) : all.items
   return limit ? rows.slice(0, limit) : rows
 }
 
 export function signalGeneratedAt(): string {
-  return signal.generatedAt
+  return signal().generatedAt
 }
 
 /**
