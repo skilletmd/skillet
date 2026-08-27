@@ -28,6 +28,7 @@ import { emitSummonEvent, summonCountsBySkillPrisma } from '../lib/summon-events
 import { countSkillAdoptersPrisma } from '../lib/profile-payload.js';
 import { serveBlockForModerationPrisma, serveBlockForScanPrisma } from '../routes/serve-guards.js';
 import { canReadSkillPrisma } from '../auth/skill-read-access.js';
+import { isAccountBound } from '../auth/account-bound.js';
 import type { Principal } from '../auth/middleware.js';
 
 /**
@@ -221,15 +222,21 @@ export function createRegistryDiscoveryPrisma(
         if (bytes) skillMd = new TextDecoder().decode(bytes);
       }
 
-      // Attribution. `via` present means this read came from a summon, which is
-      // the server-side equivalent of the route skill's `?src=summon&via=`; a
-      // plain fetch of a public ref counts nothing, exactly as over HTTP.
+      // Attribution. `summoned` means this read came from a summon; `via` only
+      // names the curator when the pick was not the summoned handle's own work.
+      // Gating on `via` alone silently dropped every AUTHORED summon — the
+      // common case — while the same summon over HTTP counted, because HTTP
+      // gates on `src=summon` with `via` optional. `via` still implies a summon
+      // so clients on the older contract keep counting through the transition.
       // Fire-and-forget: a counter must never fail a read or delay a response.
-      if (opts?.via && skillRow.visibility === 'public') {
+      if ((opts?.summoned || opts?.via) && skillRow.visibility === 'public') {
         void emitSummonEvent({
           prisma,
           skillId: skillRow.id,
-          viaHandle: opts.via,
+          authed: isAccountBound(ctx.principal),
+          // Attribution is optional now that `summoned` carries the intent:
+          // an authored summon counts with no curator to credit.
+          viaHandle: opts.via ?? '',
         }).catch(() => {});
       }
 

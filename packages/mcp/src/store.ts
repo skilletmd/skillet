@@ -180,10 +180,19 @@ export interface PublicReadOptions {
   /** Pin to a specific version; omit for latest. */
   hash?: string | null;
   /**
-   * The summoned handle this ref came from. Present means the read originated
-   * in a summon, which is what moves the author's summon count.
+   * The summoned handle this ref came from, when it is NOT the skill's own
+   * author. Attribution only: a curated pick credits the curator alongside the
+   * author. Absent for a skill the summoned handle wrote themselves.
    */
   via?: string | null;
+  /**
+   * True when this read came from a summon, whatever the attribution. Counting
+   * used to key off `via`, which is absent for an authored skill — the common
+   * case — so an authored summon over MCP counted nothing while the same summon
+   * over HTTP counted one. HTTP gates on `src=summon` with `via` optional; this
+   * is the MCP equivalent.
+   */
+  summoned?: boolean;
 }
 
 export interface PublicSkill {

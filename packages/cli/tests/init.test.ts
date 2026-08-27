@@ -25,9 +25,12 @@ test("init --print emits the router skill with the @handle summon flow", async (
     assert.equal(res.status, 0, res.stderr);
     // It is the router skill...
     assert.match(res.stdout, /^---\nname: skillet\n/);
-    // ...carrying the @handle summon flow this feature added.
-    assert.match(res.stdout, /Summon a handle/);
-    assert.match(res.stdout, /authors\/\{handle\}\/summon/);
+    // ...carrying the handle branch. The stub names the verb rather than
+    // inlining the summon flow: that prose now rides `route summon`'s response,
+    // so it costs nothing on a bare /skillet that will never summon.
+    assert.match(res.stdout, /skillet route summon/);
+    assert.match(res.stdout, /skillet route start/);
+    assert.doesNotMatch(res.stdout, /authors\/\{handle\}\/summon/);
     // --print must not create the skillet skill dir under HOME.
     const home = spawnSync("ls", [join(root, ".claude", "skills")], { encoding: "utf8" });
     assert.notEqual(home.status, 0, "init --print must not write any skill files");

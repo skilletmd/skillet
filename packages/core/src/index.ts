@@ -94,8 +94,11 @@ export {
   listRouteManifest,
   recordRouteInvocation,
   recordSkillRoute,
+  resolveRouteBody,
+  ROUTE_RESPONSE_MAX_BYTES,
   RouteSkillError,
   skillRefFromEntry,
+  type RouteBody,
   type RouteManifestEntry,
   type RouteInvocationOptions,
   type RouteSurface,
@@ -103,9 +106,18 @@ export {
   type RouteSkillErrorCode,
 } from "./commands/route.js";
 export {
+  summonHandle,
+  searchPublicSkills,
+  fetchSummonBody,
+  type SummonCandidate,
+  type SummonResult,
+} from "./commands/summon.js";
+export {
   installRouteHook,
   installRouteHooksForRuntimes,
   hookRuntimesFromDetected,
+  canInjectContext,
+  CONTEXT_INJECTING_RUNTIMES,
   isHookCapableRuntime,
   installCursorRouteHook,
   type RouteHookInstallOptions,

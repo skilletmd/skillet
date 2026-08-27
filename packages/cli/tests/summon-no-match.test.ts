@@ -2,13 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { routeInstructions } from "../src/route-instructions.js";
 import test from "node:test";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const SKILL = readFileSync(
-  join(__dirname, "..", "bundled-skills", "skillet-route", "SKILL.md"),
-  "utf8",
-);
+const SKILL = routeInstructions("summon");
 
 // The added summon no-match handler: from its heading to the next `### `.
 const start = SKILL.indexOf("### When the handle has nothing that fits");
@@ -24,14 +21,18 @@ test("U1: summon no-match handler exists and the dead-end branches route into it
 });
 
 test("U1: redirect searches cross-author via the public endpoint with the summon-fallback source", () => {
-  assert.match(SECTION, /\/api\/v1\/search\?q=<keywords>&types=skills/);
-  assert.match(SECTION, /x-skillet-search-source: summon-fallback/);
+  assert.match(SECTION, /skillet route search <keyword\.\.\.>/);
+  const client = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "..", "..", "core", "src", "commands", "summon.ts"),
+    "utf8",
+  );
+  assert.match(client, /\/search\?q=/);
+  assert.match(client, /"x-skillet-search-source": "summon-fallback"/);
   // Keyword composition, never the raw task text.
   assert.match(SECTION, /never the raw\s+task text/);
 });
 
 test("U1: the trust menu leads with who the person is and attributes the real author", () => {
-  assert.match(SECTION, /\/api\/v1\/authors\/\{author\}/);
   assert.match(SECTION, /bio/);
   assert.match(SECTION, /total_installs/);
   assert.match(SECTION, /1\) Summon @<author>/);

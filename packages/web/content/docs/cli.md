@@ -78,6 +78,10 @@ The full device surface, generated from the CLI's own command registration. The 
 | `skillet route manifest` | List kit skills for agent routing (metadata only, no SKILL.md bodies) |
 | `skillet route begin` | Record a /skillet invocation (metadata only) |
 | `skillet route hook` | Agent hook entrypoint for /skillet |
+| `skillet route start` | Begin a local-kit route: candidates plus the rules for picking one |
+| `skillet route summon` | Route against a handle's public kit, fetched live. No install, no account |
+| `skillet route search` | Search every author's public skills, for the summon fall-through |
+| `skillet route use` | Load a picked skill and record the route |
 | `skillet route record` | Record a routed skill pick |
 | `skillet pending` | Skills waiting for your review, with their diffs |
 | `skillet approve` | Approve a skill's waiting update and apply it |
@@ -195,7 +199,7 @@ Read/status commands accept `--json`. Shapes are stable per command.
 
 **`skillet sync --check --json`** uses the same auth envelope when unpaired. **`skillet scan --json`** and **`skillet status --json`** share the same scan-report shape; exit 1 when `hasQuarantined` is true.
 
-**`skillet search <keyword...> --json`** searches the public library and needs no pairing. Each keyword is one literal-substring query (at most three; a fourth exits **2**); results merge across keywords, ranked by how many queries matched. The envelope is `{ ok: true, data: { results, failedQueries, queries } }`, where each result carries `ref`, `description`, `install_count`, `score`, `category`, an absolute `url`, and `installed` (already in your kit). Zero matches is success with an empty `results`; every query failing (a `429` rate limit and `5xx` count as failures, not empty results) exits **1** with `{ ok: false, code: "search_failed" }`. The `/skillet` router calls this on a whiff and passes `--source route-skill`, a fixed content-free marker; the query keywords themselves are all that leaves your machine, and only after you agree to the search.
+**`skillet search <keyword...> --json`** searches the public library and needs no pairing. Each keyword is one literal-substring query (at most three; a fourth exits **2**); results merge across keywords, ranked by how many queries matched. The envelope is `{ ok: true, data: { results, failedQueries, queries } }`, where each result carries `ref`, `description`, `install_count`, `score`, `category`, an absolute `url`, and `installed` (already in your kit). Zero matches is success with an empty `results`; every query failing (a `429` rate limit and `5xx` count as failures, not empty results) exits **1** with `{ ok: false, code: "search_failed" }`. The `/skillet` router calls this on a whiff and passes `--source route-skill`, a fixed content-free marker. The search runs without asking: the router names the keywords it sent in the line that reports the result, so what left your machine is visible after the fact rather than gated before it. There is no opt-out. The keywords are bounded to short generic capability terms, never your task text and never identifiers, paths, hostnames, or names; when no generic terms can be composed, the router skips the search instead. Installing anything still takes a number you type.
 
 Example GitHub Actions step:
 

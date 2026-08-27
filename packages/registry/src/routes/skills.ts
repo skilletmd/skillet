@@ -6,6 +6,7 @@ import { toSkillId, tryToSkillId, type SkillId } from '@skillet/protocol/skill-i
 import { blobHash } from '../db/index.js';
 import { catalogUsedByFacesPrisma, countPublicCatalogSkillsPrisma, listPublicCatalogSkillSummariesPrisma, type CatalogSkillSort } from '../lib/catalog-skills.js';
 import { emitSummonEvent } from '../lib/summon-events.js';
+import { isAccountBound } from '../auth/account-bound.js';
 import { catalogListMemo, catalogListMemoKey } from '../lib/catalog-list-memo.js';
 import { setPublicCatalogListCacheHeaders } from '../lib/catalog-list-cache-headers.js';
 import { invalidateCatalogCachesAfterPublish } from '../lib/cloudflare-catalog-purge.js';
@@ -1046,6 +1047,11 @@ export function registerSkillRoutes(app: FastifyInstance, db: DatabaseSync, blob
                 prisma,
                 skillId: version.skill_id,
                 viaHandle: typeof req.query.via === 'string' ? req.query.via : '',
+                // `req.principal` is already resolved: registerAuthDecorator mounts a
+                // global preHandler that attaches it for any valid token and lets each
+                // route decide. Public reads ignore it, so reading it here introduces
+                // no new auth path and cannot reject a request that works today.
+                authed: isAccountBound(req.principal ?? null),
             }).catch(() => {});
         }
         return reply.status(200).send({

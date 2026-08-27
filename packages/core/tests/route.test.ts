@@ -17,7 +17,9 @@ const TEST_ROOT = vi.hoisted(() => {
 
 import {
   BUNDLED_ROUTE_SLUG,
+  BUNDLED_CREATE_SLUG,
   listRouteManifest,
+  resolveRouteBody,
   recordRouteInvocation,
   recordSkillRoute,
   RouteSkillError,
@@ -49,6 +51,17 @@ async function seedSkill(
     updatedAt: now,
     owner: entry.owner,
   });
+}
+
+/** A skill materialized into the store with no kit-state entry, as authored skills are. */
+async function seedStoreOnlySkill(
+  slug: string,
+  name: string,
+  description: string,
+): Promise<void> {
+  const dir = join(TEST_ROOT, ".skillet", "skills", slug);
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, "SKILL.md"), skillMd(name, description));
 }
 
 describe("skillRefFromEntry", () => {
@@ -98,6 +111,81 @@ describe("listRouteManifest", () => {
 
   it("covers AE4: empty kit returns an empty manifest", async () => {
     expect(await listRouteManifest()).toEqual([]);
+  });
+
+  // U10 / R18. Authored skills are materialized into the store without ever
+  // getting a state entry, so a state-only manifest was blind to the user's own
+  // work and `/skillet` whiffed to the library while the match sat on disk.
+  it("covers AE13: includes a store skill kit state never recorded", async () => {
+    await seedStoreOnlySkill("@taylor/gtm-ui", "gtm-ui", "Build sites with Taylor's craft");
+
+    const manifest = await listRouteManifest();
+    expect(manifest.map((e) => e.skillRef)).toEqual(["@taylor/gtm-ui"]);
+    expect(manifest[0]?.name).toBe("gtm-ui");
+    expect(manifest[0]?.description).toBe("Build sites with Taylor's craft");
+    expect(manifest[0]?.owner).toBe("taylor");
+    expect(manifest[0]?.path).toBe(skillContentPath("@taylor/gtm-ui"));
+  });
+
+  it("lists a skill once, preferring kit-state metadata over the store copy", async () => {
+    await seedSkill("@thiago/the-lazy-dm", {
+      name: "The Lazy DM",
+      description: "RPG prep",
+      owner: "thiago",
+    });
+
+    const manifest = await listRouteManifest();
+    expect(manifest).toHaveLength(1);
+    expect(manifest[0]?.name).toBe("The Lazy DM");
+    expect(manifest[0]?.description).toBe("RPG prep");
+  });
+
+  it("still skips a state entry whose content path is missing", async () => {
+    await seedSkill("@thiago/the-lazy-dm", {
+      name: "The Lazy DM",
+      description: "RPG prep",
+      owner: "thiago",
+    });
+    await rm(join(TEST_ROOT, ".skillet", "skills", "@thiago", "the-lazy-dm"), {
+      recursive: true,
+      force: true,
+    });
+
+    expect(await listRouteManifest()).toEqual([]);
+  });
+
+  it("excludes both bundled meta-skills found only on disk", async () => {
+    await seedStoreOnlySkill(BUNDLED_ROUTE_SLUG, "skillet", "router");
+    await seedStoreOnlySkill(BUNDLED_CREATE_SLUG, "skillet-create", "authoring");
+    await seedStoreOnlySkill("@taylor/gtm-ui", "gtm-ui", "craft");
+
+    const manifest = await listRouteManifest();
+    expect(manifest.map((e) => e.skillRef)).toEqual(["@taylor/gtm-ui"]);
+  });
+
+  it("routes an unowned bare-slug store skill", async () => {
+    await seedStoreOnlySkill("screenshot-critique", "screenshot-critique", "critique a UI shot");
+
+    const manifest = await listRouteManifest();
+    expect(manifest.map((e) => e.skillRef)).toEqual(["screenshot-critique"]);
+    expect(manifest[0]?.owner).toBeNull();
+  });
+
+  it("keeps a kit of only authored skills out of the empty-kit path", async () => {
+    for (const slug of ["@taylor/a-skill", "@taylor/b-skill", "@taylor/c-skill"]) {
+      await seedStoreOnlySkill(slug, slug.split("/")[1]!, "authored");
+    }
+
+    const manifest = await listRouteManifest();
+    expect(manifest).toHaveLength(3);
+  });
+
+  it("leaves alphabetical ordering unchanged for skills state already carried", async () => {
+    await seedSkill("@thiago/zeta", { name: "Zeta", description: "z", owner: "thiago" });
+    await seedSkill("@thiago/alpha", { name: "Alpha", description: "a", owner: "thiago" });
+
+    const manifest = await listRouteManifest();
+    expect(manifest.map((e) => e.skillRef)).toEqual(["@thiago/alpha", "@thiago/zeta"]);
   });
 });
 
@@ -210,5 +298,83 @@ describe("recordRouteInvocation", () => {
 
     expect(events[0]?.meta?.runtime).toBe("cursor---prompt-");
     expect(events[0]?.meta?.source).toBe("hook-with-spaces");
+  });
+});
+
+// U5 / R9, R10. The gate is the hash that actually reached disk. `hash`
+// advances during pull BEFORE materialize, so comparing on it would report a
+// match while the bytes on disk are a different version, and the agent would
+// get stale instructions labelled as the author's current skill.
+describe("resolveRouteBody — summon path", () => {
+  beforeEach(async () => {
+    await mkdir(join(TEST_ROOT, ".skillet", "skills"), { recursive: true });
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await rm(TEST_ROOT, { recursive: true, force: true });
+  });
+
+  it("covers AE2: reads locally and makes no body fetch when materialized_hash matches", async () => {
+    await seedSkill("@thiago/the-lazy-dm", {
+      name: "The Lazy DM",
+      description: "RPG prep",
+      owner: "thiago",
+    });
+    await upsertSkill({
+      slug: "@thiago/the-lazy-dm",
+      name: "The Lazy DM",
+      description: "RPG prep",
+      version: 1,
+      hash: "sha256:current",
+      materialized_hash: "sha256:current",
+      source: "registry",
+      importedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      owner: "thiago",
+    } as never);
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ files: {} }), { status: 200 }),
+    );
+    const res = await resolveRouteBody("@thiago/the-lazy-dm", {
+      summon: { hash: "sha256:current" },
+    });
+
+    expect(res?.body).toContain("The Lazy DM");
+    // The marker still fires (author credit), but no body came over the wire.
+    const bodyFetches = fetchSpy.mock.calls.filter((c) => !String(c[0]).includes("src=summon"));
+    expect(bodyFetches).toHaveLength(0);
+  });
+
+  it("fetches when the local copy was persisted but never materialized", async () => {
+    await seedSkill("@thiago/the-lazy-dm", {
+      name: "The Lazy DM",
+      description: "stale on disk",
+      owner: "thiago",
+    });
+    await upsertSkill({
+      slug: "@thiago/the-lazy-dm",
+      name: "The Lazy DM",
+      description: "RPG prep",
+      version: 1,
+      // `hash` matches the registry, `materialized_hash` does not exist: the
+      // pull advanced but materialize never landed.
+      hash: "sha256:current",
+      source: "registry",
+      importedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      owner: "thiago",
+    } as never);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ files: { "SKILL.md": { data: "# fetched current" } } }), {
+        status: 200,
+      }),
+    );
+    const res = await resolveRouteBody("@thiago/the-lazy-dm", {
+      summon: { hash: "sha256:current" },
+    });
+    expect(res?.body).toBe("# fetched current");
   });
 });
