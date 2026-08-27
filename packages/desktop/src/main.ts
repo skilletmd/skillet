@@ -2671,12 +2671,9 @@ let editingDeviceLabel = false
 // spent prompt just silently no-ops).
 let trayAxAsked = false
 
-const PERMISSION_STATE_TEXT: Record<string, string> = {
-  allowed: 'Allowed',
-  'not-allowed': 'Not allowed',
-  'needs-access': 'Needs access',
-  denied: 'Access denied',
-}
+// Shown on the right of a row that has nothing to do. A row WITH an action puts
+// its button there instead, and that button's label already names the move.
+const PERMISSION_SETTLED_TEXT = 'Allowed'
 
 /**
  * Permissions in Settings (U4/R4): what Skillet is allowed to do on this
@@ -2708,9 +2705,13 @@ function renderPermissionsBlock(): string {
       const busy = traySyncing && row.action?.kind === 'folder-sync'
       const action = row.action
         ? `<button type="button" class="set-action${problem ? ' set-action-fix' : ''}" data-perm="${escapeHtml(row.action.kind)}" data-anchor="${escapeHtml(row.action.anchor ?? '')}"${busy ? ' disabled' : ''}>${escapeHtml(busy ? 'Checking…' : row.action.label)}</button>`
-        : `<span class="set-perm-ok">${escapeHtml(PERMISSION_STATE_TEXT[row.state] ?? '')}</span>`
-      const sub = row.state === 'allowed' ? row.detail : (PERMISSION_STATE_TEXT[row.state] ?? row.detail)
-      return `<div class="set-row set-perm-row${problem ? ' needs' : ''}"><div class="set-account-col"><span class="nm">${escapeHtml(row.label)}</span><span class="set-account-sub${problem ? ' set-perm-warn' : ''}">${escapeHtml(sub)}</span></div><span class="spacer"></span>${action}</div>`
+        : `<span class="set-perm-ok">${escapeHtml(PERMISSION_SETTLED_TEXT)}</span>`
+      // The subtitle is always the row's detail. It used to substitute a bare
+      // state word ("Not allowed", "Needs access") for every non-allowed row,
+      // which threw away the one line explaining what the permission is FOR
+      // and left an optional capability reading like a fault. The state is
+      // already carried by the caution dot and the action's own label.
+      return `<div class="set-row set-perm-row${problem ? ' needs' : ''}"><div class="set-account-col"><span class="nm">${escapeHtml(row.label)}</span><span class="set-account-sub${problem ? ' set-perm-warn' : ''}">${escapeHtml(row.detail)}</span></div><span class="spacer"></span>${action}</div>`
     })
     .join('')
   return `<div class="set-perms"><div class="set-perms-head">Permissions</div>${body}</div>`
