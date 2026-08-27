@@ -270,22 +270,71 @@ test("route use hands back a path instead of truncating an oversized skill", asy
 });
 
 // U6 / R7, R8. The prompt that used to gate the library search is gone; the
-// disclosure line replaces it, and the numbered menu still gates installs.
-test("the pick block searches without asking, bounds the payload, and gates installs", async () => {
+// disclosure line replaces it, and the payload bound is what keeps that honest.
+test("the pick block searches without asking and bounds the payload", async () => {
   await withTestKit(async (env) => {
     await seedKitSkill(env.HOME!);
     const res = runCli(["route", "start"], env);
     const { instructions } = JSON.parse(res.stdout) as { instructions: string };
 
     assert.match(instructions, /Do not ask first/);
-    assert.match(instructions, /skillet search --json --source route-skill/);
+    assert.match(instructions, /skillet route search/);
     assert.match(instructions, /names the keywords you sent/);
     // The payload bound is the substitute for the removed gate.
     assert.match(instructions, /Never send the task text/);
     assert.match(instructions, /credential-shaped/);
-    // Install consent survives.
-    assert.match(instructions, /A number is the only thing that installs/);
+  });
+});
+
+// The library fall-through is value-first: a public skill is READ for the task,
+// never installed, so there is nothing to approve before it runs. Installing is
+// the separate move, and only the user's own words start it.
+test("the library block uses a skill read-only and never installs to try it", async () => {
+  await withTestKit(async (env) => {
+    await seedKitSkill(env.HOME!);
+    const res = runCli(["route", "start"], env);
+    const { instructions } = JSON.parse(res.stdout) as { instructions: string };
+
+    // Read-only use, the same call the summon path makes.
+    assert.match(instructions, /skillet route use <ref> --hash <hash>/);
+    assert.match(instructions, /Nothing is installed by any of this/);
+    // One candidate, not a menu the user cannot rank.
+    assert.match(instructions, /Pick the single best result/);
+    assert.match(instructions, /Do not offer a menu/);
+    // The author is named before the work, not after.
+    assert.match(instructions, /Name the author before you use it/);
+    // Installing survives as a separate, user-initiated step.
     assert.match(instructions, /skillet add <ref> -y/);
+    assert.match(instructions, /always the user's sentence that starts it/);
+    // And it is never the price of finding out whether a skill helps.
+    assert.doesNotMatch(instructions, /A number is the only thing that installs/);
+  });
+});
+
+// An empty kit is the same situation as a kit with nothing fitting: the user
+// asked for something their own kit cannot answer. It used to be the one path
+// that returned an error, on the first `/skillet` anyone ever types.
+test("an empty kit routes to the library instead of erroring out", async () => {
+  await withTestKit(async (env) => {
+    const res = runCli(["route", "start"], env);
+    assert.equal(res.status, 0);
+
+    const parsed = JSON.parse(res.stdout) as {
+      ok: boolean;
+      error?: string;
+      candidates: unknown[];
+      instructions: string;
+    };
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.error, undefined);
+    assert.deepEqual(parsed.candidates, []);
+
+    // It gets the library block, and is told not to report the empty kit.
+    assert.match(parsed.instructions, /skillet route search/);
+    assert.match(parsed.instructions, /skillet route use <ref> --hash <hash>/);
+    assert.match(parsed.instructions, /not an error/);
+    // No chore list, which is what the old kit_empty message was.
+    assert.doesNotMatch(parsed.instructions, /Run `skillet sync`/);
   });
 });
 

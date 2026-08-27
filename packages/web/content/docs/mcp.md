@@ -178,6 +178,27 @@ The last three reach skills you have not added, so they are served only by the
 hosted link. `skillet mcp` runs offline against your local store and does not
 advertise them.
 
+### The `/skillet` command
+
+The server also advertises one MCP **prompt**, named `skillet`. Tools are
+model-controlled — the client never shows them to you and the model decides when
+to call one. Prompts are the user-controlled half of the protocol, so a client
+surfaces them as a command you pick yourself.
+
+| Prompt | Argument | What it does |
+| --- | --- | --- |
+| `skillet` | `task` (optional) | Finds the skill that fits and applies it, crediting the author. Lead the task with a handle to use that person's published skills |
+
+That is what makes `/skillet` a real command on a chat surface rather than
+something the model has to infer. It is the same verb as `/skillet` in an agent
+and the menubar app: one name everywhere, and the same attribution and consent
+rules on every transport.
+
+Where the client puts it varies. Claude Code lists MCP prompts as
+`/mcp__<server>__<prompt>`; other clients show the prompt's title in their own
+command menu. The kit tools work with or without it — the prompt makes the
+invocation visible and deliberate, it does not gate anything.
+
 Each file in a skill is also exposed as an MCP **resource** under the URI scheme `skillet://{owner}/{slug}/{path}`. The SKILL.md body is the headline resource; supporting files are siblings. Metadata is cheap to list, the body is fetched on demand: the same progressive-disclosure model skills use everywhere else.
 
 ## Troubleshooting

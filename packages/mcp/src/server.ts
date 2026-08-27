@@ -7,6 +7,8 @@
  *   ping                → pong
  *   tools/list          → TOOLS
  *   tools/call          → callTool()
+ *   prompts/list        → the `/skillet` verb, as a client-surfaced command
+ *   prompts/get         → its messages
  *   resources/list      → listResources()
  *   resources/read      → handleReadResource()
  */
@@ -32,6 +34,7 @@ import {
   listResources,
   TOOLS,
 } from "./handler.js";
+import { getPrompt, listPrompts } from "./prompts.js";
 import { visibleSkills } from "./auth.js";
 import {
   localSkillSource,
@@ -52,6 +55,11 @@ const DEFAULT_SERVER_VERSION = "0.1.0";
 const CAPABILITIES = {
   tools: {},
   resources: {},
+  /**
+   * `listChanged: false` is the honest answer: the prompt set is static, so we
+   * never emit notifications/prompts/list_changed and must not claim we might.
+   */
+  prompts: { listChanged: false },
 };
 
 /**
@@ -172,6 +180,21 @@ export async function handleMessage(
         }
         const result = await callTool(p.name, p.arguments ?? {}, skills, source, opts.discovery);
         return ok(id, result);
+      }
+
+      case "prompts/list":
+        return ok(id, { prompts: listPrompts(Boolean(opts.discovery)) });
+
+      case "prompts/get": {
+        const p = params as { name?: string; arguments?: unknown } | null;
+        if (!p?.name) {
+          return err(id, ERRC.INVALID_PARAMS, "prompts/get requires `name`");
+        }
+        const prompt = getPrompt(p.name, p.arguments ?? {}, Boolean(opts.discovery));
+        if (!prompt) {
+          return err(id, ERRC.INVALID_PARAMS, `Unknown prompt: ${p.name}`);
+        }
+        return ok(id, prompt);
       }
 
       case "resources/list": {
