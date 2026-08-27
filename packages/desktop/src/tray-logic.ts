@@ -533,6 +533,143 @@ export function accessibilityActionLabel(asked: boolean): string {
   return asked ? 'Open System Settings' : 'Allow access'
 }
 
+// ── Permissions block (Settings) ────────────────────────────────────────────
+// One place that says what Skillet is allowed to do on this machine, present
+// whether or not anything is wrong. Before this the app never reported its own
+// permissions: accessibility state surfaced only as a conditional button in the
+// Agents view, and folder state only as a notice you could dismiss and never
+// find again.
+//
+// Every state-to-action mapping lives here so the Settings block and the Synced
+// folders rows cannot drift, and so the mapping is testable without a webview.
+
+export type PermissionState = 'allowed' | 'not-allowed' | 'needs-access' | 'denied'
+
+export type PermissionActionKind =
+  | 'ax-request'
+  | 'folder-sync'
+  | 'folder-retry'
+
+export type PermissionAction = {
+  label: string
+  kind: PermissionActionKind
+  /** The protected folder the action applies to (folder actions only). */
+  anchor?: string
+}
+
+export type PermissionRow = {
+  /** 'accessibility', or `folder:<anchor>` — stable per surface. */
+  id: string
+  label: string
+  detail: string
+  state: PermissionState
+  /** Null only when the state needs nothing done (R3). */
+  action: PermissionAction | null
+}
+
+/** One detected runtime as the tray sees it, with the folder-access block
+ *  `skillet agents --json` reports. `access` is optional: an older bundled
+ *  sidecar does not send it, and that must degrade to today's behaviour rather
+ *  than to a false alarm. */
+export type PermissionAgentLike = {
+  name: string
+  label?: string
+  access?: {
+    protected: boolean
+    grant: string
+    anchor: string | null
+  }
+}
+
+function folderName(anchor: string): string {
+  const parts = anchor.split('/').filter(Boolean)
+  return parts[parts.length - 1] ?? anchor
+}
+
+export function permissionRows(input: {
+  isMac: boolean
+  accessibilityGranted: boolean
+  accessibilityAsked: boolean
+  agents: PermissionAgentLike[]
+}): PermissionRow[] {
+  // TCC and Accessibility are macOS mechanisms. A Linux or Windows install has
+  // nothing to show and nothing to act on.
+  if (!input.isMac) return []
+
+  const rows: PermissionRow[] = [
+    input.accessibilityGranted
+      ? {
+          id: 'accessibility',
+          label: 'Paste into other apps',
+          detail: 'Skillet can drop a skill into whatever you are typing in.',
+          state: 'allowed',
+          action: null,
+        }
+      : {
+          id: 'accessibility',
+          label: 'Paste into other apps',
+          detail: 'Needed so the shortcut can paste a skill for you.',
+          state: 'not-allowed',
+          action: {
+            label: accessibilityActionLabel(input.accessibilityAsked),
+            kind: 'ax-request',
+          },
+        },
+  ]
+
+  // Group by anchor, not by agent. macOS scopes a grant to the whole protected
+  // folder, so two agents inside ~/Documents share one grant: two rows would
+  // offer the same thing twice and the second press would do nothing.
+  const byAnchor = new Map<string, { agents: string[]; grant: string }>()
+  for (const agent of input.agents) {
+    const access = agent.access
+    if (!access?.protected || !access.anchor) continue
+    const entry = byAnchor.get(access.anchor)
+    const label = agent.label ?? agent.name
+    if (entry) {
+      entry.agents.push(label)
+      // Worst state wins: a denial anywhere under the anchor is the anchor's
+      // state, because it is the anchor macOS refused.
+      if (access.grant === 'suspended') entry.grant = 'suspended'
+      else if (entry.grant === 'active' && access.grant === 'none') entry.grant = 'none'
+    } else {
+      byAnchor.set(access.anchor, { agents: [label], grant: access.grant })
+    }
+  }
+
+  for (const [anchor, { agents, grant }] of byAnchor) {
+    const who = agents.join(', ')
+    const label = `${folderName(anchor)} folder`
+    if (grant === 'active') {
+      rows.push({
+        id: `folder:${anchor}`,
+        label,
+        detail: `Skillet can sync ${who} here.`,
+        state: 'allowed',
+        action: null,
+      })
+    } else if (grant === 'suspended') {
+      rows.push({
+        id: `folder:${anchor}`,
+        label,
+        detail: `Access was refused, so ${who} is not syncing.`,
+        state: 'denied',
+        action: { label: 'Try again', kind: 'folder-retry', anchor },
+      })
+    } else {
+      rows.push({
+        id: `folder:${anchor}`,
+        label,
+        detail: `${who} lives here and needs your permission.`,
+        state: 'needs-access',
+        action: { label: 'Sync now', kind: 'folder-sync', anchor },
+      })
+    }
+  }
+
+  return rows
+}
+
 /**
  * Hero status text override (R7): a resting synced hero with a parked folder
  * must not read as plain "Synced" — the status line says what's missing.

@@ -1127,6 +1127,57 @@ fn open_privacy_pane(anchor: &str) {
         .spawn();
 }
 
+/// The `tccutil` service name for a protected-folder anchor.
+///
+/// A fixed mapping, not string interpolation. The anchor arrives from the
+/// webview, and this is what keeps it out of the command's argument list: an
+/// unrecognised path maps to None and no process is spawned at all.
+fn tccutil_service_for(anchor: &str) -> Option<&'static str> {
+    match std::path::Path::new(anchor).file_name()?.to_str()? {
+        "Documents" => Some("SystemPolicyDocumentsFolder"),
+        "Desktop" => Some("SystemPolicyDesktopFolder"),
+        "Downloads" => Some("SystemPolicyDownloadsFolder"),
+        _ => None,
+    }
+}
+
+/// Re-arm the macOS folder-access prompt for one protected folder.
+///
+/// Once a grant is refused, TCC records the denial and never asks again, so
+/// "try again" is not something the app can do by retrying its own work.
+/// Resetting this bundle's own entry for that service is what makes the next
+/// user-initiated sync able to prompt at all.
+///
+/// Best-effort by design. `tccutil` needs no elevation to reset an app's own
+/// entries today, but it is a shell-out to a tool Apple has tightened before,
+/// and it exits non-zero when there is no entry to reset. The caller always
+/// falls through to System Settings, so the button lands somewhere useful
+/// whatever this returns.
+///
+/// No marker bookkeeping: a successful user-initiated read afterwards calls
+/// recordTccGrant, which clears the suspension in tcc-access.json on its own.
+#[tauri::command]
+fn reset_folder_access(app: tauri::AppHandle, anchor: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let service = tccutil_service_for(&anchor).ok_or("not a protected folder")?;
+        let bundle_id = app.config().identifier.clone();
+        let status = hidden_command("tccutil")
+            .args(["reset", service, &bundle_id])
+            .status()
+            .map_err(|e| e.to_string())?;
+        if !status.success() {
+            return Err(format!("tccutil exited {status}"));
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (app, anchor);
+        Err("folder access is a macOS concept".to_string())
+    }
+}
+
 /// Files and Folders — the recovery route for a REFUSED folder grant.
 ///
 /// macOS records a denial and never prompts again, so the tray's needs-access
@@ -1576,6 +1627,7 @@ pub fn run() {
             request_accessibility,
             accessibility_asked,
             open_folder_access_settings,
+            reset_folder_access,
             finish_onboarding
         ])
         .setup(|app| {
@@ -1692,6 +1744,41 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Skillet");
+}
+
+#[cfg(test)]
+mod folder_access_tests {
+    use super::tccutil_service_for;
+
+    // The anchor comes from the webview. Only the three real protected folders
+    // may reach a spawned command, and they reach it as a fixed service name,
+    // never as the caller's own string.
+    #[test]
+    fn maps_each_protected_folder_to_its_service() {
+        assert_eq!(
+            tccutil_service_for("/Users/x/Documents"),
+            Some("SystemPolicyDocumentsFolder")
+        );
+        assert_eq!(
+            tccutil_service_for("/Users/x/Desktop"),
+            Some("SystemPolicyDesktopFolder")
+        );
+        assert_eq!(
+            tccutil_service_for("/Users/x/Downloads"),
+            Some("SystemPolicyDownloadsFolder")
+        );
+    }
+
+    #[test]
+    fn refuses_anything_else() {
+        assert_eq!(tccutil_service_for("/Users/x/.claude/skills"), None);
+        assert_eq!(tccutil_service_for("/Users/x/Documents/nested"), None);
+        assert_eq!(tccutil_service_for(""), None);
+        assert_eq!(tccutil_service_for("/"), None);
+        // Shell metacharacters are not special to Command, but they must not
+        // resolve to a service either.
+        assert_eq!(tccutil_service_for("/tmp/Documents; rm -rf /"), None);
+    }
 }
 
 #[cfg(test)]

@@ -43,6 +43,7 @@ import {
   eventToAccel,
   heroCardState,
   accessibilityActionLabel,
+  permissionRows,
   heroStatusOverride,
   humanizeAppError,
   palettePhaseFrom,
@@ -119,6 +120,9 @@ type Adapter = {
   parked?: boolean
   /** The macOS grant was refused or revoked; System Settings is the fix. */
   parkedDenied?: boolean
+  /** Folder-access state from `skillet agents --json` (U2). Absent on an older
+   *  bundled sidecar — treat that as unprotected, never as a problem. */
+  access?: { protected: boolean; grant: string; anchor: string | null }
 }
 // Only the count of pending updates is ever surfaced in the tray (badge, CTA,
 // pulse) — review happens on the web, so the per-field diff shape isn't consumed
@@ -346,13 +350,19 @@ async function getDetectedAgents(): Promise<Adapter[]> {
   }
   try {
     const parsed = JSON.parse(await invoke<string>('detect_runtimes')) as {
-      runtimes?: { name: string; label?: string; targetDir?: string }[]
+      runtimes?: {
+        name: string
+        label?: string
+        targetDir?: string
+        access?: { protected: boolean; grant: string; anchor: string | null }
+      }[]
     }
     return (parsed.runtimes ?? []).map((s) => ({
       name: s.name,
       status: 'materialized',
       targetDir: s.targetDir,
       label: s.label,
+      ...(s.access ? { access: s.access } : {}),
     }))
   } catch {
     return []
@@ -2633,6 +2643,69 @@ function paintSyncedFolders(): void {
 // no-ops while it is set (plan 2026-07-08-002, U5 guard a).
 let editingDeviceLabel = false
 
+// Whether the one-per-app Accessibility prompt is already spent. Refreshed
+// whenever Settings paints; false is the safe default (offers to allow, and a
+// spent prompt just silently no-ops).
+let trayAxAsked = false
+
+const PERMISSION_STATE_TEXT: Record<string, string> = {
+  allowed: 'Allowed',
+  'not-allowed': 'Not allowed',
+  'needs-access': 'Needs access',
+  denied: 'Access denied',
+}
+
+/**
+ * Permissions in Settings (U4/R4): what Skillet is allowed to do on this
+ * machine, present whether or not anything is wrong. This is the durable
+ * surface a denial can be recovered from — the home-view notice is transient
+ * and dismissible, so before this a person who denied something and moved on
+ * had no path back.
+ */
+function renderPermissionsBlock(): string {
+  const rows = permissionRows({
+    isMac: isMacOsDesktop(),
+    accessibilityGranted: lastGranted,
+    accessibilityAsked: trayAxAsked,
+    agents: trayDetectedAgents ?? [],
+  })
+  if (rows.length === 0) return ''
+  const body = rows
+    .map((row) => {
+      const action = row.action
+        ? `<button type="button" class="set-action" data-perm="${escapeHtml(row.action.kind)}" data-anchor="${escapeHtml(row.action.anchor ?? '')}">${escapeHtml(row.action.label)}</button>`
+        : `<span class="set-perm-ok">${escapeHtml(PERMISSION_STATE_TEXT[row.state] ?? '')}</span>`
+      return `<div class="set-row set-perm-row"><div class="set-account-col"><span class="nm">${escapeHtml(row.label)}</span><span class="set-account-sub">${escapeHtml(row.state === 'allowed' ? row.detail : PERMISSION_STATE_TEXT[row.state] ?? row.detail)}</span></div><span class="spacer"></span>${action}</div>`
+    })
+    .join('')
+  return `<div class="set-perms"><div class="set-perms-head">Permissions</div>${body}</div>`
+}
+
+/**
+ * Try again on a refused folder grant (U5/R2/R3).
+ *
+ * macOS never re-prompts after a denial, so the reset is what makes the next
+ * user-initiated sync able to ask at all. Every branch ends somewhere useful:
+ * if the reset fails, or the sync still comes back denied, the same press
+ * opens System Settings rather than leaving the row exactly as it was.
+ */
+async function retryFolderAccess(anchor: string | null): Promise<void> {
+  if (!anchor) return
+  let reset = true
+  try {
+    await invoke('reset_folder_access', { anchor })
+  } catch {
+    reset = false
+  }
+  if (reset) {
+    // User-initiated: the only invocation class assessTccRoot lets probe.
+    await runSync({ background: false })
+    const stillDenied = (trayAdapters ?? []).some((a) => a.parkedDenied === true)
+    if (!stillDenied) return
+  }
+  void invoke('open_folder_access_settings')
+}
+
 function paintSettings() {
   if (editingDeviceLabel) return
   const auth = trayAuthNow()
@@ -2661,6 +2734,7 @@ function paintSettings() {
       <div class="set-body">
         ${accountBlock}
         ${deviceBlock}
+        ${renderPermissionsBlock()}
         <div class="set-links">
           <button type="button" class="set-link" id="setweb"><span class="nm">Open web</span><span class="spacer"></span><span class="set-ext">${ICON.arrowUpRight}</span></button>
           <button type="button" class="set-link" id="setdocs"><span class="nm">Help &amp; docs</span><span class="spacer"></span><span class="set-ext">${ICON.arrowUpRight}</span></button>
@@ -2683,6 +2757,27 @@ function paintSettings() {
   document.getElementById('update-stuck')?.addEventListener('click', () =>
     invoke('open_web', { path: '/install' }),
   )
+  // Permissions actions. Every state that is not "allowed" carries one, and it
+  // has to land somewhere useful: a folder with no grant gets the user-initiated
+  // sync (the invocation class allowed to probe), a REFUSED one gets a reset
+  // plus re-ask, because macOS never re-prompts on its own.
+  document.querySelectorAll<HTMLElement>('.set-perm-row [data-perm]').forEach((el) => {
+    el.onclick = () => {
+      const kind = el.dataset.perm
+      const anchor = el.dataset.anchor || null
+      if (kind === 'ax-request') void invoke('request_accessibility')
+      else if (kind === 'folder-sync') void runSync({ background: false })
+      else if (kind === 'folder-retry') void retryFolderAccess(anchor)
+    }
+  })
+  // The prompt-spent flag decides the accessibility label, so refresh it and
+  // repaint if it changed under us.
+  void axAsked().then((asked) => {
+    if (asked !== trayAxAsked && trayView === 'settings') {
+      trayAxAsked = asked
+      paintSettings()
+    }
+  })
   document.getElementById('settingslogout')?.addEventListener('click', () => void signOutFromTray())
   document.getElementById('setweb')?.addEventListener('click', () => invoke('open_web'))
   const openDeviceRename = () => {

@@ -445,6 +445,16 @@ button.link { appearance: none; -webkit-appearance: none; background: none; bord
 .set-row { display: flex; align-items: center; padding: 8px 16px; }
 .set-row .nm { font-size: 13px; font-weight: 500; }
 .set-account { margin-top: 4px; padding-top: 10px; }
+/* Permissions — a standing block, not an alert. It reads as an inventory when
+   everything is fine, which is the point: a denial has to be findable later,
+   not only in the moment it happens. */
+.set-perms { margin-top: 10px; }
+.set-perms-head {
+  padding: 0 16px 2px; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3, var(--ink-2));
+}
+.set-perm-row { padding-top: 6px; padding-bottom: 6px; }
+.set-perm-ok { font-size: 12px; color: var(--ink-2); }
 /* Navigation rows (Open web, Help & docs) — full-width tappable rows with an
    external-link glyph, set off from the account block by spacing (no hairline). */
 .set-links { margin-top: 10px; }

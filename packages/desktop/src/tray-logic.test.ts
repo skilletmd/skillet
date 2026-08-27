@@ -17,6 +17,7 @@ import {
   eventToAccel,
   heroCardState,
   accessibilityActionLabel,
+  permissionRows,
   heroStatusOverride,
   humanizeAppError,
   palettePhaseFrom,
@@ -30,6 +31,7 @@ import {
   uploadOutcome,
   syncKitsFromListFallback,
   type CustomizedRow,
+  type PermissionAgentLike,
   type KitStatus,
   type Skill,
   type SyncKitGroupJson,
@@ -350,6 +352,166 @@ describe('accessibilityActionLabel', () => {
   it('never uses an em-dash (product copy rule)', () => {
     expect(accessibilityActionLabel(false)).not.toContain('—')
     expect(accessibilityActionLabel(true)).not.toContain('—')
+  })
+})
+
+// U4/R3/R4/R12: Settings carries a Permissions block that is present whether or
+// not anything is wrong, and every row with a problem carries an action that
+// can change that state. Before this, nothing in the app ever reported which
+// permissions Skillet held; folder state existed only as a dismissible notice.
+describe('permissionRows', () => {
+  const agent = (over: Partial<PermissionAgentLike> = {}): PermissionAgentLike => ({
+    name: 'claude-code',
+    label: 'Claude Code',
+    ...over,
+  })
+  const base = { isMac: true, accessibilityGranted: true, accessibilityAsked: false }
+  const protectedAt = (anchor: string, grant: string) => ({
+    protected: true,
+    grant,
+    anchor,
+  })
+
+  it('renders nothing off macOS (R12)', () => {
+    expect(
+      permissionRows({
+        ...base,
+        isMac: false,
+        agents: [agent({ access: protectedAt('/Users/x/Documents', 'none') })],
+      }),
+    ).toEqual([])
+  })
+
+  it('is present with nothing wrong, and offers no action then (R4)', () => {
+    const rows = permissionRows({ ...base, agents: [agent()] })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.id).toBe('accessibility')
+    expect(rows[0]!.state).toBe('allowed')
+    expect(rows[0]!.action).toBeNull()
+  })
+
+  it('offers the accessibility ask when it is not granted', () => {
+    const rows = permissionRows({ ...base, accessibilityGranted: false, agents: [agent()] })
+    expect(rows[0]!.state).toBe('not-allowed')
+    expect(rows[0]!.action).toEqual({ label: 'Allow access', kind: 'ax-request' })
+  })
+
+  it('labels the accessibility ask honestly once the prompt is spent', () => {
+    const rows = permissionRows({
+      ...base,
+      accessibilityGranted: false,
+      accessibilityAsked: true,
+      agents: [agent()],
+    })
+    expect(rows[0]!.action?.label).toBe('Open System Settings')
+  })
+
+  it('adds no folder row for an unprotected agent folder', () => {
+    const rows = permissionRows({
+      ...base,
+      agents: [agent({ access: { protected: false, grant: 'none', anchor: null } })],
+    })
+    expect(rows).toHaveLength(1)
+  })
+
+  it('adds no folder row when the sidecar is too old to report access', () => {
+    // Version skew must degrade to today's behaviour, never to a false alarm.
+    const rows = permissionRows({ ...base, agents: [agent({ access: undefined })] })
+    expect(rows).toHaveLength(1)
+  })
+
+  it('offers a sync for a protected folder with no grant yet', () => {
+    const rows = permissionRows({
+      ...base,
+      agents: [agent({ access: protectedAt('/Users/x/Documents', 'none') })],
+    })
+    const folder = rows.find((r) => r.id.startsWith('folder:'))
+    expect(folder?.state).toBe('needs-access')
+    expect(folder?.action).toEqual({
+      label: 'Sync now',
+      kind: 'folder-sync',
+      anchor: '/Users/x/Documents',
+    })
+  })
+
+  it('offers a retry, not another sync, for a denied folder', () => {
+    const rows = permissionRows({
+      ...base,
+      agents: [agent({ access: protectedAt('/Users/x/Documents', 'suspended') })],
+    })
+    const folder = rows.find((r) => r.id.startsWith('folder:'))
+    expect(folder?.state).toBe('denied')
+    expect(folder?.action).toEqual({
+      label: 'Try again',
+      kind: 'folder-retry',
+      anchor: '/Users/x/Documents',
+    })
+  })
+
+  it('reports a granted folder as allowed, with nothing to do', () => {
+    const rows = permissionRows({
+      ...base,
+      agents: [agent({ access: protectedAt('/Users/x/Documents', 'active') })],
+    })
+    const folder = rows.find((r) => r.id.startsWith('folder:'))
+    expect(folder?.state).toBe('allowed')
+    expect(folder?.action).toBeNull()
+  })
+
+  it('collapses two agents under one anchor into one row', () => {
+    // macOS scopes consent per protected folder, so two rows would offer the
+    // same grant twice and a second press would do nothing.
+    const rows = permissionRows({
+      ...base,
+      agents: [
+        agent({ name: 'claude-code', access: protectedAt('/Users/x/Documents', 'none') }),
+        agent({ name: 'codex', label: 'Codex', access: protectedAt('/Users/x/Documents', 'none') }),
+      ],
+    })
+    expect(rows.filter((r) => r.id.startsWith('folder:'))).toHaveLength(1)
+  })
+
+  it('keeps separate anchors as separate rows', () => {
+    const rows = permissionRows({
+      ...base,
+      agents: [
+        agent({ name: 'claude-code', access: protectedAt('/Users/x/Documents', 'none') }),
+        agent({ name: 'codex', label: 'Codex', access: protectedAt('/Users/x/Desktop', 'suspended') }),
+      ],
+    })
+    expect(rows.filter((r) => r.id.startsWith('folder:'))).toHaveLength(2)
+  })
+
+  it('never leaves a problem row without an action (R3)', () => {
+    for (const grant of ['none', 'suspended', 'active']) {
+      for (const granted of [true, false]) {
+        const rows = permissionRows({
+          ...base,
+          accessibilityGranted: granted,
+          agents: [agent({ access: protectedAt('/Users/x/Documents', grant) })],
+        })
+        for (const row of rows) {
+          expect(row.label.length).toBeGreaterThan(0)
+          if (row.state !== 'allowed') {
+            expect(row.action, `${row.id} in state ${row.state} has no action`).toBeTruthy()
+            expect(row.action!.label.length).toBeGreaterThan(0)
+          }
+        }
+      }
+    }
+  })
+
+  it('never uses an em-dash (product copy rule)', () => {
+    const rows = permissionRows({
+      ...base,
+      accessibilityGranted: false,
+      agents: [agent({ access: protectedAt('/Users/x/Documents', 'suspended') })],
+    })
+    for (const row of rows) {
+      expect(row.label).not.toContain('—')
+      expect(row.detail).not.toContain('—')
+      expect(row.action?.label ?? '').not.toContain('—')
+    }
   })
 })
 
