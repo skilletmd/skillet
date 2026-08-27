@@ -5,7 +5,7 @@ import {
   getSkillCatalog,
 } from '@/lib/registry'
 import type { FeedResult } from '@/lib/registry'
-import { getAllPosts } from '@/lib/blog'
+import { getEditorialPosts } from '@/lib/blog'
 import { KitCard } from '@/components/kit-card'
 import { KitCardMenu } from '@/components/kits/kit-card-menu'
 import { kitCardMenu } from '@/lib/kit-card-menu'
@@ -180,7 +180,7 @@ export async function HomeCatalogShelves({
 
 /** The same three posts, sized for the right rail rather than the main column. */
 export function HomeBlogRail() {
-  return <BlogRail posts={getAllPosts().slice(0, 3)} />
+  return <BlogRail posts={getEditorialPosts().slice(0, 3)} />
 }
 
 /** Live registry activity for the logged-out homepage right rail — first page is

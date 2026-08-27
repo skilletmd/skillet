@@ -17,7 +17,13 @@ vi.mock('@/lib/registry', () => ({
   getFeed: vi.fn(),
   getFollowSuggestions: vi.fn(),
 }))
-vi.mock('@/lib/blog', () => ({ getAllPosts: vi.fn(() => []) }))
+// The rail reads editorial posts only, so machine-written stories stay off
+// the homepage. Mock both: a partial module mock makes the missing export
+// undefined, and the call then suspends mid-render rather than failing loudly.
+vi.mock('@/lib/blog', () => ({
+  getAllPosts: vi.fn(() => []),
+  getEditorialPosts: vi.fn(() => []),
+}))
 vi.mock('@/lib/get-session', () => ({ getSession: vi.fn() }))
 vi.mock('@/components/kits/followed-curations-context', () => ({
   FollowedCurationsProvider: ({ children }: { children: React.ReactNode }) => children,

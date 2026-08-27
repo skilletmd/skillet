@@ -40,10 +40,20 @@ const numberFormat = new Intl.NumberFormat('en-US')
 
 /** Rank-row metric with the registry-wide zero rule: a real count reads as
  *  "1,240 installs"; zero never prints "0 installs" (it reads as no traction) —
- *  it shows the "New" status instead, matching the card/rail treatment. */
-function metricCount(value: number, label: string): { metric: string; metricLabel: string } {
+ *  it shows the "New" status instead, matching the card/rail treatment.
+ *
+ *  The label is a singular/plural pair rather than one string. Every rank list
+ *  goes through here, so the count and its noun agree at the one place that
+ *  formats the number, instead of each call site remembering. Two of the three
+ *  call sites did not: a chart mixing skills and kits printed "1 installs" next
+ *  to "1 sub" on adjacent rows of the SAME list. */
+function metricCount(
+  value: number,
+  one: string,
+  many: string,
+): { metric: string; metricLabel: string } {
   return value > 0
-    ? { metric: numberFormat.format(value), metricLabel: label }
+    ? { metric: numberFormat.format(value), metricLabel: value === 1 ? one : many }
     : { metric: 'New', metricLabel: '' }
 }
 
@@ -266,7 +276,8 @@ type ContentRank = {
   ownerAvatarUrl: string | null
   title: string
   value: number
-  metricLabel: string
+  /** Singular/plural noun for `value`, resolved by `metricCount` at render. */
+  metric: readonly [one: string, many: string]
   visual: React.ReactNode
   action: React.ReactNode
 }
@@ -287,7 +298,7 @@ function mergeContent(
     ownerAvatarUrl: s.author_avatar_url ?? avatarByHandle.get(s.author) ?? null,
     title: s.title?.trim() ? s.title : humanizeSlug(s.slug),
     value: s.install_count ?? 0,
-    metricLabel: 'installs',
+    metric: ['install', 'installs'],
     // Logged out there's no add action, so omit it — otherwise the row hides the
     // install count on hover and replaces it with nothing (a blank row).
     action: viewerHandle ? (
@@ -306,7 +317,7 @@ function mergeContent(
     ownerAvatarUrl: k.ownerAvatarUrl ?? avatarByHandle.get(k.owner) ?? null,
     title: k.name,
     value: k.subscriberCount,
-    metricLabel: k.subscriberCount === 1 ? 'sub' : 'subs',
+    metric: ['sub', 'subs'],
     action: viewerHandle ? (
       <KitCardMenu {...kitCardMenu({ kitId: k.id, owner: k.owner, viewerHandle })} />
     ) : undefined,
@@ -377,7 +388,7 @@ export function ChartsRow({
                           }
                           title={p.name}
                           subtitle={<span className="truncate font-medium">@{p.handle}</span>}
-                          {...metricCount(p.totalInstalls, 'installs')}
+                          {...metricCount(p.totalInstalls, 'install', 'installs')}
                           action={
                             viewerHandle == null || viewerHandle === p.handle ? undefined : (
                               <FollowButton
@@ -429,7 +440,7 @@ export function ChartsRow({
                               <span className="truncate font-medium">@{c.owner}</span>
                             </Link>
                           }
-                          {...metricCount(c.value, c.metricLabel)}
+                          {...metricCount(c.value, ...c.metric)}
                           action={c.action}
                         />
                       ))}
