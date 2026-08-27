@@ -1059,12 +1059,55 @@ fn accessibility_granted() -> bool {
     }
 }
 
+/// Marks that this app has already raised the Accessibility prompt once.
+///
+/// macOS shows that prompt at most once per app: every later call to
+/// `application_is_trusted_with_prompt` is a silent no-op. Nothing in the API
+/// reports "already asked" — `application_is_trusted()` is equally false before
+/// the first ask and after a refusal — so the only way to tell a first ask from
+/// a repeat is to remember it. Same shape as the onboarding flag.
+#[cfg(target_os = "macos")]
+fn accessibility_asked_flag() -> std::path::PathBuf {
+    std::path::Path::new(&skillet_home()).join(".skillet-accessibility-asked")
+}
+
+/// Ask for Accessibility, one surface at a time.
+///
+/// This used to fire the native prompt AND open System Settings in the same
+/// breath, so a first-time ask put a system dialog and a settings window on
+/// screen together and made the app look like it was demanding two things.
+/// The redirect was there because a second press does nothing visible, which
+/// is true — but that is a reason to branch, not to always do both.
 #[tauri::command]
 fn request_accessibility() {
     #[cfg(target_os = "macos")]
     {
+        let flag = accessibility_asked_flag();
+        if flag.exists() {
+            // The prompt is spent. Settings is the only surface left.
+            open_privacy_pane("Privacy_Accessibility");
+            return;
+        }
+        if let Some(parent) = flag.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&flag, "1");
         macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
-        open_privacy_pane("Privacy_Accessibility");
+    }
+}
+
+/// Whether the Accessibility prompt has already been spent on this machine.
+/// Surfaces read this to label the action honestly: "Allow" the first time,
+/// "Open System Settings" after.
+#[tauri::command]
+fn accessibility_asked() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        accessibility_asked_flag().exists()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        false
     }
 }
 
@@ -1531,6 +1574,7 @@ pub fn run() {
             open_web,
             accessibility_granted,
             request_accessibility,
+            accessibility_asked,
             open_folder_access_settings,
             finish_onboarding
         ])

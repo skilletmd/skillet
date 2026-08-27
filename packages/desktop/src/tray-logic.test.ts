@@ -16,6 +16,7 @@ import {
   cleanCliError,
   eventToAccel,
   heroCardState,
+  accessibilityActionLabel,
   heroStatusOverride,
   humanizeAppError,
   palettePhaseFrom,
@@ -331,6 +332,24 @@ describe('parkedNoticeCopy', () => {
       expect(copy.detail).not.toContain('—')
       expect(copy.action.label).not.toContain('—')
     }
+  })
+})
+
+// U7/R10: the macOS Accessibility prompt is one-per-app. The old flow fired it
+// AND opened System Settings every time, so a first-time ask put two surfaces
+// on screen at once and a repeat ask promised a prompt that could never appear.
+describe('accessibilityActionLabel', () => {
+  it('offers to allow while a prompt can still appear', () => {
+    expect(accessibilityActionLabel(false)).toBe('Allow access')
+  })
+
+  it('routes to System Settings once the prompt is spent', () => {
+    expect(accessibilityActionLabel(true)).toBe('Open System Settings')
+  })
+
+  it('never uses an em-dash (product copy rule)', () => {
+    expect(accessibilityActionLabel(false)).not.toContain('—')
+    expect(accessibilityActionLabel(true)).not.toContain('—')
   })
 })
 

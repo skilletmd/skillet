@@ -520,6 +520,19 @@ export function parkedNoticeCopy(notice: ParkedNotice): {
   return { title, detail, action }
 }
 
+// ── Accessibility ask ───────────────────────────────────────────────────────
+// macOS raises the Accessibility prompt at most once per app; every later call
+// is a silent no-op. The old flow fired the prompt and opened System Settings
+// together, which put two surfaces on screen for a first-time ask. Branching
+// needs the app to remember whether the prompt was already spent, because the
+// OS will not say.
+
+/** Label for the Accessibility action. "Allow access" is only honest while a
+ *  prompt can still appear; after that the button can do one thing. */
+export function accessibilityActionLabel(asked: boolean): string {
+  return asked ? 'Open System Settings' : 'Allow access'
+}
+
 /**
  * Hero status text override (R7): a resting synced hero with a parked folder
  * must not read as plain "Synced" — the status line says what's missing.

@@ -42,6 +42,7 @@ import {
   cleanCliError,
   eventToAccel,
   heroCardState,
+  accessibilityActionLabel,
   heroStatusOverride,
   humanizeAppError,
   palettePhaseFrom,
@@ -600,6 +601,10 @@ function wirePairCodeBoxes(
 // Fail closed: if we can't determine the permission, show Grant rather than
 // silently hide it (better to prompt than to assume trust we don't have).
 const axGranted = () => invoke<boolean>('accessibility_granted').catch(() => false)
+// Has the one-per-app macOS Accessibility prompt already been spent? Surfaces
+// use this to label the action honestly: the first press can still raise the
+// prompt, a later one can only send you to System Settings.
+const axAsked = () => invoke<boolean>('accessibility_asked').catch(() => false)
 
 function stripFrontmatter(body: string): string {
   if (!body.startsWith('---')) return body
@@ -2971,6 +2976,9 @@ async function renderOnboarding() {
 
   async function paint() {
     const granted = step === 'permission' ? await axGranted() : false
+    // The prompt is one-per-app. Once spent, "Allow access" would be a lie —
+    // pressing it can only open System Settings from then on.
+    const asked = step === 'permission' ? await axAsked() : false
     const noun = deviceNoun() // platform noun: Mac/PC/device, from platform-copy
     const Noun = noun.charAt(0).toUpperCase() + noun.slice(1)
     const dotSteps = needsPerm
@@ -3077,7 +3085,7 @@ async function renderOnboarding() {
       const permFine = onboardingPermissionFine(obShortcut)
       body = granted
         ? `<div class="ob-card center"><div class="ob-big" style="color:var(--success)">✓</div><b>You're all set</b><span class="ob-sub2">Press ${escapeHtml(prettyAccel(obShortcut))} in any app to drop a skill.</span></div><button class="ob-cta" id="done">Done</button>`
-        : `<div class="ob-card center"><div class="ob-big" style="color:var(--accent)">⌨</div><b>Let Skillet paste for you</b><span class="ob-sub2">${escapeHtml(permNeeded)}</span></div><button class="ob-cta" id="allow">Open System Settings</button><button class="ob-skip" id="skip">Skip for now</button><div class="ob-fine">${escapeHtml(permFine)}</div>`
+        : `<div class="ob-card center"><div class="ob-big" style="color:var(--accent)">⌨</div><b>Let Skillet paste for you</b><span class="ob-sub2">${escapeHtml(permNeeded)}</span></div><button class="ob-cta" id="allow">${escapeHtml(accessibilityActionLabel(asked))}</button><button class="ob-skip" id="skip">Skip for now</button><div class="ob-fine">${escapeHtml(permFine)}</div>`
     }
 
     const stepChanged = lastPaintedStep !== step
