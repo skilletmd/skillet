@@ -29,7 +29,8 @@ export function SummonSuggestions({ author, suggestions, voice = 'third-person' 
   // placeholder apologising for a kit that simply has nothing to suggest.
   if (suggestions.length === 0) return null
 
-  const heading = voice === 'first-person' ? 'Summon me for' : `People summon @${author} for`
+  const heading =
+    voice === 'first-person' ? 'Summon me for:' : `People summon @${author} for:`
 
   async function copy(line: string) {
     try {
@@ -44,22 +45,32 @@ export function SummonSuggestions({ author, suggestions, voice = 'third-person' 
 
   return (
     <section className="mb-8" aria-label="Suggested invocations">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-(--ink-subtle)">
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-(--ink-2)">
         {heading}
       </h2>
-      <ul className="flex flex-col gap-1.5">
+      {/* Lines, not form fields. Each sits on the recessive card surface with no
+          border and shrinks to its own width, so three of them read as things
+          you copy rather than three inputs waiting to be filled in. The copy
+          hint stays hidden until hover or keyboard focus — repeating "Copy"
+          down the column competes with the lines themselves. */}
+      <ul className="flex flex-col items-start gap-1">
         {suggestions.map((s) => {
           const line = summonSuggestionLine(author, s.task)
           return (
-            <li key={s.ref}>
+            <li key={s.ref} className="max-w-full">
               <button
                 type="button"
                 onClick={() => void copy(line)}
                 title={`Copy. Uses ${s.ref}`}
-                className="group flex w-full items-center justify-between gap-3 rounded-lg border border-(--rule) bg-(--surface) px-3 py-2 text-left transition-colors hover:border-(--ink-subtle)"
+                className="group flex max-w-full items-center gap-3 rounded-md bg-(--card-soft) px-2.5 py-1.5 text-left transition-colors hover:bg-(--accent-bg)"
               >
                 <code className="min-w-0 truncate font-mono text-sm text-(--ink)">{line}</code>
-                <span className="shrink-0 text-xs text-(--ink-subtle)">
+                <span
+                  aria-live="polite"
+                  className={`shrink-0 text-xs text-(--ink-2) transition-opacity ${
+                    copied === line ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
+                  }`}
+                >
                   {copied === line ? 'Copied' : 'Copy'}
                 </span>
               </button>

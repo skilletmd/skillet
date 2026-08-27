@@ -20,12 +20,12 @@ describe('SummonSuggestions', () => {
 
   it('describes an unclaimed mirror rather than speaking as them', () => {
     render(<SummonSuggestions author="wshobson" suggestions={three} voice="third-person" />)
-    expect(screen.getByText('People summon @wshobson for')).toBeTruthy()
+    expect(screen.getByText('People summon @wshobson for:')).toBeTruthy()
   })
 
   it('speaks as the author once the profile is claimed', () => {
     render(<SummonSuggestions author="phuryn" suggestions={three} voice="first-person" />)
-    expect(screen.getByText('Summon me for')).toBeTruthy()
+    expect(screen.getByText('Summon me for:')).toBeTruthy()
   })
 
   it('renders nothing at all for an empty set', () => {

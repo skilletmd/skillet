@@ -236,12 +236,6 @@ export default async function AuthorPage({
   // the skills they wrote. No subscriptions here — those live under Saved.
   const createdPanel = (
     <div className="space-y-10">
-      {/* Above the kits: the one action here that costs the visitor nothing. */}
-      <SummonSuggestions
-        author={profile.username}
-        suggestions={profile.suggestions ?? []}
-        voice={profile.suggestionsVoice ?? 'third-person'}
-      />
       <LibrarySection
         id="kits"
         level="eyebrow"
@@ -359,6 +353,13 @@ export default async function AuthorPage({
             <ClaimResultNotice result={claimResult} />
           </div>
         ))}
+      {/* Above the tabs, not inside Created: this is what the profile is FOR,
+          so it should not sit behind a tab the visitor has to be on. */}
+      <SummonSuggestions
+        author={profile.username}
+        suggestions={profile.suggestions ?? []}
+        voice={profile.suggestionsVoice ?? 'third-person'}
+      />
       {showSaved || activity.length > 0 || showTeams ? (
         <ProfileTabs
           // One rule for the whole row: every tab counts what it holds.
