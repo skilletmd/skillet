@@ -327,6 +327,7 @@ export {
   hermesProfileRoot,
   isTccParkedPath,
   assessTccRoot,
+  describeTccRoot,
   detectTccInvocation,
   setTccInvocation,
   resetTccInvocation,
@@ -339,6 +340,7 @@ export type {
   TccInitiation,
   TccContext,
   TccRootAccess,
+  TccRootDescription,
 } from "./util/tcc-access.js";
 export { atomicWrite } from "./util/atomic.js";
 export {
