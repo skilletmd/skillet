@@ -28,6 +28,9 @@ export interface StorySource {
 /** Tag marking a post as an edition of the Skillet Daily feed's story stream. */
 export const STORY_TAG = 'story'
 
+/** Tag marking a post as a Skillet Daily edition (the roundup, not a story). */
+export const DAILY_TAG = 'daily'
+
 export interface PostFrontmatter {
   title: string
   /** Optional `<title>` override, so a long display headline can still ship a
@@ -157,6 +160,25 @@ function parseSources(raw: string | null): StorySource[] {
  */
 export function getStories(): Post[] {
   return getAllPosts().filter((p) => p.tags.includes(STORY_TAG))
+}
+
+/**
+ * Hand-written blog posts only, newest first.
+ *
+ * News rides the same `posts` table as the blog (see `getStories`), so a bare
+ * `getAllPosts()` hands back editorial posts, auto-generated stories, and daily
+ * editions in one list. The homepage's "From the blog" rail took that list
+ * verbatim and printed a machine-written story headline as its third post,
+ * mid-sentence and lowercase, beside two real ones.
+ *
+ * Anything a person sat down and wrote is what belongs under a "blog" heading;
+ * the news surfaces (`/news`, the news RSS) select their own posts by tag and
+ * are unaffected.
+ */
+export function getEditorialPosts(): Post[] {
+  return getAllPosts().filter(
+    (p) => !p.tags.includes(STORY_TAG) && !p.tags.includes(DAILY_TAG),
+  )
 }
 
 /** The post's `<title>` text: the SEO override when set, else the headline.
