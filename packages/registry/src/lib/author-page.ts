@@ -1,5 +1,7 @@
 // Author page assembly for the MySQL/Prisma path (U4).
 import type { PrismaDb } from '../db/prisma-client.js'
+import { parseSummonSuggestionSet } from '@skillet/protocol'
+import { filterResolvableSuggestions, suggestionVoice } from '../suggestions/payload.js'
 import {
   getFollowerCountPrisma,
   getFollowingCountPrisma,
@@ -404,6 +406,7 @@ export async function getAuthorPagePrisma(
       source_owner_type: true,
       agents_public: true,
       shown_agents: true,
+      suggestions: true,
     },
   })
   if (!author) return null
@@ -438,6 +441,20 @@ export async function getAuthorPagePrisma(
 
   const skills = await skillSummariesForAuthorPrisma(prisma, authorId, includePrivate)
   const total_installs = await countSkillAdoptersPrisma(prisma, authorId)
+
+  // Same read rule as the profile payload: a stored set outlives the skills it
+  // was generated from, so a line survives only while its skill is reachable.
+  const storedSuggestions = parseSummonSuggestionSet(
+    (author as { suggestions?: string | null }).suggestions ?? null,
+  )
+  const publicRefs = new Set(
+    skills
+      .filter((s) => (s as { visibility?: string }).visibility !== 'private')
+      .map((s) => `@${authorId}/${(s as { slug: string }).slug}`),
+  )
+  const suggestions = storedSuggestions
+    ? filterResolvableSuggestions(storedSuggestions.suggestions, publicRefs)
+    : null
 
   let teams: Array<{ slug: string; name: string; role: string }> = []
   if (!org) {
@@ -578,6 +595,8 @@ export async function getAuthorPagePrisma(
       ? normalizeSourceOwnerType(author.source_owner_type)
       : null,
     total_installs,
+    suggestions,
+    suggestions_voice: suggestionVoice(isMirror),
     followers: await getFollowerCountPrisma(prisma, 'author', author.id),
     following: authorUserId
       ? await getFollowingCountPrisma(prisma, authorUserId)
