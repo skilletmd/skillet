@@ -5,6 +5,7 @@ import { Suspense, type ComponentType } from 'react'
 import { CommandBlock } from '@/components/command-block'
 import { HomeCatalogShelves, HomeBlogRail, HomeActivityRail } from '@/components/home/home-shelves'
 import { SummonDemo } from '@/components/home/install-steps'
+import { getSummonDemoPeople } from '@/lib/registry'
 import { InstallActions } from '@/components/install/install-picker'
 import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/ui/avatar'
@@ -75,6 +76,21 @@ function HeroInstall() {
   )
 }
 
+/**
+ * The hero demo with a real cast.
+ *
+ * Split out and suspended so `Hero` stays synchronous: the homepage is rendered
+ * to static markup in tests and at build time, and an awaited fetch inside it
+ * suspends that render.
+ *
+ * The fallback is the hardcoded script, which is the same floor the widget
+ * enforces internally -- the demo never renders worse than it did, whether the
+ * fetch is slow, failing, or returns too few eligible authors.
+ */
+async function SummonDemoLive() {
+  return <SummonDemo people={await getSummonDemoPeople()} />
+}
+
 function Hero() {
   return (
     <section className="relative overflow-hidden border-b border-(--line)">
@@ -122,7 +138,9 @@ function Hero() {
             </p>
           </div>
           <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
-            <SummonDemo />
+            <Suspense fallback={<SummonDemo />}>
+              <SummonDemoLive />
+            </Suspense>
           </div>
           <div className="lg:col-start-1 lg:row-start-2">
             <HeroInstall />

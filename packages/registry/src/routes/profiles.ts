@@ -5,6 +5,7 @@ import {
   emitSuggestionCopyEvent,
   isRecordableCopy,
 } from '../lib/suggestion-copy-events.js';
+import { summonDemoPeoplePrisma } from '../lib/summon-demo.js';
 import type { PrismaClient } from '@prisma/client';
 import { requireSession } from '../auth/middleware.js';
 import type { AvatarStore } from '../avatars/avatar-store.js';
@@ -272,6 +273,20 @@ export function registerProfileRoutes(
     const skills = await getHandleKitCandidatesPrisma(db, handle);
     reply.header('Cache-Control', 'public, max-age=300');
     return reply.send({ handle, skills });
+  });
+
+  // GET /authors/summon-demo — authors the homepage hero can honestly depict.
+  //
+  // Public and cacheable. Returns only authors with a non-empty stored
+  // suggestion, an avatar, and a still-public skill behind the line, so the
+  // hero never claims something an author's published work does not support.
+  app.get<{ Querystring: { limit?: string } }>('/authors/summon-demo', async (req, reply) => {
+    const db = requirePrisma(prisma);
+    const raw = Number.parseInt(req.query.limit ?? '', 10);
+    const limit = Number.isFinite(raw) ? Math.min(Math.max(raw, 1), 12) : 5;
+    const people = await summonDemoPeoplePrisma(db, limit);
+    reply.header('Cache-Control', 'public, max-age=300');
+    return reply.send({ people });
   });
 
   // POST /authors/:handle/suggestions/copy — count a copied suggestion line.

@@ -29,7 +29,8 @@ type Person = {
   reply: { pre: string; post: string }
 }
 
-const PEOPLE: readonly Person[] = [
+/** The cast that plays when too few real authors qualify. */
+const FALLBACK_PEOPLE: readonly Person[] = [
   {
     handle: 'addyosmani',
     name: 'Addy Osmani',
@@ -71,6 +72,9 @@ const PEOPLE: readonly Person[] = [
     reply: { pre: 'On it, my ', post: ' skill will get your feature out the door.' },
   },
 ]
+
+/** Below this many eligible authors, play the hardcoded script instead. */
+const MIN_CAST = 3
 
 // Texting rhythm, in ms.
 const SYSTEM_MS = 1000
@@ -129,7 +133,68 @@ function seedPerson(person: Person, startId: number): Message[] {
 // Contained in a soft card with a "your agent" window chrome so it reads as a
 // thing you're looking at, not text you read through. Reduced-motion shows a
 // static pair of exchanges.
-export function SummonDemo() {
+/**
+ * Replies for a generated cast, rotated so the thread does not read as one
+ * template repeated down the page.
+ *
+ * The hardcoded entries name the object of the work ("to check your Core Web
+ * Vitals", "through your PR"), which is what makes them feel like a real agent
+ * answering. A generated reply cannot: it knows the skill, not what the skill
+ * is about. So these vary the opener and the rhythm and stop there, rather than
+ * substituting enthusiasm for the specificity they cannot have.
+ *
+ * Deliberately no "10x you" / "level you up" / "make you smarter" register.
+ * A reply that promises an outcome the skill has not produced yet is the one
+ * thing this widget cannot afford, since its whole job is being true about real
+ * people's work.
+ */
+const GENERATED_REPLIES: ReadonlyArray<{ pre: string; post: string }> = [
+  { pre: 'On it, using my ', post: ' skill.' },
+  { pre: 'Sure, my ', post: ' skill covers this.' },
+  { pre: 'Let me take that through my ', post: ' skill.' },
+  { pre: 'Got it. Running my ', post: ' skill now.' },
+  { pre: 'On it, my ', post: ' skill is built for this.' },
+  { pre: 'Happy to. My ', post: ' skill handles it.' },
+]
+
+/**
+ * Turn stored suggestions into the hero's cast.
+ *
+ * `specialty` is the link text, so it is the slug read back as words.
+ *
+ * The reply rotates by position rather than at random: the cast is stable
+ * across renders, so a random pick would reshuffle the same person's line
+ * between visits and could hand two people in a row the same sentence.
+ */
+export interface SuggestionRow {
+  handle: string
+  name: string
+  task: string
+  slug: string
+}
+
+export function peopleFromSuggestions(rows: SuggestionRow[]): Person[] {
+  return rows.map((r, i) => ({
+    handle: r.handle,
+    name: r.name,
+    specialty: r.slug.replace(/[-_]+/g, ' '),
+    task: r.task,
+    slug: r.slug,
+    reply: GENERATED_REPLIES[i % GENERATED_REPLIES.length]!,
+  }))
+}
+
+/**
+ * `people` overrides the hardcoded cast when enough real authors qualify.
+ *
+ * All-or-nothing by design: a half-real cast is harder to reason about than
+ * either, and the hardcoded script is the floor this can never render below.
+ */
+export function SummonDemo({ people }: { people?: SuggestionRow[] } = {}) {
+  // Mapped here, not by the caller: this module is `'use client'`, so a server
+  // component cannot invoke its functions -- only pass it plain data.
+  const cast = people ? peopleFromSuggestions(people) : []
+  const PEOPLE = cast.length >= MIN_CAST ? cast : FALLBACK_PEOPLE
   const reduce = useReducedMotion()
   const [msgs, setMsgs] = useState<Message[]>(() => [
     ...seedPerson(PEOPLE[0]!, 0),

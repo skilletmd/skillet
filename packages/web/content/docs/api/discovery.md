@@ -26,7 +26,7 @@ One query across every public object type. This is the right first call for "is 
 
 | Parameter | Description |
 | --- | --- |
-| `q` string · query · required | The search query. An empty query returns no results. Multi-word queries match word by word, across hyphens and underscores, so `web design` finds `web-design-guidelines`. Results matching every word rank first; when nothing matches every word, results matching any word are returned. Words of three or more characters match anywhere (`lint` finds `eslint-config`); shorter words match only where they start a word, so `x` finds `twitter-x` but not `linux`. |
+| `q` string · query · required | The search query. An empty query returns no results. |
 | `types` string · query · optional | Comma-separated object types to include. Defaults to all of `skills,kits,people`. |
 | `limit` integer · query · optional | Maximum results per type. |
 

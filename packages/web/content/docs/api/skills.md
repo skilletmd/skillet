@@ -23,7 +23,7 @@ Auth, errors, caching, pagination, and rate limits are in the [API overview](/do
 
 ## GET /skills
 
-The public skill catalog, newest first by default. Use `q` to filter by name and description, or `category` to narrow to one domain. Returns only public skills for an anonymous caller.
+The public skill catalog, newest first by default. Use `q` for a substring match over name and description, or `category` to narrow to one domain. Returns only public skills for an anonymous caller.
 
 **Auth** — none. This endpoint is anonymous. A bearer token with the `read` scope also works.
 
@@ -33,7 +33,7 @@ The public skill catalog, newest first by default. Use `q` to filter by name and
 | --- | --- |
 | `limit` integer · query · optional | Page size. Clamped server-side to 1-100. |
 | `offset` integer · query · optional | Zero-based offset into the result set. |
-| `q` string · query · optional | Free-text filter over skill name and description. Words are matched separately, across hyphens and underscores, and every word must match. Words of three or more characters match anywhere; shorter words match only where they start a word. |
+| `q` string · query · optional | Free-text filter over skill name and description. |
 | `category` string · query · optional | One category key, or a comma-separated list. Unknown keys are ignored rather than widening the query. |
 | `sort` `new` \| `alpha` · query · optional | `new` for most recently published, `alpha` for name order. |
 

@@ -28,7 +28,7 @@ The public kit catalog. A kit is a named, versioned collection of skills that a 
 | --- | --- |
 | `limit` integer · query · optional | Page size. Clamped server-side to 1-100. |
 | `offset` integer · query · optional | Zero-based offset into the result set. |
-| `q` string · query · optional | Free-text filter over kit name and description. Words are matched separately, across hyphens and underscores, and every word must match. Words of three or more characters match anywhere; shorter words match only where they start a word. |
+| `q` string · query · optional | Free-text filter over kit name and description. |
 | `category` string · query · optional | One category key, or a comma-separated list. |
 | `sort` `new` \| `alpha` · query · optional | `new` for most recently published, `alpha` for name order. |
 

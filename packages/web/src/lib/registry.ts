@@ -974,6 +974,21 @@ function scanBatchChunks<T extends { author: string; slug: string; hash: string 
   return chunks
 }
 
+/**
+ * Authors the homepage hero can honestly depict, or `[]`.
+ *
+ * Empty on any failure, which the hero reads as "play the hardcoded script".
+ * The most-visited page on the site must not depend on this call succeeding.
+ */
+export async function getSummonDemoPeople(
+  limit = 5,
+): Promise<Array<{ handle: string; name: string; task: string; slug: string }>> {
+  const live = await fetchLive<{
+    people?: Array<{ handle: string; name: string; task: string; slug: string }>
+  }>(`/authors/summon-demo?limit=${limit}`)
+  return live?.people ?? []
+}
+
 export async function getAuthorProfile(
   username: string,
   options: RegistryFetchOptions = {},
