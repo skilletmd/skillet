@@ -15,11 +15,37 @@
 // can be made.
 
 import assert from 'node:assert/strict';
-import { homedir } from 'node:os';
+import { homedir, platform } from 'node:os';
+import { resolve } from 'node:path';
 import test from 'node:test';
 import { ADAPTER_TABLE, adapterEntry } from '@skillet/protocol/adapter-table';
 import { MATERIALIZATION_ROOT_ALLOWLIST, PROJECT_TARGET_ALLOWLIST } from '@skillet/core';
 import { ALL_ADAPTERS, BASELINE_READER_ADAPTERS } from '../src/cli-context.js';
+
+const IS_WINDOWS = platform() === 'win32';
+
+/**
+ * Runtimes whose root is platform-conditional, and the POSIX root the table
+ * carries for them.
+ *
+ * `AdapterEntry.root` is tilde-form by contract, and the client verifier only
+ * expands a leading `~/`. Hermes reads `%LOCALAPPDATA%\hermes\skills` and
+ * Devin CLI `%APPDATA%\devin\skills` on native Windows — env-var roots that
+ * the wire format has no way to express, and that need not sit under the
+ * homedir at all. So on win32 the table's root CANNOT equal the adapter's
+ * resolved `targetDir` for these two, and asserting it did is what made this
+ * suite red on the Windows job while every POSIX job stayed green.
+ *
+ * The drift check still runs there, against the value the platform actually
+ * resolves: the table must carry the POSIX sibling, and the adapter must land
+ * inside core's own Windows allowlist (which builds the LOCALAPPDATA/APPDATA
+ * entries from the same env vars the adapters read). Neither side can rot
+ * unnoticed; they are just checked against different sources of truth.
+ */
+const WINDOWS_DIVERGENT: Record<string, string> = {
+  hermes: '~/.hermes/skills',
+  devin: '~/.config/devin/skills',
+};
 
 /** Adapter `targetDir` is absolute and host-specific; the table is tilde-form. */
 function toTildeForm(abs: string): string {
@@ -53,6 +79,23 @@ test('table root matches each adapter targetDir', () => {
   for (const adapter of ALL_ADAPTERS) {
     const entry = adapterEntry(adapter.name);
     if (!entry) continue; // covered by the test above
+
+    const posixRoot = WINDOWS_DIVERGENT[adapter.name];
+    if (IS_WINDOWS && posixRoot !== undefined) {
+      assert.equal(
+        entry.root,
+        posixRoot,
+        `table root for "${adapter.name}" drifted from its POSIX root ${posixRoot}`,
+      );
+      const target = resolve(adapter.targetDir);
+      assert.ok(
+        MATERIALIZATION_ROOT_ALLOWLIST.some((a) => resolve(a) === target),
+        `adapter "${adapter.name}" writes to ${adapter.targetDir} on Windows, ` +
+          `which is not in MATERIALIZATION_ROOT_ALLOWLIST — materialization would be rejected`,
+      );
+      continue;
+    }
+
     const actual = entry.kind === 'project' ? adapter.targetDir : toTildeForm(adapter.targetDir);
     assert.equal(
       actual,
