@@ -289,6 +289,40 @@ describe('the cross-author fallback', { skip: !hasDatabaseUrl }, () => {
       assert.deepEqual(await discovery(prisma, store).searchPublic('zzzznothing'), [])
     })
   })
+
+  // The router asks for "what the task needs, in a few words", so nearly every
+  // call here is multi-word. Whole-string matching answered those with nothing.
+  it('finds a hyphenated slug from a multi-word query', async () => {
+    await withDb(async (prisma, store) => {
+      await seedSkill(prisma, store, { author: 'vercel', slug: 'web-design-guidelines' })
+      await seedSkill(prisma, store, { author: 'matt', slug: 'unrelated' })
+
+      const found = await discovery(prisma, store).searchPublic('web design')
+      assert.equal(found.length, 1)
+      assert.equal(found[0]?.ref, '@vercel/web-design-guidelines')
+    })
+  })
+
+  // This path does not lowercase before calling search; the matcher does.
+  it('ignores the case of the keywords', async () => {
+    await withDb(async (prisma, store) => {
+      await seedSkill(prisma, store, { author: 'vercel', slug: 'web-design-guidelines' })
+      const d = discovery(prisma, store)
+
+      assert.deepEqual(await d.searchPublic('Web Design'), await d.searchPublic('web design'))
+      assert.equal((await d.searchPublic('WEB DESIGN')).length, 1)
+    })
+  })
+
+  it('falls back to any-word matching when no skill matches every word', async () => {
+    await withDb(async (prisma, store) => {
+      await seedSkill(prisma, store, { author: 'matt', slug: 'changelog-writer' })
+
+      const found = await discovery(prisma, store).searchPublic('changelog for zzzznothing')
+      assert.equal(found.length, 1, 'an empty answer would strand the router')
+      assert.equal(found[0]?.ref, '@matt/changelog-writer')
+    })
+  })
 })
 
 describe('a cloud summon moves the same counter the URL path moves', { skip: !hasDatabaseUrl }, () => {
