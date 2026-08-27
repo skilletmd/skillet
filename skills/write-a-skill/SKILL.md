@@ -218,9 +218,11 @@ Skillet checks the mechanical items automatically when you publish (the skill li
 Once your SKILL.md reads well:
 
 ```bash
-skillet publish @you/skill-name
+skillet upload --skill skill-name
 ```
 
-Skillet runs the privacy scan, signs it with your key, and publishes it. Your skill page goes live immediately with "Add to Claude" and "Add to ChatGPT" install buttons.
+That saves it to your profile as **private**. Add `--public` when you want anyone to find it.
 
-For a v2 update, edit the file and publish again. Recipients see it as a graded diff and approve before it materializes.
+Skillet runs the privacy scan before anything leaves your machine, then publishes it. Your skill page goes live immediately with "Add to Claude" and "Add to ChatGPT" install buttons.
+
+For a v2 update, edit the file and upload again. Recipients see it as a graded diff and approve before it materializes.

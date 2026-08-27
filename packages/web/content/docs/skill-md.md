@@ -45,13 +45,13 @@ Keep frontmatter to these fields. Extra keys may be ignored by some runtimes and
 
 ## Version and visibility
 
-You don't set a version in frontmatter. Each skill carries a single integer version that `skillet publish` bumps by one every time the content changes. There's no semver.
+You don't set a version in frontmatter. Each skill carries a single integer version that `skillet upload` bumps by one every time the content changes. There's no semver.
 
 Visibility is set at publish time, not in frontmatter. See [Publish a skill](/docs/publish) for the full flow.
 
 ```bash
-skillet publish my-skill            # private (default)
-skillet publish my-skill --public   # public on Skillet
+skillet upload --skill my-skill            # private (default)
+skillet upload --skill my-skill --public   # public on Skillet
 ```
 
 ## Basic eval (optional)

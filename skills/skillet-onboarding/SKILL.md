@@ -58,21 +58,24 @@ and what behavior you want.
 Save it anywhere, then import:
 
 ```bash
-skillet import ./path/to/my-first-skill/SKILL.md
+skillet import ./path/to/my-first-skill
 skillet sync
 ```
 
+Point `import` at the skill's **directory** (the one with `SKILL.md` inside it), not at the file.
+
 ### Publish
 
-```bash
-# First publish — CLI can prompt for handle and name
-skillet publish my-first-skill
+Your handle is claimed when you sign in, so connect this machine first:
 
-# Or claim inline
-skillet publish --handle you --name "Your Name" my-first-skill
+```bash
+skillet connect <code>                    # pair code from skillet.md/settings
+skillet upload --skill my-first-skill     # private
 ```
 
-Skillet runs a privacy scan before anything leaves your machine, then signs with your Ed25519 author key.
+Add `--public` when you want it findable by anyone.
+
+Skillet runs a privacy scan before anything leaves your machine. When this machine holds an Ed25519 author key the version is signed with it; otherwise it publishes through your signed-in session.
 
 Your skill gets a page at `https://skillet.md/skills/you/my-first-skill` with an install command and Add to Claude / Add to ChatGPT buttons.
 
@@ -81,7 +84,7 @@ Your skill gets a page at `https://skillet.md/skills/you/my-first-skill` with an
 Edit the SKILL.md, then:
 
 ```bash
-skillet publish my-first-skill
+skillet upload --skill my-first-skill
 ```
 
 Anyone who added your skill sees it as a diff on their next `skillet sync` or in `skillet pending` — not a silent overwrite. They approve explicitly:
@@ -119,5 +122,5 @@ Commit this. Anyone cloning your repo can run `skillet sync` and get exactly the
 
 - **Write a better skill:** `skillet add @skillet/write-a-skill`
 - **Understand the sync model:** `skillet add @skillet/skillet-sync`
-- **Share a kit with your team:** `skillet kit create my-kit && skillet kit add my-kit @you/my-first-skill`
+- **Share a kit with your team:** create it on skillet.md, then add your skills to it there
 - **Harm-scan your kit:** `skillet scan`
