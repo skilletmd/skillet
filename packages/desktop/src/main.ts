@@ -42,6 +42,9 @@ import {
   cleanCliError,
   eventToAccel,
   heroCardState,
+  accessibilityActionLabel,
+  permissionRows,
+  permissionsNeedAttention,
   heroStatusOverride,
   humanizeAppError,
   palettePhaseFrom,
@@ -118,6 +121,9 @@ type Adapter = {
   parked?: boolean
   /** The macOS grant was refused or revoked; System Settings is the fix. */
   parkedDenied?: boolean
+  /** Folder-access state from `skillet agents --json` (U2). Absent on an older
+   *  bundled sidecar — treat that as unprotected, never as a problem. */
+  access?: { protected: boolean; grant: string; anchor: string | null }
 }
 // Only the count of pending updates is ever surfaced in the tray (badge, CTA,
 // pulse) — review happens on the web, so the per-field diff shape isn't consumed
@@ -345,13 +351,19 @@ async function getDetectedAgents(): Promise<Adapter[]> {
   }
   try {
     const parsed = JSON.parse(await invoke<string>('detect_runtimes')) as {
-      runtimes?: { name: string; label?: string; targetDir?: string }[]
+      runtimes?: {
+        name: string
+        label?: string
+        targetDir?: string
+        access?: { protected: boolean; grant: string; anchor: string | null }
+      }[]
     }
     return (parsed.runtimes ?? []).map((s) => ({
       name: s.name,
       status: 'materialized',
       targetDir: s.targetDir,
       label: s.label,
+      ...(s.access ? { access: s.access } : {}),
     }))
   } catch {
     return []
@@ -600,6 +612,10 @@ function wirePairCodeBoxes(
 // Fail closed: if we can't determine the permission, show Grant rather than
 // silently hide it (better to prompt than to assume trust we don't have).
 const axGranted = () => invoke<boolean>('accessibility_granted').catch(() => false)
+// Has the one-per-app macOS Accessibility prompt already been spent? Surfaces
+// use this to label the action honestly: the first press can still raise the
+// prompt, a later one can only send you to System Settings.
+const axAsked = () => invoke<boolean>('accessibility_asked').catch(() => false)
 
 function stripFrontmatter(body: string): string {
   if (!body.startsWith('---')) return body
@@ -1524,6 +1540,10 @@ function panelWithRail(active: RailKey, viewHtml: string): string {
   const badges = resolveRailBadges({
     pendingCount: trayPending?.length ?? 0,
     updateReady: updateReadyVersion != null,
+    // A missing permission is only visible inside Settings, so the path to
+    // Settings has to advertise it. Otherwise the one surface that can fix a
+    // denial is the one surface nothing points at.
+    permissionsNeedAttention: permissionsNeedAttention(currentPermissionRows()),
   })
   const pulse = badgePulse // consume once
   badgePulse = false
@@ -1541,8 +1561,19 @@ function panelWithRail(active: RailKey, viewHtml: string): string {
   // The dot is a visual cue only; the accessible name carries the same signal so
   // screen-reader and keyboard users aren't left with a color-only indicator.
   const accountName = auth.displayHandle ? '@' + escapeHtml(auth.displayHandle) : 'Account'
-  const accountTitle = badges.account ? `${accountName}, update ready to install` : accountName
-  const accountDot = badges.account ? `<span class="rail-avatar-dot"></span>` : ''
+  const accountTitle =
+    badges.account === 'attention'
+      ? `${accountName}, a permission needs your attention`
+      : badges.account === 'ready'
+        ? `${accountName}, update ready to install`
+        : accountName
+  // Tone follows cause: green for an update waiting to install (go), amber for
+  // a capability Skillet needs and lacks (matching the Permissions row it
+  // leads to). A blocked capability rendered as a green "ready" dot would say
+  // the opposite of the truth.
+  const accountDot = badges.account
+    ? `<span class="rail-avatar-dot${badges.account === 'attention' ? ' attention' : ''}"></span>`
+    : ''
   return `<div class="panel tray tray-railed">
       <nav class="rail">
         <div class="rail-brand">${brandMark('rail-brand-mark')}</div>
@@ -1816,10 +1847,14 @@ function paintTray(skills: Skill[], granted: boolean) {
     }
     void runSync({ background: false })
   })
-  // Parked-folder notice: Sync now is a grant affordance, so it too runs
-  // user-initiated.
-  document.getElementById('parkedsync')?.addEventListener('click', () => {
-    void runSync({ background: false })
+  // Parked-folder notice. Sync is a grant affordance, so it runs
+  // user-initiated (the only class assessTccRoot lets probe). Settings is the
+  // denied path: re-syncing cannot re-prompt a refused grant, so the button
+  // has to leave the app.
+  document.getElementById('parkedsync')?.addEventListener('click', (e) => {
+    const kind = (e.currentTarget as HTMLElement).dataset.kind
+    if (kind === 'settings') void invoke('open_folder_access_settings')
+    else void runSync({ background: false })
   })
   // Skill-stats ask: either answer marks the question answered account-side
   // (choose sync|local), so no surface re-asks; localStorage only remembers
@@ -1857,11 +1892,13 @@ function paintTray(skills: Skill[], granted: boolean) {
 }
 
 // Needs-access notice (U3/R7): one row, visible for as long as any agent
-// folder stays parked. Sync now runs a user-initiated sync, which is the flow
-// allowed to trigger the macOS folder-access prompt and record the grant.
+// folder stays parked. The label and the behaviour both come from
+// parkedNoticeCopy — an ungranted folder gets a user-initiated sync (the flow
+// allowed to trigger the macOS prompt and record the grant), a DENIED one gets
+// System Settings, because macOS never re-prompts after a refusal.
 function renderParkedNote(notice: ParkedNotice): string {
   const copy = parkedNoticeCopy(notice)
-  return `<div class="row action syncissue"><div class="bcol"><b>${escapeHtml(copy.title)}</b><span>${escapeHtml(copy.detail)}</span></div><span class="spacer"></span><button class="link" id="parkedsync">Sync now</button></div>`
+  return `<div class="row action syncissue"><div class="bcol"><b>${escapeHtml(copy.title)}</b><span>${escapeHtml(copy.detail)}</span></div><span class="spacer"></span><button class="link" id="parkedsync" data-kind="${copy.action.kind}">${escapeHtml(copy.action.label)}</button></div>`
 }
 
 // Transient post-sync note: per-skill failures the registry reported. Surfaces
@@ -1886,7 +1923,8 @@ function agentGlyph(name: string): string {
  * skip until a day has passed.
  *
  * `background` defaults to true (fail-closed, U3): only the explicit sync
- * affordances (the hero sync button, the parked-folder Sync now) pass false —
+ * affordances (the hero sync button, and the folder-access Allow access in the
+ * parked notice and Settings) pass false —
  * a user-initiated run may read agent folders that still need the macOS
  * folder-access grant, prompting once and recording the unlock. Automatic
  * syncs (launch, daily, tray-open check, SSE push, post-connect/publish)
@@ -1908,6 +1946,12 @@ async function runSync(opts: { background?: boolean } = {}): Promise<void> {
   syncJustSucceeded = false
   await renderTray() // spinner
   trayAdapters = await getAdapters({ background })
+  // Re-scan detected agents too. A sync is exactly when folder access can
+  // CHANGE (a user-initiated one probes the root and records the grant; a
+  // denial suspends the marker), and the Permissions rows read this. Without
+  // the refresh the cached scan from launch stands forever, so granting access
+  // left the row reading "Needs access" and the button looked dead.
+  trayDetectedAgents = await getDetectedAgents()
   traySyncedAt = Date.now()
   try {
     localStorage.setItem('lastAutoSync', String(traySyncedAt))
@@ -2622,6 +2666,82 @@ function paintSyncedFolders(): void {
 // no-ops while it is set (plan 2026-07-08-002, U5 guard a).
 let editingDeviceLabel = false
 
+// Whether the one-per-app Accessibility prompt is already spent. Refreshed
+// whenever Settings paints; false is the safe default (offers to allow, and a
+// spent prompt just silently no-ops).
+let trayAxAsked = false
+
+// Shown on the right of a row that has nothing to do. A row WITH an action puts
+// its button there instead, and that button's label already names the move.
+const PERMISSION_SETTLED_TEXT = 'Allowed'
+
+/**
+ * Permissions in Settings (U4/R4): what Skillet is allowed to do on this
+ * machine, present whether or not anything is wrong. This is the durable
+ * surface a denial can be recovered from — the home-view notice is transient
+ * and dismissible, so before this a person who denied something and moved on
+ * had no path back.
+ */
+function currentPermissionRows() {
+  return permissionRows({
+    isMac: isMacOsDesktop(),
+    accessibilityGranted: lastGranted,
+    accessibilityAsked: trayAxAsked,
+    agents: trayDetectedAgents ?? [],
+  })
+}
+
+function renderPermissionsBlock(): string {
+  const rows = currentPermissionRows()
+  if (rows.length === 0) return ''
+  const body = rows
+    .map((row) => {
+      // Only a BLOCKING row gets the alarm treatment. An optional capability
+      // that is simply off is a setting, not a fault.
+      const problem = row.blocking
+      // A sync is the slowest thing behind these buttons (10s+ with a big kit).
+      // Without a pending state the press looks like it did nothing, which is
+      // exactly how a working grant read as a broken button.
+      const busy = traySyncing && row.action?.kind === 'folder-sync'
+      const action = row.action
+        ? `<button type="button" class="set-action${problem ? ' set-action-fix' : ''}" data-perm="${escapeHtml(row.action.kind)}" data-anchor="${escapeHtml(row.action.anchor ?? '')}"${busy ? ' disabled' : ''}>${escapeHtml(busy ? 'Checking…' : row.action.label)}</button>`
+        : `<span class="set-perm-ok">${escapeHtml(PERMISSION_SETTLED_TEXT)}</span>`
+      // The subtitle is always the row's detail. It used to substitute a bare
+      // state word ("Not allowed", "Needs access") for every non-allowed row,
+      // which threw away the one line explaining what the permission is FOR
+      // and left an optional capability reading like a fault. The state is
+      // already carried by the caution dot and the action's own label.
+      return `<div class="set-row set-perm-row${problem ? ' needs' : ''}"><div class="set-account-col"><span class="nm">${escapeHtml(row.label)}</span><span class="set-account-sub${problem ? ' set-perm-warn' : ''}">${escapeHtml(row.detail)}</span></div><span class="spacer"></span>${action}</div>`
+    })
+    .join('')
+  return `<div class="set-perms"><div class="set-perms-head">Permissions</div>${body}</div>`
+}
+
+/**
+ * Try again on a refused folder grant (U5/R2/R3).
+ *
+ * macOS never re-prompts after a denial, so the reset is what makes the next
+ * user-initiated sync able to ask at all. Every branch ends somewhere useful:
+ * if the reset fails, or the sync still comes back denied, the same press
+ * opens System Settings rather than leaving the row exactly as it was.
+ */
+async function retryFolderAccess(anchor: string | null): Promise<void> {
+  if (!anchor) return
+  let reset = true
+  try {
+    await invoke('reset_folder_access', { anchor })
+  } catch {
+    reset = false
+  }
+  if (reset) {
+    // User-initiated: the only invocation class assessTccRoot lets probe.
+    await runSync({ background: false })
+    const stillDenied = (trayAdapters ?? []).some((a) => a.parkedDenied === true)
+    if (!stillDenied) return
+  }
+  void invoke('open_folder_access_settings')
+}
+
 function paintSettings() {
   if (editingDeviceLabel) return
   const auth = trayAuthNow()
@@ -2650,6 +2770,7 @@ function paintSettings() {
       <div class="set-body">
         ${accountBlock}
         ${deviceBlock}
+        ${renderPermissionsBlock()}
         <div class="set-links">
           <button type="button" class="set-link" id="setweb"><span class="nm">Open web</span><span class="spacer"></span><span class="set-ext">${ICON.arrowUpRight}</span></button>
           <button type="button" class="set-link" id="setdocs"><span class="nm">Help &amp; docs</span><span class="spacer"></span><span class="set-ext">${ICON.arrowUpRight}</span></button>
@@ -2672,6 +2793,27 @@ function paintSettings() {
   document.getElementById('update-stuck')?.addEventListener('click', () =>
     invoke('open_web', { path: '/install' }),
   )
+  // Permissions actions. Every state that is not "allowed" carries one, and it
+  // has to land somewhere useful: a folder with no grant gets the user-initiated
+  // sync (the invocation class allowed to probe), a REFUSED one gets a reset
+  // plus re-ask, because macOS never re-prompts on its own.
+  document.querySelectorAll<HTMLElement>('.set-perm-row [data-perm]').forEach((el) => {
+    el.onclick = () => {
+      const kind = el.dataset.perm
+      const anchor = el.dataset.anchor || null
+      if (kind === 'ax-request') void invoke('request_accessibility')
+      else if (kind === 'folder-sync') void runSync({ background: false })
+      else if (kind === 'folder-retry') void retryFolderAccess(anchor)
+    }
+  })
+  // The prompt-spent flag decides the accessibility label, so refresh it and
+  // repaint if it changed under us.
+  void axAsked().then((asked) => {
+    if (asked !== trayAxAsked && trayView === 'settings') {
+      trayAxAsked = asked
+      paintSettings()
+    }
+  })
   document.getElementById('settingslogout')?.addEventListener('click', () => void signOutFromTray())
   document.getElementById('setweb')?.addEventListener('click', () => invoke('open_web'))
   const openDeviceRename = () => {
@@ -2965,6 +3107,9 @@ async function renderOnboarding() {
 
   async function paint() {
     const granted = step === 'permission' ? await axGranted() : false
+    // The prompt is one-per-app. Once spent, "Allow access" would be a lie —
+    // pressing it can only open System Settings from then on.
+    const asked = step === 'permission' ? await axAsked() : false
     const noun = deviceNoun() // platform noun: Mac/PC/device, from platform-copy
     const Noun = noun.charAt(0).toUpperCase() + noun.slice(1)
     const dotSteps = needsPerm
@@ -3071,7 +3216,7 @@ async function renderOnboarding() {
       const permFine = onboardingPermissionFine(obShortcut)
       body = granted
         ? `<div class="ob-card center"><div class="ob-big" style="color:var(--success)">✓</div><b>You're all set</b><span class="ob-sub2">Press ${escapeHtml(prettyAccel(obShortcut))} in any app to drop a skill.</span></div><button class="ob-cta" id="done">Done</button>`
-        : `<div class="ob-card center"><div class="ob-big" style="color:var(--accent)">⌨</div><b>Let Skillet paste for you</b><span class="ob-sub2">${escapeHtml(permNeeded)}</span></div><button class="ob-cta" id="allow">Open System Settings</button><button class="ob-skip" id="skip">Skip for now</button><div class="ob-fine">${escapeHtml(permFine)}</div>`
+        : `<div class="ob-card center"><div class="ob-big" style="color:var(--accent)">⌨</div><b>Let Skillet paste for you</b><span class="ob-sub2">${escapeHtml(permNeeded)}</span></div><button class="ob-cta" id="allow">${escapeHtml(accessibilityActionLabel(asked))}</button><button class="ob-skip" id="skip">Skip for now</button><div class="ob-fine">${escapeHtml(permFine)}</div>`
     }
 
     const stepChanged = lastPaintedStep !== step

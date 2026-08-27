@@ -16,6 +16,9 @@ import {
   cleanCliError,
   eventToAccel,
   heroCardState,
+  accessibilityActionLabel,
+  permissionRows,
+  permissionsNeedAttention,
   heroStatusOverride,
   humanizeAppError,
   palettePhaseFrom,
@@ -29,6 +32,7 @@ import {
   uploadOutcome,
   syncKitsFromListFallback,
   type CustomizedRow,
+  type PermissionAgentLike,
   type KitStatus,
   type Skill,
   type SyncKitGroupJson,
@@ -280,14 +284,16 @@ describe('parkedNotice', () => {
 })
 
 describe('parkedNoticeCopy', () => {
-  it('asks for a sync to grant access (singular and plural)', () => {
+  it('asks for access, not for a sync (singular and plural)', () => {
     expect(parkedNoticeCopy({ count: 1, denied: false })).toEqual({
       title: '1 agent folder needs access',
-      detail: 'Sync now to grant it.',
+      detail: 'Allow access so Skillet can update it.',
+      action: { label: 'Allow access', kind: 'sync' },
     })
     expect(parkedNoticeCopy({ count: 3, denied: false })).toEqual({
       title: '3 agent folders need access',
-      detail: 'Sync now to grant them.',
+      detail: 'Allow access so Skillet can update them.',
+      action: { label: 'Allow access', kind: 'sync' },
     })
   })
 
@@ -295,6 +301,27 @@ describe('parkedNoticeCopy', () => {
     expect(parkedNoticeCopy({ count: 1, denied: true }).detail).toBe(
       'Allow Skillet in System Settings under Privacy and Security, then sync.',
     )
+  })
+
+  // U1/R3: macOS never re-prompts once a grant is refused, so the denied
+  // notice's action must open System Settings. Re-running the sync is the one
+  // thing that provably cannot help, and shipping it as the only affordance is
+  // what left a denied person with no way back.
+  it('offers System Settings, not another sync, once a grant was denied', () => {
+    expect(parkedNoticeCopy({ count: 2, denied: true }).action).toEqual({
+      label: 'Open System Settings',
+      kind: 'settings',
+    })
+  })
+
+  it('always offers an action that leads somewhere (R3)', () => {
+    for (const count of [1, 2, 7]) {
+      for (const denied of [false, true]) {
+        const { action } = parkedNoticeCopy({ count, denied })
+        expect(action.label.length).toBeGreaterThan(0)
+        expect(['sync', 'settings']).toContain(action.kind)
+      }
+    }
   })
 
   it('never uses an em-dash (product copy rule)', () => {
@@ -306,7 +333,258 @@ describe('parkedNoticeCopy', () => {
       const copy = parkedNoticeCopy(notice)
       expect(copy.title).not.toContain('—')
       expect(copy.detail).not.toContain('—')
+      expect(copy.action.label).not.toContain('—')
     }
+  })
+})
+
+// U7/R10: the macOS Accessibility prompt is one-per-app. The old flow fired it
+// AND opened System Settings every time, so a first-time ask put two surfaces
+// on screen at once and a repeat ask promised a prompt that could never appear.
+describe('accessibilityActionLabel', () => {
+  it('offers to allow while a prompt can still appear', () => {
+    expect(accessibilityActionLabel(false)).toBe('Allow access')
+  })
+
+  it('routes to System Settings once the prompt is spent', () => {
+    expect(accessibilityActionLabel(true)).toBe('Open System Settings')
+  })
+
+  it('never uses an em-dash (product copy rule)', () => {
+    expect(accessibilityActionLabel(false)).not.toContain('—')
+    expect(accessibilityActionLabel(true)).not.toContain('—')
+  })
+})
+
+// U4/R3/R4/R12: Settings carries a Permissions block that is present whether or
+// not anything is wrong, and every row with a problem carries an action that
+// can change that state. Before this, nothing in the app ever reported which
+// permissions Skillet held; folder state existed only as a dismissible notice.
+describe('permissionRows', () => {
+  const agent = (over: Partial<PermissionAgentLike> = {}): PermissionAgentLike => ({
+    name: 'claude-code',
+    label: 'Claude Code',
+    ...over,
+  })
+  const base = { isMac: true, accessibilityGranted: true, accessibilityAsked: false }
+  const protectedAt = (anchor: string, grant: string) => ({
+    protected: true,
+    grant,
+    anchor,
+  })
+
+  it('renders nothing off macOS (R12)', () => {
+    expect(
+      permissionRows({
+        ...base,
+        isMac: false,
+        agents: [agent({ access: protectedAt('/Users/x/Documents', 'none') })],
+      }),
+    ).toEqual([])
+  })
+
+  it('is present with nothing wrong, and offers no action then (R4)', () => {
+    const rows = permissionRows({ ...base, agents: [agent()] })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.id).toBe('accessibility')
+    expect(rows[0]!.state).toBe('allowed')
+    expect(rows[0]!.action).toBeNull()
+  })
+
+  it('offers the accessibility ask when it is not granted', () => {
+    const rows = permissionRows({ ...base, accessibilityGranted: false, agents: [agent()] })
+    expect(rows[0]!.state).toBe('not-allowed')
+    expect(rows[0]!.action).toEqual({ label: 'Allow access', kind: 'ax-request' })
+  })
+
+  it('labels the accessibility ask honestly once the prompt is spent', () => {
+    const rows = permissionRows({
+      ...base,
+      accessibilityGranted: false,
+      accessibilityAsked: true,
+      agents: [agent()],
+    })
+    expect(rows[0]!.action?.label).toBe('Open System Settings')
+  })
+
+  it('adds no folder row for an unprotected agent folder', () => {
+    const rows = permissionRows({
+      ...base,
+      agents: [agent({ access: { protected: false, grant: 'none', anchor: null } })],
+    })
+    expect(rows).toHaveLength(1)
+  })
+
+  it('adds no folder row when the sidecar is too old to report access', () => {
+    // Version skew must degrade to today's behaviour, never to a false alarm.
+    const rows = permissionRows({ ...base, agents: [agent({ access: undefined })] })
+    expect(rows).toHaveLength(1)
+  })
+
+  it('offers a sync for a protected folder with no grant yet', () => {
+    const rows = permissionRows({
+      ...base,
+      agents: [agent({ access: protectedAt('/Users/x/Documents', 'none') })],
+    })
+    const folder = rows.find((r) => r.id.startsWith('folder:'))
+    expect(folder?.state).toBe('needs-access')
+    // "Sync now" named the MECHANISM (a user-initiated sync is what triggers
+    // the probe that makes macOS ask). It is not what the person is trying to
+    // do, and in Skillet "sync" pulls from the registry, so a permissions
+    // button reading "Sync now" suggests the opposite of what it does. It
+    // matches the Accessibility row directly above it instead.
+    expect(folder?.action).toEqual({
+      label: 'Allow access',
+      kind: 'folder-sync',
+      anchor: '/Users/x/Documents',
+    })
+  })
+
+  it('offers a retry, not another sync, for a denied folder', () => {
+    const rows = permissionRows({
+      ...base,
+      agents: [agent({ access: protectedAt('/Users/x/Documents', 'suspended') })],
+    })
+    const folder = rows.find((r) => r.id.startsWith('folder:'))
+    expect(folder?.state).toBe('denied')
+    expect(folder?.action).toEqual({
+      label: 'Try again',
+      kind: 'folder-retry',
+      anchor: '/Users/x/Documents',
+    })
+  })
+
+  it('reports a granted folder as allowed, with nothing to do', () => {
+    const rows = permissionRows({
+      ...base,
+      agents: [agent({ access: protectedAt('/Users/x/Documents', 'active') })],
+    })
+    const folder = rows.find((r) => r.id.startsWith('folder:'))
+    expect(folder?.state).toBe('allowed')
+    expect(folder?.action).toBeNull()
+  })
+
+  it('collapses two agents under one anchor into one row', () => {
+    // macOS scopes consent per protected folder, so two rows would offer the
+    // same grant twice and a second press would do nothing.
+    const rows = permissionRows({
+      ...base,
+      agents: [
+        agent({ name: 'claude-code', access: protectedAt('/Users/x/Documents', 'none') }),
+        agent({ name: 'codex', label: 'Codex', access: protectedAt('/Users/x/Documents', 'none') }),
+      ],
+    })
+    expect(rows.filter((r) => r.id.startsWith('folder:'))).toHaveLength(1)
+  })
+
+  it('keeps separate anchors as separate rows', () => {
+    const rows = permissionRows({
+      ...base,
+      agents: [
+        agent({ name: 'claude-code', access: protectedAt('/Users/x/Documents', 'none') }),
+        agent({ name: 'codex', label: 'Codex', access: protectedAt('/Users/x/Desktop', 'suspended') }),
+      ],
+    })
+    expect(rows.filter((r) => r.id.startsWith('folder:'))).toHaveLength(2)
+  })
+
+  // Settings lists every permission (that is the inventory value), but only a
+  // capability Skillet actually needs counts as a problem. Accessibility drives
+  // the optional paste shortcut; a folder Skillet cannot read stops it doing
+  // its core job.
+  it('marks a folder that needs access as blocking', () => {
+    const rows = permissionRows({
+      ...base,
+      agents: [agent({ access: protectedAt('/Users/x/Documents', 'none') })],
+    })
+    expect(rows.find((r) => r.id.startsWith('folder:'))?.blocking).toBe(true)
+  })
+
+  it('marks a denied folder as blocking', () => {
+    const rows = permissionRows({
+      ...base,
+      agents: [agent({ access: protectedAt('/Users/x/Documents', 'suspended') })],
+    })
+    expect(rows.find((r) => r.id.startsWith('folder:'))?.blocking).toBe(true)
+  })
+
+  it('never marks accessibility as blocking, granted or not', () => {
+    for (const granted of [true, false]) {
+      const rows = permissionRows({ ...base, accessibilityGranted: granted, agents: [agent()] })
+      expect(rows.find((r) => r.id === 'accessibility')?.blocking).toBe(false)
+    }
+  })
+
+  it('marks an allowed folder as not blocking', () => {
+    const rows = permissionRows({
+      ...base,
+      agents: [agent({ access: protectedAt('/Users/x/Documents', 'active') })],
+    })
+    expect(rows.find((r) => r.id.startsWith('folder:'))?.blocking).toBe(false)
+  })
+
+  it('never leaves a problem row without an action (R3)', () => {
+    for (const grant of ['none', 'suspended', 'active']) {
+      for (const granted of [true, false]) {
+        const rows = permissionRows({
+          ...base,
+          accessibilityGranted: granted,
+          agents: [agent({ access: protectedAt('/Users/x/Documents', grant) })],
+        })
+        for (const row of rows) {
+          expect(row.label.length).toBeGreaterThan(0)
+          if (row.state !== 'allowed') {
+            expect(row.action, `${row.id} in state ${row.state} has no action`).toBeTruthy()
+            expect(row.action!.label.length).toBeGreaterThan(0)
+          }
+        }
+      }
+    }
+  })
+
+  it('never uses an em-dash (product copy rule)', () => {
+    const rows = permissionRows({
+      ...base,
+      accessibilityGranted: false,
+      agents: [agent({ access: protectedAt('/Users/x/Documents', 'suspended') })],
+    })
+    for (const row of rows) {
+      expect(row.label).not.toContain('—')
+      expect(row.detail).not.toContain('—')
+      expect(row.action?.label ?? '').not.toContain('—')
+    }
+  })
+})
+
+describe('permissionsNeedAttention', () => {
+  const rows = (...blocking: boolean[]) =>
+    blocking.map((b, i) => ({
+      id: `r${i}`,
+      label: 'x',
+      detail: 'y',
+      state: b ? 'needs-access' : 'allowed',
+      blocking: b,
+      action: null,
+    })) as Parameters<typeof permissionsNeedAttention>[0]
+
+  it('is quiet when everything is allowed', () => {
+    expect(permissionsNeedAttention(rows(false, false))).toBe(false)
+  })
+
+  it('is quiet with no rows at all (off macOS)', () => {
+    expect(permissionsNeedAttention([])).toBe(false)
+  })
+
+  it('fires only for a blocking row', () => {
+    expect(permissionsNeedAttention(rows(false, true))).toBe(true)
+  })
+
+  // Accessibility powers ONE optional feature (the paste shortcut), and the
+  // Agents view already explains it where you would go to enable it. Badging
+  // the avatar because someone never turned on a feature they may not want is
+  // nagging, not signal.
+  it('stays quiet for an optional capability that is merely off', () => {
+    expect(permissionsNeedAttention(rows(false, false))).toBe(false)
   })
 })
 

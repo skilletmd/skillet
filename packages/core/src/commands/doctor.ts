@@ -11,6 +11,7 @@ import { resolveSkillDescription } from '../kit/skill-description.js';
 import { isKitSyncedSkill } from '../kit/sync-scope.js';
 import matter from 'gray-matter';
 import { defaultApprovalLockPath } from '../trust/approval-lock.js';
+import { describeTccRoot, detectTccInvocation } from '../util/tcc-access.js';
 import { listPinnedHandles, defaultPinDir } from '../signing/pin.js';
 import {
   deviceFilePath,
@@ -84,6 +85,31 @@ export interface DoctorReportCursorDescription {
   resolved_description: string;
 }
 
+export interface DoctorReportFolderAccessEntry {
+  name: string;
+  target_dir: string;
+  /** The realpath'd protected folder the root resolves under. */
+  anchor: string | null;
+  grant: 'active' | 'suspended' | 'none';
+}
+
+/**
+ * macOS folder access, per adapter root.
+ *
+ * `context` is the TCC identity this report describes. macOS attributes a
+ * grant to the responsible app, so one earned under the desktop tray says
+ * nothing about the terminal's and vice versa. A support paste that does not
+ * name which identity it means is worse than no paste at all.
+ *
+ * `entries` lists only roots that actually resolve under a protected folder.
+ * A normal install has none, and a diagnostic that prints a row per adapter
+ * saying "fine" is noise in the 99% case.
+ */
+export interface DoctorReportFolderAccess {
+  context: 'desktop' | 'cli';
+  entries: DoctorReportFolderAccessEntry[];
+}
+
 export interface DoctorReport {
   schema: typeof DOCTOR_REPORT_SCHEMA;
   generated_at: string;
@@ -97,6 +123,7 @@ export interface DoctorReport {
   store_drift: DoctorReportStoreDrift[];
   store_missing: DoctorReportStoreMissing[];
   cursor_description_synthesis: DoctorReportCursorDescription[];
+  folder_access: DoctorReportFolderAccess;
 }
 
 export interface DoctorReportOptions extends AuthStatusOptions {
@@ -234,5 +261,45 @@ export async function collectDoctorReport(
     store_drift: storeDrift,
     store_missing: storeMissing,
     cursor_description_synthesis: cursorDescriptionSynthesis,
+    folder_access: collectFolderAccess(adapters),
   };
+}
+
+/**
+ * Protected adapter roots and what this identity may do with them.
+ *
+ * Reported through describeTccRoot, never assessTccRoot: a diagnostic that
+ * raised the macOS consent dialog would be a diagnostic nobody could run
+ * safely. Only protected roots are listed, so a normal install reports an
+ * empty list and the human formatter prints nothing.
+ *
+ * Project adapters are skipped, matching the TCC gate in sync(). Their
+ * targetDir is a RELATIVE path under the project cwd (`.cursor/rules`), so
+ * resolving it here would describe wherever the command happened to run. Any
+ * checkout inside ~/Documents would then report every project adapter as
+ * needing folder access, which is both wrong and unactionable: sync never
+ * parks a project adapter, and the consent that matters belongs to the repo,
+ * not to Skillet.
+ */
+function collectFolderAccess(adapters: Adapter[]): DoctorReportFolderAccess {
+  const { context } = detectTccInvocation();
+  const entries: DoctorReportFolderAccessEntry[] = [];
+  const seenAnchors = new Set<string>();
+  for (const adapter of adapters) {
+    if (adapter.kind === 'project') continue;
+    const access = describeTccRoot(adapter.targetDir, context);
+    if (!access.protected) continue;
+    // One row per adapter, but never two rows for one anchor+root pair —
+    // several adapters can share a skills dir (the universal baseline).
+    const key = `${adapter.name}:${access.anchor ?? ''}:${adapter.targetDir}`;
+    if (seenAnchors.has(key)) continue;
+    seenAnchors.add(key);
+    entries.push({
+      name: adapter.name,
+      target_dir: adapter.targetDir,
+      anchor: access.anchor,
+      grant: access.grant,
+    });
+  }
+  return { context, entries };
 }

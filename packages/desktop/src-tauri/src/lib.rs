@@ -1059,14 +1059,137 @@ fn accessibility_granted() -> bool {
     }
 }
 
+/// Marks that this app has already raised the Accessibility prompt once.
+///
+/// macOS shows that prompt at most once per app: every later call to
+/// `application_is_trusted_with_prompt` is a silent no-op. Nothing in the API
+/// reports "already asked" — `application_is_trusted()` is equally false before
+/// the first ask and after a refusal — so the only way to tell a first ask from
+/// a repeat is to remember it. Same shape as the onboarding flag.
+#[cfg(target_os = "macos")]
+fn accessibility_asked_flag() -> std::path::PathBuf {
+    std::path::Path::new(&skillet_home()).join(".skillet-accessibility-asked")
+}
+
+/// Ask for Accessibility, one surface at a time.
+///
+/// This used to fire the native prompt AND open System Settings in the same
+/// breath, so a first-time ask put a system dialog and a settings window on
+/// screen together and made the app look like it was demanding two things.
+/// The redirect was there because a second press does nothing visible, which
+/// is true — but that is a reason to branch, not to always do both.
 #[tauri::command]
 fn request_accessibility() {
     #[cfg(target_os = "macos")]
     {
+        let flag = accessibility_asked_flag();
+        if flag.exists() {
+            // The prompt is spent. Settings is the only surface left.
+            open_privacy_pane("Privacy_Accessibility");
+            return;
+        }
+        if let Some(parent) = flag.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&flag, "1");
         macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
-        let _ = std::process::Command::new("open")
-            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
-            .spawn();
+    }
+}
+
+/// Whether the Accessibility prompt has already been spent on this machine.
+/// Surfaces read this to label the action honestly: "Allow" the first time,
+/// "Open System Settings" after.
+#[tauri::command]
+fn accessibility_asked() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        accessibility_asked_flag().exists()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        false
+    }
+}
+
+/// Open one anchor of System Settings ▸ Privacy & Security.
+///
+/// Uses the MODERN pane id (`com.apple.settings.PrivacySecurity.extension`).
+/// The legacy `com.apple.preference.security` form still resolves for
+/// Accessibility, but Files and Folders has no legacy anchor at all, so one
+/// modern helper keeps both links on the same spelling instead of leaving a
+/// lone legacy string to rot next to a modern one.
+#[cfg(target_os = "macos")]
+fn open_privacy_pane(anchor: &str) {
+    let _ = std::process::Command::new("open")
+        .arg(format!(
+            "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?{anchor}"
+        ))
+        .spawn();
+}
+
+/// The `tccutil` service name for a protected-folder anchor.
+///
+/// A fixed mapping, not string interpolation. The anchor arrives from the
+/// webview, and this is what keeps it out of the command's argument list: an
+/// unrecognised path maps to None and no process is spawned at all.
+fn tccutil_service_for(anchor: &str) -> Option<&'static str> {
+    match std::path::Path::new(anchor).file_name()?.to_str()? {
+        "Documents" => Some("SystemPolicyDocumentsFolder"),
+        "Desktop" => Some("SystemPolicyDesktopFolder"),
+        "Downloads" => Some("SystemPolicyDownloadsFolder"),
+        _ => None,
+    }
+}
+
+/// Re-arm the macOS folder-access prompt for one protected folder.
+///
+/// Once a grant is refused, TCC records the denial and never asks again, so
+/// "try again" is not something the app can do by retrying its own work.
+/// Resetting this bundle's own entry for that service is what makes the next
+/// user-initiated sync able to prompt at all.
+///
+/// Best-effort by design. `tccutil` needs no elevation to reset an app's own
+/// entries today, but it is a shell-out to a tool Apple has tightened before,
+/// and it exits non-zero when there is no entry to reset. The caller always
+/// falls through to System Settings, so the button lands somewhere useful
+/// whatever this returns.
+///
+/// No marker bookkeeping: a successful user-initiated read afterwards calls
+/// recordTccGrant, which clears the suspension in tcc-access.json on its own.
+#[tauri::command]
+fn reset_folder_access(app: tauri::AppHandle, anchor: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let service = tccutil_service_for(&anchor).ok_or("not a protected folder")?;
+        let bundle_id = app.config().identifier.clone();
+        let status = hidden_command("tccutil")
+            .args(["reset", service, &bundle_id])
+            .status()
+            .map_err(|e| e.to_string())?;
+        if !status.success() {
+            return Err(format!("tccutil exited {status}"));
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (app, anchor);
+        Err("folder access is a macOS concept".to_string())
+    }
+}
+
+/// Files and Folders — the recovery route for a REFUSED folder grant.
+///
+/// macOS records a denial and never prompts again, so the tray's needs-access
+/// notice cannot fix a denied folder by re-running the sync however many times
+/// it is pressed. Leaving the app is the only move left, and until this existed
+/// there was nothing to leave to: the app shipped copy telling people to open
+/// System Settings with no way to take them there.
+#[tauri::command]
+fn open_folder_access_settings() {
+    #[cfg(target_os = "macos")]
+    {
+        open_privacy_pane("Privacy_FilesAndFolders");
     }
 }
 
@@ -1502,6 +1625,9 @@ pub fn run() {
             open_web,
             accessibility_granted,
             request_accessibility,
+            accessibility_asked,
+            open_folder_access_settings,
+            reset_folder_access,
             finish_onboarding
         ])
         .setup(|app| {
@@ -1618,6 +1744,41 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Skillet");
+}
+
+#[cfg(test)]
+mod folder_access_tests {
+    use super::tccutil_service_for;
+
+    // The anchor comes from the webview. Only the three real protected folders
+    // may reach a spawned command, and they reach it as a fixed service name,
+    // never as the caller's own string.
+    #[test]
+    fn maps_each_protected_folder_to_its_service() {
+        assert_eq!(
+            tccutil_service_for("/Users/x/Documents"),
+            Some("SystemPolicyDocumentsFolder")
+        );
+        assert_eq!(
+            tccutil_service_for("/Users/x/Desktop"),
+            Some("SystemPolicyDesktopFolder")
+        );
+        assert_eq!(
+            tccutil_service_for("/Users/x/Downloads"),
+            Some("SystemPolicyDownloadsFolder")
+        );
+    }
+
+    #[test]
+    fn refuses_anything_else() {
+        assert_eq!(tccutil_service_for("/Users/x/.claude/skills"), None);
+        assert_eq!(tccutil_service_for("/Users/x/Documents/nested"), None);
+        assert_eq!(tccutil_service_for(""), None);
+        assert_eq!(tccutil_service_for("/"), None);
+        // Shell metacharacters are not special to Command, but they must not
+        // resolve to a service either.
+        assert_eq!(tccutil_service_for("/tmp/Documents; rm -rf /"), None);
+    }
 }
 
 #[cfg(test)]

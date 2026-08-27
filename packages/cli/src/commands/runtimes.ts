@@ -2,7 +2,8 @@ import type { Command } from 'commander'
 import { homedir } from 'node:os'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { runtimeLabel } from '@skillet/core'
+import { describeTccRoot, detectTccInvocation, runtimeLabel } from '@skillet/core'
+import type { TccRootDescription } from '@skillet/core'
 import {
   ADDITIONAL_ADAPTERS,
   BASELINE_GLOBAL_ADAPTERS,
@@ -33,7 +34,18 @@ export function registerRuntimesCommand(program: Command): void {
   const action = async (opts: { json?: boolean }) => {
       const agentsSkills = join(homedir(), '.agents', 'skills')
       const seen = new Set<string>()
-      const runtimes: Array<{ name: string; label: string; targetDir: string }> = []
+      // Folder access is reported, never probed: describeTccRoot answers from
+      // paths and the grant store, so listing your agents can't be the thing
+      // that raises the macOS consent dialog. The context is this process's
+      // own TCC identity (desktop when the tray spawned us, cli otherwise) —
+      // a grant earned under one says nothing about the other.
+      const { context } = detectTccInvocation()
+      const runtimes: Array<{
+        name: string
+        label: string
+        targetDir: string
+        access: TccRootDescription
+      }> = []
       // Baseline first (Codex owns the universal dir), then additional runtimes.
       for (const adapter of [...BASELINE_GLOBAL_ADAPTERS, ...ADDITIONAL_ADAPTERS]) {
         if (seen.has(adapter.name)) continue
@@ -49,12 +61,14 @@ export function registerRuntimesCommand(program: Command): void {
               adapter.name === 'codex' && existsSync(join(homedir(), '.codex'))
                 ? 'Codex'
                 : runtimeLabel(adapter.name)
+            const targetDir = GLOBAL_AGENTS_SKILLS.has(adapter.name)
+              ? agentsSkills
+              : adapter.targetDir
             runtimes.push({
               name: adapter.name,
               label,
-              targetDir: GLOBAL_AGENTS_SKILLS.has(adapter.name)
-                ? agentsSkills
-                : adapter.targetDir,
+              targetDir,
+              access: describeTccRoot(targetDir, context),
             })
           }
         } catch {
@@ -74,6 +88,7 @@ export function registerRuntimesCommand(program: Command): void {
               name: adapter.name,
               label: runtimeLabel(adapter.name),
               targetDir: agentsSkills,
+              access: describeTccRoot(agentsSkills, context),
             })
           }
         } catch {

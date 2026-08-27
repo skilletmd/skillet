@@ -267,6 +267,49 @@ export function hermesProfileRoot(): string | null {
   return computeHermesProfileRootUngated();
 }
 
+export interface TccRootDescription {
+  /** The root resolves into a macOS-protected folder. */
+  protected: boolean;
+  /** The strongest grant `context` holds over the root. */
+  grant: GrantState;
+  /** The realpath'd protected folder the root resolves under, or null when it
+   *  resolves outside all three. This is the unit of both grouping and reset:
+   *  macOS scopes consent per protected folder, so two roots sharing an anchor
+   *  are one grant, one surface row, and one `tccutil` service. */
+  anchor: string | null;
+}
+
+/**
+ * Non-probing assessment — the REPORTING counterpart to `assessTccRoot`.
+ *
+ * `assessTccRoot` exists to perform the TCC-gated read; for a user-initiated
+ * run that read is the consent moment and macOS may prompt. That makes it
+ * unusable for a status readout: a surface that only wants to SAY a folder
+ * needs access must never be the thing that raises the dialog. This answers
+ * from paths and the grant store alone, touching the filesystem no further
+ * than realpath resolution.
+ *
+ * `context` is an argument rather than a read of `detectTccInvocation()` so a
+ * caller can report on an identity other than its own — `skillet doctor` run
+ * in a terminal still needs to say what the desktop's markers look like, and
+ * conflating the two is how a support paste reports the wrong answer
+ * confidently.
+ */
+export function describeTccRoot(
+  root: string,
+  context: TccContext,
+): TccRootDescription {
+  if (!isTccProtectedPath(root)) {
+    return { protected: false, grant: "none", anchor: null };
+  }
+  const resolved = realpathDeepestExisting(root);
+  return {
+    protected: true,
+    grant: grantStateCovering(resolved, context),
+    anchor: tccProtectedAnchorFor(resolved),
+  };
+}
+
 export interface TccRootAccess {
   /** The root resolves into a macOS-protected folder. */
   protected: boolean;

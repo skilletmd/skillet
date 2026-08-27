@@ -484,9 +484,27 @@ export function parkedNotice(
   return { count: parked.length, denied: parked.some((a) => a.parkedDenied === true) }
 }
 
-/** Notice copy: one row, an action, no modes. The denied variant routes to
- *  System Settings because re-syncing cannot re-prompt a refused grant. */
-export function parkedNoticeCopy(notice: ParkedNotice): { title: string; detail: string } {
+/** What the notice's one button does. `sync` re-runs a user-initiated sync,
+ *  which is what earns an ungranted folder its one macOS prompt. `settings`
+ *  opens the Files and Folders pane, the only route left once a grant was
+ *  refused. */
+export type ParkedActionKind = 'sync' | 'settings'
+
+export type ParkedAction = { label: string; kind: ParkedActionKind }
+
+/** Notice copy: one row, an action, no modes.
+ *
+ *  The action is part of the copy, not the caller's choice. It used to be a
+ *  hardcoded "Sync now" in the renderer while only the DETAIL string branched
+ *  on `denied` — so a denied person read "allow Skillet in System Settings"
+ *  next to a button that ran the one operation macOS guarantees cannot help
+ *  (it never re-prompts after a refusal). Keeping label, detail, and behaviour
+ *  in one place is what stops that drift recurring. */
+export function parkedNoticeCopy(notice: ParkedNotice): {
+  title: string
+  detail: string
+  action: ParkedAction
+} {
   const title =
     notice.count === 1
       ? '1 agent folder needs access'
@@ -494,9 +512,195 @@ export function parkedNoticeCopy(notice: ParkedNotice): { title: string; detail:
   const detail = notice.denied
     ? 'Allow Skillet in System Settings under Privacy and Security, then sync.'
     : notice.count === 1
-      ? 'Sync now to grant it.'
-      : 'Sync now to grant them.'
-  return { title, detail }
+      ? 'Allow access so Skillet can update it.'
+      : 'Allow access so Skillet can update them.'
+  // Not "Sync now". That names the mechanism rather than the outcome, and this
+  // notice sits on the same view as the hero refresh — two buttons reading
+  // "Sync now" that do different things. In Skillet, sync also PULLS from the
+  // registry, so it reads as the opposite of granting a local folder.
+  const action: ParkedAction = notice.denied
+    ? { label: 'Open System Settings', kind: 'settings' }
+    : { label: 'Allow access', kind: 'sync' }
+  return { title, detail, action }
+}
+
+// ── Accessibility ask ───────────────────────────────────────────────────────
+// macOS raises the Accessibility prompt at most once per app; every later call
+// is a silent no-op. The old flow fired the prompt and opened System Settings
+// together, which put two surfaces on screen for a first-time ask. Branching
+// needs the app to remember whether the prompt was already spent, because the
+// OS will not say.
+
+/** Label for the Accessibility action. "Allow access" is only honest while a
+ *  prompt can still appear; after that the button can do one thing. */
+export function accessibilityActionLabel(asked: boolean): string {
+  return asked ? 'Open System Settings' : 'Allow access'
+}
+
+// ── Permissions block (Settings) ────────────────────────────────────────────
+// One place that says what Skillet is allowed to do on this machine, present
+// whether or not anything is wrong. Before this the app never reported its own
+// permissions: accessibility state surfaced only as a conditional button in the
+// Agents view, and folder state only as a notice you could dismiss and never
+// find again.
+//
+// Every state-to-action mapping lives here so the Settings block and the Synced
+// folders rows cannot drift, and so the mapping is testable without a webview.
+
+export type PermissionState = 'allowed' | 'not-allowed' | 'needs-access' | 'denied'
+
+export type PermissionActionKind =
+  | 'ax-request'
+  | 'folder-sync'
+  | 'folder-retry'
+
+export type PermissionAction = {
+  label: string
+  kind: PermissionActionKind
+  /** The protected folder the action applies to (folder actions only). */
+  anchor?: string
+}
+
+export type PermissionRow = {
+  /** 'accessibility', or `folder:<anchor>` — stable per surface. */
+  id: string
+  label: string
+  detail: string
+  state: PermissionState
+  /**
+   * Is Skillet actually stopped by this?
+   *
+   * Settings lists every permission because the inventory is the point, but
+   * only a blocking row is a PROBLEM: it gets the caution mark and it lights
+   * the rail dot. Accessibility drives one optional feature (the paste
+   * shortcut), and the Agents view already explains it where you would go to
+   * enable it — badging someone for a feature they never asked for is nagging.
+   * A folder Skillet cannot read stops it doing its core job.
+   */
+  blocking: boolean
+  /** Null only when the state needs nothing done (R3). */
+  action: PermissionAction | null
+}
+
+/** One detected runtime as the tray sees it, with the folder-access block
+ *  `skillet agents --json` reports. `access` is optional: an older bundled
+ *  sidecar does not send it, and that must degrade to today's behaviour rather
+ *  than to a false alarm. */
+export type PermissionAgentLike = {
+  name: string
+  label?: string
+  access?: {
+    protected: boolean
+    grant: string
+    anchor: string | null
+  }
+}
+
+/** Is Skillet blocked by a missing permission? Drives the Settings rail dot: a
+ *  blocked capability that only Settings reveals is one the user has to go and
+ *  find, and one they never find stays blocked. Optional capabilities that are
+ *  merely off do not qualify. */
+export function permissionsNeedAttention(rows: PermissionRow[]): boolean {
+  return rows.some((row) => row.blocking)
+}
+
+function folderName(anchor: string): string {
+  const parts = anchor.split('/').filter(Boolean)
+  return parts[parts.length - 1] ?? anchor
+}
+
+export function permissionRows(input: {
+  isMac: boolean
+  accessibilityGranted: boolean
+  accessibilityAsked: boolean
+  agents: PermissionAgentLike[]
+}): PermissionRow[] {
+  // TCC and Accessibility are macOS mechanisms. A Linux or Windows install has
+  // nothing to show and nothing to act on.
+  if (!input.isMac) return []
+
+  const rows: PermissionRow[] = [
+    input.accessibilityGranted
+      ? {
+          id: 'accessibility',
+          label: 'Paste into other apps',
+          detail: 'Skillet can drop a skill into whatever you are typing in.',
+          state: 'allowed',
+          blocking: false,
+          action: null,
+        }
+      : {
+          id: 'accessibility',
+          label: 'Paste into other apps',
+          detail: 'Used by the paste shortcut. Skillet works without it.',
+          state: 'not-allowed',
+          blocking: false,
+          action: {
+            label: accessibilityActionLabel(input.accessibilityAsked),
+            kind: 'ax-request',
+          },
+        },
+  ]
+
+  // Group by anchor, not by agent. macOS scopes a grant to the whole protected
+  // folder, so two agents inside ~/Documents share one grant: two rows would
+  // offer the same thing twice and the second press would do nothing.
+  const byAnchor = new Map<string, { agents: string[]; grant: string }>()
+  for (const agent of input.agents) {
+    const access = agent.access
+    if (!access?.protected || !access.anchor) continue
+    const entry = byAnchor.get(access.anchor)
+    const label = agent.label ?? agent.name
+    if (entry) {
+      entry.agents.push(label)
+      // Worst state wins: a denial anywhere under the anchor is the anchor's
+      // state, because it is the anchor macOS refused.
+      if (access.grant === 'suspended') entry.grant = 'suspended'
+      else if (entry.grant === 'active' && access.grant === 'none') entry.grant = 'none'
+    } else {
+      byAnchor.set(access.anchor, { agents: [label], grant: access.grant })
+    }
+  }
+
+  for (const [anchor, { agents, grant }] of byAnchor) {
+    const who = agents.join(', ')
+    const label = `${folderName(anchor)} folder`
+    if (grant === 'active') {
+      rows.push({
+        id: `folder:${anchor}`,
+        label,
+        detail: `Skillet can update ${who} skills here.`,
+        state: 'allowed',
+        blocking: false,
+        action: null,
+      })
+    } else if (grant === 'suspended') {
+      rows.push({
+        id: `folder:${anchor}`,
+        label,
+        detail: `Access was refused, so ${who} is not up to date.`,
+        state: 'denied',
+        blocking: true,
+        action: { label: 'Try again', kind: 'folder-retry', anchor },
+      })
+    } else {
+      rows.push({
+        id: `folder:${anchor}`,
+        label,
+        detail: `${who} keeps skills here. macOS asks before Skillet can read it.`,
+        state: 'needs-access',
+        blocking: true,
+        // The label says what the person gets, not how it happens. Pressing it
+        // runs a user-initiated sync because that is the invocation class
+        // allowed to probe, but "Sync now" describes Skillet's plumbing and,
+        // worse, sync PULLS from the registry — so it reads as the opposite of
+        // granting a local folder. Matches the Accessibility row's wording.
+        action: { label: 'Allow access', kind: 'folder-sync', anchor },
+      })
+    }
+  }
+
+  return rows
 }
 
 /**

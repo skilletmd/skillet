@@ -320,14 +320,16 @@ button.link { appearance: none; -webkit-appearance: none; background: none; bord
 }
 .rail-avatar:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
 .rail-avatar.on { background: color-mix(in srgb, var(--ink) 9%, transparent); }
-/* Passive "app update ready" cue on the account avatar (opens Settings, where the
-   relaunch bar lives). Green = ready/go, distinct from the amber Home bell; the
-   double ring keeps it legible over any avatar photo (light, dark, or busy). */
+/* Passive cue on the account avatar (opens Settings). Two meanings, two colours:
+   green = an app update ready to install (go, distinct from the amber Home
+   bell), amber = a capability Skillet needs and lacks, matching the Permissions
+   row it leads to. The double ring keeps either legible over any avatar photo. */
 .rail-avatar-dot {
   position: absolute; top: 3px; right: 3px; width: 8px; height: 8px;
   border-radius: 50%; background: var(--success);
   box-shadow: 0 0 0 1.5px var(--card-soft), 0 0 0 2.5px color-mix(in srgb, var(--ink) 18%, transparent);
 }
+.rail-avatar-dot.attention { background: var(--caution); }
 .avatar-mono {
   width: 27px; height: 27px; border-radius: 50%; background: var(--accent-bg); color: var(--ink-2);
   display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; text-transform: uppercase;
@@ -445,6 +447,34 @@ button.link { appearance: none; -webkit-appearance: none; background: none; bord
 .set-row { display: flex; align-items: center; padding: 8px 16px; }
 .set-row .nm { font-size: 13px; font-weight: 500; }
 .set-account { margin-top: 4px; padding-top: 10px; }
+/* Permissions — a standing block, not an alert. It reads as an inventory when
+   everything is fine, which is the point: a denial has to be findable later,
+   not only in the moment it happens. */
+.set-perms { margin-top: 10px; }
+.set-perms-head {
+  padding: 0 16px 2px; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3, var(--ink-2));
+}
+.set-perm-row { padding-top: 6px; padding-bottom: 6px; }
+.set-perm-ok { font-size: 12px; color: var(--ink-2); }
+/* A blocked capability is not a settings row. Grey status text next to Sign out
+   and Rename reads as information; this is a problem with a fix attached, so
+   the state carries color and the fix looks like the action in its row. */
+/* Dot carries the alarm, text carries the meaning. Amber TEXT on the light
+   surface fails contrast, so the status keeps full ink weight and the caution
+   token shows up as a mark beside it. */
+.set-perm-warn { color: var(--ink); font-weight: 500; display: flex; align-items: center; gap: 5px; }
+.set-perm-warn::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--caution); flex: none;
+}
+.set-perm-row.needs .nm { font-weight: 600; }
+.set-action-fix {
+  color: var(--accent); font-weight: 600;
+  background: var(--accent-bg); border-radius: 6px; padding: 4px 10px;
+}
+.set-action-fix:hover { background: var(--accent-bg); filter: brightness(0.96); }
+.set-action-fix:disabled { opacity: 0.55; }
 /* Navigation rows (Open web, Help & docs) — full-width tappable rows with an
    external-link glyph, set off from the account block by spacing (no hairline). */
 .set-links { margin-top: 10px; }
