@@ -2,6 +2,8 @@
 import type { PrismaDb } from '../db/prisma-client.js'
 import { isHandleSuspendedPrisma, suspendedAuthorHandlesPrisma } from './suspension.js'
 import { handleReachPrisma, summonCountsBySkillPrisma } from './summon-events.js'
+import { parseSummonSuggestionSet } from '@skillet/protocol'
+import { filterResolvableSuggestions, suggestionVoice } from '../suggestions/payload.js'
 
 interface ProfileAuthorRow {
   id: string
@@ -17,6 +19,7 @@ interface ProfileAuthorRow {
   source_owner_type: string | null
   agents_public: number
   shown_agents: string | null
+  suggestions: string | null
 }
 
 function normalizeSourceOwnerType(
@@ -138,6 +141,7 @@ export async function getProfilePrisma(
       source_owner_type: true,
       agents_public: true,
       shown_agents: true,
+      suggestions: true,
     },
   })) as ProfileAuthorRow | null
   if (!author) return null
@@ -178,6 +182,14 @@ export async function getProfilePrisma(
     },
   })
 
+  // A stored set outlives the skills it was generated from, so it is filtered
+  // against the same public list the profile renders rather than trusted as-is.
+  const storedSuggestions = parseSummonSuggestionSet(author.suggestions)
+  const publicRefs = new Set(skills.map((s) => `@${authorId}/${s.slug}`))
+  const suggestions = storedSuggestions
+    ? filterResolvableSuggestions(storedSuggestions.suggestions, publicRefs)
+    : null
+
   const total_installs = await countSkillAdoptersPrisma(prisma, authorId)
   // Summon reach (plan 012 U7): "summoned N times" per skill + the handle total.
   const summonBySkill = await summonCountsBySkillPrisma(prisma, skills.map((s) => s.id))
@@ -197,6 +209,11 @@ export async function getProfilePrisma(
     source_owner_type: isMirror ? normalizeSourceOwnerType(author.source_owner_type) : null,
     total_installs,
     total_summons,
+    // null means never generated; [] means generated and this kit could not
+    // support a confident line. The client renders nothing for either, but the
+    // backfill selects on the difference.
+    suggestions,
+    suggestions_voice: suggestionVoice(isMirror),
     skills: skills.map((s) => ({
       slug: s.slug,
       skill_id: s.id,
