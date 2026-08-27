@@ -32,12 +32,14 @@ The first sync completes in under 60 seconds. No OAuth until you publish.
 ## Publishing a skill
 
 ```bash
-# Publish under your account
-skillet publish @you/skill-name
+# Save to your profile, private
+skillet upload --skill skill-name
 
-# Publish under an org
-skillet publish @org/skill-name
+# Make it public
+skillet upload --skill skill-name --public
 ```
+
+Publishing under an organization is done on skillet.md, not from the CLI.
 
 Before publishing, Skillet runs a privacy scan to flag any PII (emails, tokens, API keys) in the skill content. Every published version is signed with your Ed25519 author key — recipients can verify the signature before the skill materializes on their machine.
 
@@ -74,12 +76,12 @@ Writes are atomic (temp file + rename). Existing files are backed up before any 
 
 **Auto-trust is OFF.** Updates from other authors arrive as graded diffs — colored, line-level changes — and require your explicit approval before they materialize. You are never silently overwritten.
 
-**Kits** are curated collections on the registry: `skillet kit add my-kit @author/skill` adds a skill to a kit you own. Good for sharing a team's standard context.
+**Kits** are curated collections on the registry. You build and edit them on skillet.md, then `skillet add kit @author/kit-name` subscribes this machine to one. Good for sharing a team's standard context.
 
 **`skillet.lock`** pins the exact version and registry URL for every skill your project depends on — the same guarantee as a lockfile in any package manager.
 
 ## Where to go from here
 
-- Publish your first skill: `skillet publish @you/<name>`
+- Publish your first skill: `skillet upload --skill <name>`
 - Write a better skill: `npx skilletmd add @skillet/write-a-skill`
 - Onboarding walkthrough: `npx skilletmd add @skillet/skillet-onboarding`

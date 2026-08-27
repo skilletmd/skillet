@@ -5,9 +5,16 @@
 // undefined and the caller reads the SKILL.md from disk, which exists in the
 // source tree.
 declare const __SKILLET_ROUTE_SKILL_MD__: string;
+declare const __SKILLET_CREATE_SKILL_MD__: string;
 
 export function inlinedRouteSkillMd(): string | undefined {
   return typeof __SKILLET_ROUTE_SKILL_MD__ !== "undefined"
     ? __SKILLET_ROUTE_SKILL_MD__
+    : undefined;
+}
+
+export function inlinedCreateSkillMd(): string | undefined {
+  return typeof __SKILLET_CREATE_SKILL_MD__ !== "undefined"
+    ? __SKILLET_CREATE_SKILL_MD__
     : undefined;
 }

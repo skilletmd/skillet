@@ -4,7 +4,7 @@ import { RESERVED_HANDLES, isReservedHandle } from '../src/reserved-handles.js';
 
 describe('reserved handles', () => {
   it('reserves brand, authority, and route names', () => {
-    for (const h of ['skillet', 'admin', 'support', 'official', 'api', 'settings', 'noreply']) {
+    for (const h of ['skillet', 'admin', 'support', 'official', 'api', 'settings', 'noreply', 'create']) {
       assert.equal(isReservedHandle(h), true, h);
     }
   });

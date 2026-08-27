@@ -66,8 +66,8 @@ This is the one task with no website equivalent: CI and headless agents have no 
 Mint a **kit-key**: a scoped, revocable credential that pulls one kit and nothing else.
 
 ```bash
-skillet kit key mint my-team-kit --label ci-runner   # prints a token, shown once
-skillet kit key revoke my-team-kit <kit-key-id>       # cut it off
+SKILLET_LEGACY_CLI=1 skillet kit key mint my-team-kit --label ci-runner   # prints a token, shown once
+SKILLET_LEGACY_CLI=1 skillet kit key revoke my-team-kit <kit-key-id>      # cut it off
 ```
 
 Store the token in your CI secret store. A kit-key for one kit can't see any other kit, even on the same machine. Revoking it takes effect on the next pull.

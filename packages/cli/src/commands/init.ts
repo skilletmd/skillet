@@ -9,8 +9,8 @@ import {
   BASELINE_GLOBAL_ADAPTERS,
   BASELINE_READER_ADAPTERS,
 } from '../cli-context.js'
-import { inlinedRouteSkillMd } from '../bundled-route-content.js'
-import { resolveBundledRouteSkillDir } from '../bundled-route-path.js'
+import { inlinedCreateSkillMd, inlinedRouteSkillMd } from '../bundled-route-content.js'
+import { resolveBundledCreateSkillDir, resolveBundledRouteSkillDir } from '../bundled-route-path.js'
 
 // Cursor reads the global ~/.agents/skills baseline rather than its own dir
 // (mirrors the runtimes command).
@@ -21,6 +21,13 @@ async function routeSkillMd(): Promise<string> {
   const inlined = inlinedRouteSkillMd()
   if (inlined) return inlined
   return readFile(join(resolveBundledRouteSkillDir(), 'SKILL.md'), 'utf8')
+}
+
+/** The `/skillet create` playbook the router dispatches to. */
+async function createSkillMd(): Promise<string> {
+  const inlined = inlinedCreateSkillMd()
+  if (inlined) return inlined
+  return readFile(join(resolveBundledCreateSkillDir(), 'SKILL.md'), 'utf8')
 }
 
 /** Detected runtimes and where their skills live (same detection as `agents`). */
@@ -74,6 +81,12 @@ export interface RouterInstallResult {
  */
 export async function installRouterSkill(): Promise<RouterInstallResult> {
   const md = await routeSkillMd()
+  // The router dispatches a leading `create` token to this playbook, so it has
+  // to land in the SAME pass. `init` is the no-account front door: there is no
+  // `~/.skillet` store yet and `sync` needs pairing, so a router installed
+  // without its playbook would answer `/skillet create` with a missing file and
+  // no reachable way to fix it.
+  const createMd = await createSkillMd()
   const targets = await detectRuntimeTargets()
   // Dedup by target dir: several runtimes can share ~/.agents/skills.
   const written = new Set<string>()
@@ -83,6 +96,9 @@ export async function installRouterSkill(): Promise<RouterInstallResult> {
     if (!written.has(dir)) {
       await mkdir(dir, { recursive: true })
       await writeFile(join(dir, 'SKILL.md'), md, 'utf8')
+      const createDir = join(t.targetDir, 'skillet-create')
+      await mkdir(createDir, { recursive: true })
+      await writeFile(join(createDir, 'SKILL.md'), createMd, 'utf8')
       written.add(dir)
     }
     labels.push(t.label)

@@ -11,6 +11,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 // which is what prepublishOnly uses.
 const dist = process.argv[2] ?? join(here, "..", "dist");
 const bundledSkill = join(dist, "bundled-skills", "skillet-route", "SKILL.md");
+const bundledCreateSkill = join(dist, "bundled-skills", "skillet-create", "SKILL.md");
 const cliCjs = join(dist, "cli.cjs");
 
 function fail(message) {
@@ -20,6 +21,10 @@ function fail(message) {
 
 if (!existsSync(bundledSkill)) {
   fail(`missing bundled route skill at ${bundledSkill}`);
+}
+
+if (!existsSync(bundledCreateSkill)) {
+  fail(`missing bundled create playbook at ${bundledCreateSkill}`);
 }
 
 if (!existsSync(cliCjs)) {

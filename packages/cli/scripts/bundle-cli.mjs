@@ -18,6 +18,10 @@ const routeSkillMd = await readFile(
   join(pkgRoot, "bundled-skills", "skillet-route", "SKILL.md"),
   "utf8",
 );
+const createSkillMd = await readFile(
+  join(pkgRoot, "bundled-skills", "skillet-create", "SKILL.md"),
+  "utf8",
+);
 
 const workspaceBuilt = join(pkgRoot, "node_modules", "@skillet", "core", "dist", "index.js");
 try {
@@ -47,6 +51,7 @@ await esbuild.build({
     "import.meta.url": "__esbuild_import_meta_url__",
     __SKILLET_CLI_VERSION__: JSON.stringify(pkgJson.version),
     __SKILLET_ROUTE_SKILL_MD__: JSON.stringify(routeSkillMd),
+    __SKILLET_CREATE_SKILL_MD__: JSON.stringify(createSkillMd),
   },
   packages: "bundle",
   logLevel: "info",

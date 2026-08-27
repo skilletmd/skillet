@@ -15,8 +15,8 @@ import { resolveSyncAdapters } from "./adapter-tiers.js";
 import { REGISTRY_DEFAULT } from "./cli-context.js";
 import { installRouteHooksWithConsent } from "./route-hooks-consent.js";
 import { webBaseUrl } from "./cli-command-tier.js";
-import { resolveBundledRouteSkillDir } from "./bundled-route-path.js";
-import { inlinedRouteSkillMd } from "./bundled-route-content.js";
+import { resolveBundledCreateSkillDir, resolveBundledRouteSkillDir } from "./bundled-route-path.js";
+import { inlinedCreateSkillMd, inlinedRouteSkillMd } from "./bundled-route-content.js";
 import { ok, fail, dim, bold, cyan } from "./cli-colors.js";
 import { printPendingReviewSummary } from "./pending-review-summary.js";
 import { printRenderedError } from "./render-error.js";
@@ -164,6 +164,8 @@ export async function runConnectedSync(
       registryUrl: REGISTRY_DEFAULT,
       bundledRouteSkillDir: resolveBundledRouteSkillDir(),
       bundledRouteSkillMd: inlinedRouteSkillMd(),
+      bundledCreateSkillDir: resolveBundledCreateSkillDir(),
+      bundledCreateSkillMd: inlinedCreateSkillMd(),
     });
     const stateAfter = await readState();
     const totalSkills = countUserSkills(stateAfter);

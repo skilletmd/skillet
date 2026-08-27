@@ -1,5 +1,7 @@
 import type { MaterializeOptions } from "../adapter.js";
 import {
+  BUNDLED_CREATE_MATERIALIZE_DIR,
+  BUNDLED_CREATE_SLUG,
   BUNDLED_ROUTE_MATERIALIZE_DIR,
   BUNDLED_ROUTE_SLUG,
 } from "../commands/route.js";
@@ -28,6 +30,13 @@ export function skillMaterializeIdentity(
       adapterSlug,
       owner,
       dirName: BUNDLED_ROUTE_MATERIALIZE_DIR,
+    };
+  }
+  if (slug === BUNDLED_CREATE_SLUG) {
+    return {
+      adapterSlug,
+      owner,
+      dirName: BUNDLED_CREATE_MATERIALIZE_DIR,
     };
   }
   return { adapterSlug, owner };

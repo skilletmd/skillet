@@ -7,6 +7,8 @@ import { PAGE_CONTAINER_CLASS } from '@/lib/page-layout'
 import { PageHeader } from '@/components/page-header'
 import { CARD_TREATMENT, CARD_STATIC } from '@/lib/card-shell'
 import { GithubImportPanel } from '@/components/github-import-panel'
+import { CommandBlock } from '@/components/command-block'
+import { NPX_SKILLET_COMMAND } from '@/config'
 import { listOwnedRepos, type OwnedRepo } from '@/lib/github-repos'
 import { listConnectedRepos, fetchOwnedReposViaRegistry } from '@/lib/connected-repos'
 import { readSessionCookie } from '@/lib/session-cookie'
@@ -18,7 +20,7 @@ export const metadata = {
 }
 
 const CREATE_OPTIONS = [
-  { href: '/skills/new', title: 'New skill', body: 'Write a single skill: instructions an agent can run.' },
+  { href: '/skills/new', title: 'Blank skill', body: 'Start from an empty SKILL.md and write it yourself.' },
   { href: '/kits/new', title: 'New kit', body: 'Bundle skills into a kit to share or deploy.' },
 ]
 
@@ -52,7 +54,23 @@ async function NewPageContent() {
       <div className="mx-auto max-w-[720px]">
         <PageHeader title="Create" />
 
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {/* The agent flow leads. Nobody can answer "what skill do you want to
+            write?", but everybody has a thing they keep re-explaining, so the
+            page opens with the path that reads that rather than the blank form.
+            Two commands and no account needed until it saves. */}
+        <div className={`rounded-2xl ${CARD_STATIC} p-5`}>
+          <span className="text-base font-semibold text-(--ink)">From what you already do</span>
+          <p className="mt-1 text-sm leading-[1.5] text-(--ink-2)">
+            Your agent reads the work you keep repeating, drafts the skill, and saves it here.
+            Private by default.
+          </p>
+          <div className="mt-4 grid gap-2">
+            <CommandBlock command={NPX_SKILLET_COMMAND} size="sm" bare />
+            <CommandBlock command="/skillet create" prompt={null} size="sm" bare />
+          </div>
+        </div>
+
+        <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           {CREATE_OPTIONS.map((o) => (
             <li key={o.href}>
               <Link

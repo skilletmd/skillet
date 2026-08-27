@@ -18,8 +18,8 @@ import { writeJsonError } from '../json-output.js'
 import type { SyncDryRunPlan } from '../dry-run.js'
 import { renderAdapterLine, REGISTRY_DEFAULT, BASELINE_READER_ADAPTERS } from '../cli-context.js'
 import { resolveSyncAdapters } from '../adapter-tiers.js'
-import { resolveBundledRouteSkillDir } from '../bundled-route-path.js'
-import { inlinedRouteSkillMd } from '../bundled-route-content.js'
+import { resolveBundledCreateSkillDir, resolveBundledRouteSkillDir } from '../bundled-route-path.js'
+import { inlinedCreateSkillMd, inlinedRouteSkillMd } from '../bundled-route-content.js'
 import { webBaseUrl } from '../cli-command-tier.js'
 import { ok, fail, dim, yellow } from '../cli-colors.js'
 import { renderSyncKitPlan } from '../kit-list-format.js'
@@ -181,6 +181,8 @@ export function registerSyncCommand(program: Command): void {
             registryUrl: REGISTRY_DEFAULT,
             bundledRouteSkillDir: resolveBundledRouteSkillDir(),
             bundledRouteSkillMd: inlinedRouteSkillMd(),
+            bundledCreateSkillDir: resolveBundledCreateSkillDir(),
+            bundledCreateSkillMd: inlinedCreateSkillMd(),
             ...(tccInitiation ? { tccInitiation } : {}),
           }
 
