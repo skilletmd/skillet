@@ -320,14 +320,16 @@ button.link { appearance: none; -webkit-appearance: none; background: none; bord
 }
 .rail-avatar:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
 .rail-avatar.on { background: color-mix(in srgb, var(--ink) 9%, transparent); }
-/* Passive "app update ready" cue on the account avatar (opens Settings, where the
-   relaunch bar lives). Green = ready/go, distinct from the amber Home bell; the
-   double ring keeps it legible over any avatar photo (light, dark, or busy). */
+/* Passive cue on the account avatar (opens Settings). Two meanings, two colours:
+   green = an app update ready to install (go, distinct from the amber Home
+   bell), amber = a capability Skillet needs and lacks, matching the Permissions
+   row it leads to. The double ring keeps either legible over any avatar photo. */
 .rail-avatar-dot {
   position: absolute; top: 3px; right: 3px; width: 8px; height: 8px;
   border-radius: 50%; background: var(--success);
   box-shadow: 0 0 0 1.5px var(--card-soft), 0 0 0 2.5px color-mix(in srgb, var(--ink) 18%, transparent);
 }
+.rail-avatar-dot.attention { background: var(--caution); }
 .avatar-mono {
   width: 27px; height: 27px; border-radius: 50%; background: var(--accent-bg); color: var(--ink-2);
   display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; text-transform: uppercase;

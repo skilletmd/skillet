@@ -14,15 +14,22 @@ export interface RailBadgeInput {
   pendingCount: number
   /** True when an app update is downloaded and waiting to install on relaunch. */
   updateReady: boolean
-  /** True when a permission Skillet needs is missing, denied, or ungranted.
-   *  Settings is the only place that state is visible, so the path to it has
-   *  to advertise itself. */
+  /** True when a permission Skillet NEEDS is missing or denied. Optional
+   *  capabilities do not count: badging someone because they never enabled a
+   *  feature they may not want is nagging, not signal. */
   permissionsNeedAttention?: boolean
 }
 
+/** The account dot carries two meanings and they are not the same colour.
+ *  'ready' is an app update waiting to install: go, green. 'attention' is a
+ *  capability Skillet needs and does not have: amber, matching the Permissions
+ *  row it leads to. null is no dot. Both tones are truthy so dot-or-no-dot
+ *  checks read naturally. */
+export type AccountBadge = null | 'ready' | 'attention'
+
 export interface RailBadges {
   home: boolean
-  account: boolean
+  account: AccountBadge
 }
 
 export function resolveRailBadges({
@@ -32,6 +39,8 @@ export function resolveRailBadges({
 }: RailBadgeInput): RailBadges {
   return {
     home: pendingCount > 0,
-    account: updateReady || permissionsNeedAttention,
+    // Attention outranks ready when both are behind one dot: an update can
+    // wait, a blocked capability cannot.
+    account: permissionsNeedAttention ? 'attention' : updateReady ? 'ready' : null,
   }
 }

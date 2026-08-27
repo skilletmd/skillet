@@ -567,6 +567,17 @@ export type PermissionRow = {
   label: string
   detail: string
   state: PermissionState
+  /**
+   * Is Skillet actually stopped by this?
+   *
+   * Settings lists every permission because the inventory is the point, but
+   * only a blocking row is a PROBLEM: it gets the caution mark and it lights
+   * the rail dot. Accessibility drives one optional feature (the paste
+   * shortcut), and the Agents view already explains it where you would go to
+   * enable it — badging someone for a feature they never asked for is nagging.
+   * A folder Skillet cannot read stops it doing its core job.
+   */
+  blocking: boolean
   /** Null only when the state needs nothing done (R3). */
   action: PermissionAction | null
 }
@@ -585,11 +596,12 @@ export type PermissionAgentLike = {
   }
 }
 
-/** Does any permission need the user? Drives the Settings rail dot: a blocked
- *  capability that only Settings reveals is one the user has to go and find,
- *  and one they never find stays blocked. */
+/** Is Skillet blocked by a missing permission? Drives the Settings rail dot: a
+ *  blocked capability that only Settings reveals is one the user has to go and
+ *  find, and one they never find stays blocked. Optional capabilities that are
+ *  merely off do not qualify. */
 export function permissionsNeedAttention(rows: PermissionRow[]): boolean {
-  return rows.some((row) => row.state !== 'allowed')
+  return rows.some((row) => row.blocking)
 }
 
 function folderName(anchor: string): string {
@@ -614,13 +626,15 @@ export function permissionRows(input: {
           label: 'Paste into other apps',
           detail: 'Skillet can drop a skill into whatever you are typing in.',
           state: 'allowed',
+          blocking: false,
           action: null,
         }
       : {
           id: 'accessibility',
           label: 'Paste into other apps',
-          detail: 'Needed so the shortcut can paste a skill for you.',
+          detail: 'Used by the paste shortcut. Skillet works without it.',
           state: 'not-allowed',
+          blocking: false,
           action: {
             label: accessibilityActionLabel(input.accessibilityAsked),
             kind: 'ax-request',
@@ -657,14 +671,16 @@ export function permissionRows(input: {
         label,
         detail: `Skillet can update ${who} skills here.`,
         state: 'allowed',
+        blocking: false,
         action: null,
       })
     } else if (grant === 'suspended') {
       rows.push({
         id: `folder:${anchor}`,
         label,
-        detail: `Access was refused, so ${who} is not syncing.`,
+        detail: `Access was refused, so ${who} is not up to date.`,
         state: 'denied',
+        blocking: true,
         action: { label: 'Try again', kind: 'folder-retry', anchor },
       })
     } else {
@@ -673,6 +689,7 @@ export function permissionRows(input: {
         label,
         detail: `${who} keeps skills here. macOS asks before Skillet can read it.`,
         state: 'needs-access',
+        blocking: true,
         // The label says what the person gets, not how it happens. Pressing it
         // runs a user-initiated sync because that is the invocation class
         // allowed to probe, but "Sync now" describes Skillet's plumbing and,

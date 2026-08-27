@@ -488,6 +488,41 @@ describe('permissionRows', () => {
     expect(rows.filter((r) => r.id.startsWith('folder:'))).toHaveLength(2)
   })
 
+  // Settings lists every permission (that is the inventory value), but only a
+  // capability Skillet actually needs counts as a problem. Accessibility drives
+  // the optional paste shortcut; a folder Skillet cannot read stops it doing
+  // its core job.
+  it('marks a folder that needs access as blocking', () => {
+    const rows = permissionRows({
+      ...base,
+      agents: [agent({ access: protectedAt('/Users/x/Documents', 'none') })],
+    })
+    expect(rows.find((r) => r.id.startsWith('folder:'))?.blocking).toBe(true)
+  })
+
+  it('marks a denied folder as blocking', () => {
+    const rows = permissionRows({
+      ...base,
+      agents: [agent({ access: protectedAt('/Users/x/Documents', 'suspended') })],
+    })
+    expect(rows.find((r) => r.id.startsWith('folder:'))?.blocking).toBe(true)
+  })
+
+  it('never marks accessibility as blocking, granted or not', () => {
+    for (const granted of [true, false]) {
+      const rows = permissionRows({ ...base, accessibilityGranted: granted, agents: [agent()] })
+      expect(rows.find((r) => r.id === 'accessibility')?.blocking).toBe(false)
+    }
+  })
+
+  it('marks an allowed folder as not blocking', () => {
+    const rows = permissionRows({
+      ...base,
+      agents: [agent({ access: protectedAt('/Users/x/Documents', 'active') })],
+    })
+    expect(rows.find((r) => r.id.startsWith('folder:'))?.blocking).toBe(false)
+  })
+
   it('never leaves a problem row without an action (R3)', () => {
     for (const grant of ['none', 'suspended', 'active']) {
       for (const granted of [true, false]) {
@@ -522,27 +557,34 @@ describe('permissionRows', () => {
 })
 
 describe('permissionsNeedAttention', () => {
-  const rows = (...states: string[]) =>
-    states.map((state, i) => ({
+  const rows = (...blocking: boolean[]) =>
+    blocking.map((b, i) => ({
       id: `r${i}`,
       label: 'x',
       detail: 'y',
-      state,
+      state: b ? 'needs-access' : 'allowed',
+      blocking: b,
       action: null,
     })) as Parameters<typeof permissionsNeedAttention>[0]
 
   it('is quiet when everything is allowed', () => {
-    expect(permissionsNeedAttention(rows('allowed', 'allowed'))).toBe(false)
+    expect(permissionsNeedAttention(rows(false, false))).toBe(false)
   })
 
   it('is quiet with no rows at all (off macOS)', () => {
     expect(permissionsNeedAttention([])).toBe(false)
   })
 
-  it('fires for any state that is not allowed', () => {
-    for (const state of ['not-allowed', 'needs-access', 'denied']) {
-      expect(permissionsNeedAttention(rows('allowed', state))).toBe(true)
-    }
+  it('fires only for a blocking row', () => {
+    expect(permissionsNeedAttention(rows(false, true))).toBe(true)
+  })
+
+  // Accessibility powers ONE optional feature (the paste shortcut), and the
+  // Agents view already explains it where you would go to enable it. Badging
+  // the avatar because someone never turned on a feature they may not want is
+  // nagging, not signal.
+  it('stays quiet for an optional capability that is merely off', () => {
+    expect(permissionsNeedAttention(rows(false, false))).toBe(false)
   })
 })
 

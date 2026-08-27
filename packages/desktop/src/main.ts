@@ -1561,8 +1561,19 @@ function panelWithRail(active: RailKey, viewHtml: string): string {
   // The dot is a visual cue only; the accessible name carries the same signal so
   // screen-reader and keyboard users aren't left with a color-only indicator.
   const accountName = auth.displayHandle ? '@' + escapeHtml(auth.displayHandle) : 'Account'
-  const accountTitle = badges.account ? `${accountName}, update ready to install` : accountName
-  const accountDot = badges.account ? `<span class="rail-avatar-dot"></span>` : ''
+  const accountTitle =
+    badges.account === 'attention'
+      ? `${accountName}, a permission needs your attention`
+      : badges.account === 'ready'
+        ? `${accountName}, update ready to install`
+        : accountName
+  // Tone follows cause: green for an update waiting to install (go), amber for
+  // a capability Skillet needs and lacks (matching the Permissions row it
+  // leads to). A blocked capability rendered as a green "ready" dot would say
+  // the opposite of the truth.
+  const accountDot = badges.account
+    ? `<span class="rail-avatar-dot${badges.account === 'attention' ? ' attention' : ''}"></span>`
+    : ''
   return `<div class="panel tray tray-railed">
       <nav class="rail">
         <div class="rail-brand">${brandMark('rail-brand-mark')}</div>
@@ -2688,7 +2699,9 @@ function renderPermissionsBlock(): string {
   if (rows.length === 0) return ''
   const body = rows
     .map((row) => {
-      const problem = row.state !== 'allowed'
+      // Only a BLOCKING row gets the alarm treatment. An optional capability
+      // that is simply off is a setting, not a fault.
+      const problem = row.blocking
       // A sync is the slowest thing behind these buttons (10s+ with a big kit).
       // Without a pending state the press looks like it did nothing, which is
       // exactly how a working grant read as a broken button.
