@@ -42,4 +42,15 @@ describe('SummonSuggestions', () => {
     render(<SummonSuggestions author="phuryn" suggestions={three.slice(0, 1)} />)
     expect(screen.getByTitle("Copy. Uses @phuryn/retro")).toBeTruthy()
   })
+
+  it('gives each row its own accessible copy label', () => {
+    render(<SummonSuggestions author="phuryn" suggestions={three} />)
+    expect(screen.getByLabelText('Copy /skillet @phuryn draft nda')).toBeTruthy()
+  })
+
+  it('uses the copy glyph rather than repeating the word down the column', () => {
+    const { container } = render(<SummonSuggestions author="phuryn" suggestions={three} />)
+    expect(container.querySelectorAll('svg')).toHaveLength(3)
+    expect(screen.queryByText('Copy')).toBeNull()
+  })
 })
