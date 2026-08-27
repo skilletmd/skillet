@@ -678,40 +678,6 @@ export function permissionRows(input: {
 }
 
 /**
- * Onboarding's folder-access line (U8/R11), or null when there is nothing to
- * say. Almost always null: every agent skills folder is a $HOME dotfolder by
- * default, and only an unusual setup (iCloud "Desktop & Documents Folders"
- * moving a dotfolder under an anchor) puts one somewhere macOS gates.
- *
- * Conditional on purpose. A permissions step that always fired would be the
- * unexplained interruption this work exists to remove, and the honest version
- * of that step is one that only appears for the people who will actually meet
- * the dialog.
- */
-export function onboardingFolderNote(input: {
-  isMac: boolean
-  agents: PermissionAgentLike[]
-}): { title: string; detail: string } | null {
-  if (!input.isMac) return null
-  const anchors = new Set<string>()
-  const who: string[] = []
-  for (const agent of input.agents) {
-    const access = agent.access
-    if (!access?.protected || !access.anchor) continue
-    if (!anchors.has(access.anchor)) anchors.add(access.anchor)
-    const label = agent.label ?? agent.name
-    if (!who.includes(label)) who.push(label)
-  }
-  if (anchors.size === 0) return null
-  const names = [...anchors].map(folderName)
-  const where = names.length === 1 ? `your ${names[0]} folder` : 'protected folders'
-  return {
-    title: `Some skills live in ${where}`,
-    detail: `macOS asks before Skillet can read there. Allow it and ${who.join(', ')} stays in sync.`,
-  }
-}
-
-/**
  * Hero status text override (R7): a resting synced hero with a parked folder
  * must not read as plain "Synced" — the status line says what's missing.
  * Syncing/offline/not-connected keep their own text (they already aren't

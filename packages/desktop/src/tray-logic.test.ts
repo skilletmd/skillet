@@ -18,7 +18,6 @@ import {
   heroCardState,
   accessibilityActionLabel,
   permissionRows,
-  onboardingFolderNote,
   permissionsNeedAttention,
   heroStatusOverride,
   humanizeAppError,
@@ -514,66 +513,6 @@ describe('permissionRows', () => {
       expect(row.detail).not.toContain('—')
       expect(row.action?.label ?? '').not.toContain('—')
     }
-  })
-})
-
-// U8/R11: onboarding explains folder access only to the people who will hit
-// it. A step that always fired would be exactly the unexplained interruption
-// this work exists to remove.
-describe('onboardingFolderNote', () => {
-  const agent = (over: Partial<PermissionAgentLike> = {}): PermissionAgentLike => ({
-    name: 'claude-code',
-    label: 'Claude Code',
-    ...over,
-  })
-  const prot = (anchor: string) => ({ protected: true, grant: 'none', anchor })
-
-  it('says nothing when no agent folder is protected', () => {
-    expect(onboardingFolderNote({ isMac: true, agents: [agent()] })).toBeNull()
-  })
-
-  it('says nothing when the sidecar is too old to report access', () => {
-    expect(onboardingFolderNote({ isMac: true, agents: [agent({ access: undefined })] })).toBeNull()
-  })
-
-  it('says nothing off macOS', () => {
-    expect(
-      onboardingFolderNote({
-        isMac: false,
-        agents: [agent({ access: prot('/Users/x/Documents') })],
-      }),
-    ).toBeNull()
-  })
-
-  it('names the folder when one is protected', () => {
-    const note = onboardingFolderNote({
-      isMac: true,
-      agents: [agent({ access: prot('/Users/x/Documents') })],
-    })
-    expect(note).not.toBeNull()
-    expect(note!.title).toContain('Documents')
-    expect(note!.detail.length).toBeGreaterThan(0)
-  })
-
-  it('stays one note when two agents share a folder', () => {
-    const note = onboardingFolderNote({
-      isMac: true,
-      agents: [
-        agent({ access: prot('/Users/x/Documents') }),
-        agent({ name: 'codex', label: 'Codex', access: prot('/Users/x/Documents') }),
-      ],
-    })
-    expect(note!.title).toContain('Documents')
-    expect(note!.title).not.toContain('Desktop')
-  })
-
-  it('never uses an em-dash (product copy rule)', () => {
-    const note = onboardingFolderNote({
-      isMac: true,
-      agents: [agent({ access: prot('/Users/x/Downloads') })],
-    })
-    expect(note!.title).not.toContain('—')
-    expect(note!.detail).not.toContain('—')
   })
 })
 
