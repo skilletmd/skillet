@@ -30,7 +30,7 @@ Public profiles that have published at least one skill, with the categories they
 | --- | --- |
 | `limit` integer · query · optional | Page size. Clamped server-side to 1-100. |
 | `offset` integer · query · optional | Zero-based offset into the result set. |
-| `q` string · query · optional | Free-text filter over handle and display name. Words are matched separately, across hyphens and underscores, and every word must match. Words of three or more characters match anywhere; shorter words match only where they start a word. |
+| `q` string · query · optional | Free-text filter over handle, display name, and bio. |
 | `category` string · query · optional | One category key, or a comma-separated list. |
 | `sort` `followers` \| `new` \| `alpha` · query · optional | Ordering: `followers`, `new`, or `alpha`. |
 
