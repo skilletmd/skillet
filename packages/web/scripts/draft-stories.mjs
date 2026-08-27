@@ -75,6 +75,26 @@ const MAX_BODY = 330
 const MODEL = 'claude-opus-5'
 const DRY_RUN = process.argv.includes('--dry-run')
 
+/**
+ * Truncate without splitting an emoji.
+ *
+ * `String.slice` cuts UTF-16 code units, so a boundary landing inside a
+ * surrogate pair leaves a lone high surrogate. That is not encodable, and
+ * `JSON.stringify` emits it verbatim, so the API rejects the whole request:
+ * "The request body is not valid JSON: no low surrogate in string".
+ *
+ * The first real collection hit this on the classification call, and the
+ * failure is silent by design there: classification falls back to news, so a
+ * day of skill cards quietly filed themselves as news with the wrong headline
+ * style. Posts on X are full of emoji, so this was going to fire most days.
+ */
+function clip(text, max) {
+  const out = String(text ?? '').slice(0, max)
+  const last = out.charCodeAt(out.length - 1)
+  // A high surrogate at the end lost its pair to the cut.
+  return last >= 0xd800 && last <= 0xdbff ? out.slice(0, -1) : out
+}
+
 // -------------------------------------------------------------------- repo
 
 /** Owner/name pairs a post points at: linked repos plus install lines. A post
@@ -165,13 +185,13 @@ async function repoContext(repo) {
   const nested = await nestedSkillPaths(repo)
   for (const path of nested.slice(0, 2)) {
     const body = await raw(repo, path)
-    if (body) skills.push({ path, body: body.slice(0, 2500) })
+    if (body) skills.push({ path, body: clip(body, 2500) })
   }
   if (!readme && !skills.length) return null
   // How many skills the repo actually ships, not how many we fetched. A pack of
   // 160 and a repo of one are different subjects and get named differently.
   const skillCount = (rootSkill ? 1 : 0) + nested.length
-  return { repo, readme: readme?.slice(0, 4000) ?? null, skills, skillCount }
+  return { repo, readme: readme ? clip(readme, 4000) : null, skills, skillCount }
 }
 
 /** Context for every repo a cluster points at, in one pass. */
@@ -205,7 +225,7 @@ async function contextFor(posts) {
  */
 async function classifyPosts(posts) {
   const listed = posts
-    .map((p, i) => `[${i}] @${p.handle}: ${p.text.replace(/\s+/g, ' ').slice(0, 300)}`)
+    .map((p, i) => `[${i}] @${p.handle}: ${clip(p.text.replace(/\s+/g, ' '), 300)}`)
     .join('\n')
   const prompt =
     `Sort each post into one of two buckets.\n\n` +
@@ -376,7 +396,7 @@ function promptFor(posts, isSkill, context = []) {
       (p, i) =>
         `[${i + 1}] @${p.handle} on ${p.source ?? 'x'}` +
         (p.likes ? ` (${p.likes} likes)` : '') +
-        `\n${p.text.slice(0, 900)}`,
+        `\n${clip(p.text, 900)}`,
     )
     .join('\n\n')
 
