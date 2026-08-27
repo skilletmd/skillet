@@ -1,6 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { serializeSummonSuggestionSet } from '@skillet/protocol';
 import { validateEditedSuggestions } from '../suggestions/payload.js';
+import {
+  emitSuggestionCopyEvent,
+  isRecordableCopy,
+} from '../lib/suggestion-copy-events.js';
 import type { PrismaClient } from '@prisma/client';
 import { requireSession } from '../auth/middleware.js';
 import type { AvatarStore } from '../avatars/avatar-store.js';
@@ -269,6 +273,31 @@ export function registerProfileRoutes(
     reply.header('Cache-Control', 'public, max-age=300');
     return reply.send({ handle, skills });
   });
+
+  // POST /authors/:handle/suggestions/copy — count a copied suggestion line.
+  //
+  // Deliberately anonymous and unauthenticated: the visitor this measures is
+  // the logged-out stranger who followed a shared profile link, which is
+  // exactly the population /api/v1/events cannot see (it is requireUser()).
+  // Aggregate-only, no per-visitor row — see lib/suggestion-copy-events.ts.
+  app.post<{ Params: { handle: string }; Body: { ref?: string } }>(
+    '/authors/:handle/suggestions/copy',
+    async (req, reply) => {
+      const db = requirePrisma(prisma);
+      const handle = req.params.handle.replace(/^@/, '');
+      const ref = (req.body?.ref ?? '').replace(/^@/, '').replace('/', ':');
+
+      // Always 204. A copy already happened on the client; reporting its
+      // outcome back would only invite a retry loop over a number nobody is
+      // waiting on, and a rejected report is not the visitor's problem.
+      if (isRecordableCopy(handle, ref)) {
+        void emitSuggestionCopyEvent({ prisma: db, authorId: handle, skillId: ref }).catch(
+          () => {},
+        );
+      }
+      return reply.status(204).send();
+    },
+  );
 
   // PATCH /profiles/:author — update name or avatar (owner only)
   // 401 for unauthenticated callers, 403 for authenticated non-owners.

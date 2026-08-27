@@ -12,9 +12,32 @@
  * Every line was generated from a skill that exists in this author's kit and is
  * still public, so pasting one resolves rather than misses.
  */
+import { useRef } from 'react'
 import { useCopyToClipboard } from '@/lib/use-copy-to-clipboard'
+import { registryAuthApi } from '@/lib/registry-proxy'
 import { CopyGlyph, CopiedGlyph } from '@/components/ui/copy-glyph'
 import { summonSuggestionLine } from '@skillet/protocol/summon-suggestions'
+
+/**
+ * Tell the registry a line was copied. Anonymous and aggregate — see
+ * registry lib/suggestion-copy-events.ts.
+ *
+ * Every failure path is swallowed. This number is ours, not the visitor's: a
+ * blocked request, an offline browser, or a 500 must leave the row behaving
+ * exactly as it does with the network unplugged.
+ */
+async function reportSuggestionCopy(author: string, skillRef: string): Promise<void> {
+  try {
+    await fetch(registryAuthApi(`authors/${encodeURIComponent(author)}/suggestions/copy`), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ref: skillRef }),
+      keepalive: true,
+    })
+  } catch {
+    // Counting is not the visitor's problem.
+  }
+}
 
 interface Props {
   author: string
@@ -30,13 +53,32 @@ interface Props {
  */
 function SuggestionRow({ author, task, skillRef }: { author: string; task: string; skillRef: string }) {
   const { copied, copy } = useCopyToClipboard()
+  const reported = useRef(false)
   const line = summonSuggestionLine(author, task)
+
+  /**
+   * Copy first, count second, and never let the count affect the copy.
+   *
+   * The clipboard write is the thing the visitor asked for; the count is ours.
+   * A failed or blocked report must leave the row behaving exactly as it does
+   * offline — the text on the clipboard and the glyph flipped.
+   *
+   * Reported once per row per mount. Someone mashing the same line is not three
+   * people wanting it, and this number only means something if it counts
+   * intent rather than clicks.
+   */
+  async function copyAndCount() {
+    await copy(line)
+    if (reported.current) return
+    reported.current = true
+    void reportSuggestionCopy(author, skillRef)
+  }
 
   return (
     <li className="max-w-full">
       <button
         type="button"
-        onClick={() => void copy(line)}
+        onClick={() => void copyAndCount()}
         title={`Copy. Uses ${skillRef}`}
         aria-label={`Copy ${line}`}
         className="group flex max-w-full items-center gap-2.5 rounded-md bg-(--card-soft) px-2.5 py-1.5 text-left transition-colors hover:bg-(--accent-bg)"

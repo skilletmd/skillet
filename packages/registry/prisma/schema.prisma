@@ -975,6 +975,29 @@ model version_scan_notices {
 // handle, day). Reach = SUM per skill_id; per-handle reach = SUM per via_handle;
 // growth = the day buckets. Standalone (no FK) so a count for a since-deleted
 // skill is harmless. Fed only by a summon-marked content fetch (?src=summon).
+/// Copies of a suggested invocation from a profile (plan 004 U2).
+///
+/// A copy is the only step of the funnel attributable to the page: once the
+/// line is on someone's clipboard it leaves the site, and a pasted line is
+/// indistinguishable from a typed one, so this can never be joined to the
+/// summon it may produce.
+///
+/// Aggregate-by-construction like skill_summon_counts: a per-(author, skill,
+/// day) tally with no per-visitor row, no client id, and no IP. The population
+/// that matters here is the logged-out stranger on a shared link, so there is
+/// deliberately nothing to identify.
+model suggestion_copy_counts {
+  /// The profile the line was copied from.
+  author_id String
+  /// `author:slug` of the skill the line was derived from.
+  skill_id  String
+  day       Int
+  count     Int    @default(0)
+
+  @@id([author_id, skill_id, day])
+  @@index([author_id], map: "idx_suggestion_copy_author")
+}
+
 model skill_summon_counts {
   skill_id   String
   via_handle String @default("")
