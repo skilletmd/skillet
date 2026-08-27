@@ -189,3 +189,38 @@ describe('backfillSuggestions', () => {
     }
   });
 });
+
+describe('backfillSuggestions --stale', () => {
+  const sig = (n: number, category: string) =>
+    JSON.stringify({ suggestions: [], kit_signature: `${n}|${category}:${n}` });
+
+  it('skips an author whose kit shape has not moved', async () => {
+    const { prisma, updates } = fakePrisma(
+      [{ id: 'a', suggestions: sig(6, 'product'), suggestions_edited_at: null }],
+      { a: kit(6, 'product') },
+    );
+    const stats = await backfillSuggestions(prisma, { stale: true, phrase: phraseAll });
+    assert.equal(stats.skipped, 1);
+    assert.equal(updates.length, 0);
+  });
+
+  it('regenerates an author whose kit gained a whole new area', async () => {
+    const { prisma, updates } = fakePrisma(
+      [{ id: 'a', suggestions: sig(6, 'product'), suggestions_edited_at: null }],
+      { a: [...kit(6, 'product'), ...kit(3, 'finance')] },
+    );
+    const stats = await backfillSuggestions(prisma, { stale: true, phrase: phraseAll });
+    assert.equal(stats.generated, 1);
+    assert.equal(updates.length, 1);
+  });
+
+  it('still refuses to touch an edited author', async () => {
+    const { prisma, updates } = fakePrisma(
+      [{ id: 'a', suggestions: sig(6, 'product'), suggestions_edited_at: 1 }],
+      { a: [...kit(6, 'product'), ...kit(9, 'finance')] },
+    );
+    const stats = await backfillSuggestions(prisma, { stale: true, phrase: phraseAll });
+    assert.equal(stats.skipped, 1);
+    assert.equal(updates.length, 0);
+  });
+});

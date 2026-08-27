@@ -24,10 +24,17 @@
  *   npx tsx --env-file-if-exists=.env scripts/backfill-suggestions.ts --limit 5
  *   npx tsx --env-file-if-exists=.env scripts/backfill-suggestions.ts
  *   npx tsx --env-file-if-exists=.env scripts/backfill-suggestions.ts --handle wshobson
+ *   npx tsx --env-file-if-exists=.env scripts/backfill-suggestions.ts --stale
  */
 import { pathToFileURL } from 'node:url'
 import type { PrismaClient } from '@prisma/client'
-import { kitSignature, serializeSummonSuggestionSet, type SummonSuggestion } from '@skillet/protocol'
+import {
+  kitSignature,
+  parseSummonSuggestionSet,
+  serializeSummonSuggestionSet,
+  signatureDrifted,
+  type SummonSuggestion,
+} from '@skillet/protocol'
 import { createPrismaClient } from '../src/db/prisma-client.js'
 import {
   clusterSkills,
@@ -44,7 +51,7 @@ export interface BackfillSuggestionsStats {
   generated: number
   /** Authors whose kit could not support a confident line (empty set stored). */
   empty: number
-  /** Authors skipped because they edited their own lines. */
+  /** Authors skipped because they edited their own lines, or are still fresh. */
   skipped: number
   /** Authors whose phrasing call failed; they stay null and retry next run. */
   failed: number
@@ -54,6 +61,8 @@ export interface BackfillSuggestionsOptions {
   dryRun?: boolean
   /** Re-generate authors that already have a set (never an edited one). */
   all?: boolean
+  /** Re-generate only authors whose kit has changed shape since generation. */
+  stale?: boolean
   limit?: number
   /** Restrict the run to one author. */
   handle?: string
@@ -105,12 +114,12 @@ export async function backfillSuggestions(
   const authors = await prisma.authors.findMany({
     where: {
       ...(opts.handle ? { id: opts.handle } : {}),
-      ...(opts.all ? {} : { suggestions: null }),
+      ...(opts.all || opts.stale ? {} : { suggestions: null }),
     },
     // Deterministic, so a staged --limit run walks the same authors each time.
     orderBy: { id: 'asc' },
     ...(opts.limit ? { take: opts.limit } : {}),
-    select: { id: true, suggestions_edited_at: true },
+    select: { id: true, suggestions: true, suggestions_edited_at: true },
   })
   stats.authors = authors.length
 
@@ -125,6 +134,17 @@ export async function backfillSuggestions(
 
     const kit = await loadKit(prisma, author.id)
     const signature = kitSignature(kit.map((s) => effectiveCategory(s)))
+
+    // `--stale` is the refresh pass. The registry cannot run phrasing itself
+    // (no `claude` binary, no key), so keeping suggestions current is an
+    // operator job rather than a nightly phase. Signature drift is the whole
+    // test: one publish into a large kit is not worth a call, the first skill
+    // in a new category is, because that is an area going unrepresented.
+    if (opts.stale && !signatureDrifted(parseSummonSuggestionSet(author.suggestions)?.kit_signature, signature)) {
+      stats.skipped++
+      continue
+    }
+
     const clusters = clusterSkills(kit)
 
     let suggestions: SummonSuggestion[] = []
@@ -179,6 +199,7 @@ async function main(): Promise<void> {
     const stats = await backfillSuggestions(prisma, {
       dryRun,
       all: flag('all'),
+      stale: flag('stale'),
       ...(limitRaw ? { limit: Number.parseInt(limitRaw, 10) } : {}),
       ...(value('handle') ? { handle: value('handle')!.replace(/^@/, '') } : {}),
       log: (m) => console.log(m),
