@@ -25,6 +25,8 @@
  *   STORY_DRAFT_ONLY    write drafts instead of publishing
  *   STORY_MAX           most stories to write per run (default 3)
  *   BLOG_DB_PATH        story store (default content/blog.db)
+ *   STORY_PUBLISH_URL   post to a deployed Skillet instead of the local file
+ *   STORY_PUBLISH_TOKEN bearer token for that instance
  *
  * Usage: node scripts/draft-stories.mjs [--dry-run]
  *   --dry-run  print the clusters and exit, writing nothing and calling no API.
@@ -73,6 +75,10 @@ const MAX_BODY = 330
 
 
 const MODEL = 'claude-opus-5'
+/** Where to publish. Unset writes the local blog.db, which is the dev loop;
+ *  set, the run posts to a deployed Skillet instead. */
+const PUBLISH_URL = process.env.STORY_PUBLISH_URL
+const PUBLISH_TOKEN = process.env.STORY_PUBLISH_TOKEN
 const DRY_RUN = process.argv.includes('--dry-run')
 
 /**
@@ -708,6 +714,59 @@ function subjectFor(posts, context) {
   return { slug, repo, category, name: fm.name ?? null }
 }
 
+/**
+ * Post the edition to a deployed Skillet instead of writing a local file.
+ *
+ * The sweep runs where the keys are; the feed runs somewhere else. Sending the
+ * whole edition in one request means the server validates all of it before
+ * writing any of it, so a malformed card cannot leave half an edition live.
+ */
+async function publishRemote(clusters) {
+  const today = new Date().toISOString().slice(0, 10)
+  const stories = []
+  for (const posts of clusters) {
+    const isSkill = posts.filter((p) => p.isSkill).length * 2 >= posts.length
+    const context = isSkill ? await contextFor(posts) : []
+    const story = await writeStory(posts, isSkill, context)
+    if (!story) continue
+    const sources = sourcesFrom(posts)
+    // Two headlines can slugify the same; the server rejects a batch with a
+    // repeat, so suffix rather than lose the edition over it.
+    let slug = slugify(normalizeHandles(story.headline, sources))
+    if (stories.some((s) => s.slug === slug)) slug = `${slug}-2`
+    stories.push({
+      slug,
+      headline: normalizeHandles(story.headline, sources),
+      summary: normalizeHandles(story.summary, sources),
+      kind: story.kind,
+      publishedAt: today,
+      sources,
+      subject: isSkill ? subjectFor(posts, context) : null,
+    })
+    console.log(`  drafted ${stories.at(-1).slug} (${posts.length} sources)`)
+  }
+  if (!stories.length) {
+    console.log('\nnothing worth publishing')
+    return
+  }
+  const url = `${PUBLISH_URL.replace(/\/+$/, '')}/api/admin/stories${DRAFT_ONLY ? '' : '?publish=1'}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${PUBLISH_TOKEN}`,
+    },
+    body: JSON.stringify(stories),
+  })
+  const text = await res.text()
+  if (!res.ok) {
+    console.error(`\npublish failed ${res.status}: ${text.slice(0, 300)}`)
+    process.exitCode = 1
+    return
+  }
+  console.log(`\n${stories.length} stories -> ${url}\n${text.slice(0, 300)}`)
+}
+
 async function main() {
   if (!API_KEY && !DRY_RUN) {
     console.warn('ANTHROPIC_API_KEY unset; no stories written.')
@@ -731,6 +790,8 @@ async function main() {
     })
     return
   }
+
+  if (PUBLISH_URL) return publishRemote(clusters)
 
   const db = new DatabaseSync(DB)
   // busy_timeout is per-connection, not persisted with the file's WAL mode, so
