@@ -268,6 +268,10 @@ interface AuthorPageResponse {
   /** Mirror's GitHub source owner type — gates the web claim affordances. */
   source_owner_type?: 'User' | 'Organization' | null
   total_installs: number
+  total_summons?: number
+  /** Suggested invocations. `null` = never generated, `[]` = nothing confident. */
+  suggestions?: Array<{ task: string; ref: string }> | null
+  suggestions_voice?: 'first-person' | 'third-person'
   followers?: number
   following?: number
   followed_by_me?: boolean
@@ -496,6 +500,9 @@ function mapAuthor(a: AuthorPageResponse): AuthorProfile {
     })),
     savedSkills: a.saved_skills ?? [],
     totalInstalls: a.total_installs,
+    totalSummons: a.total_summons ?? 0,
+    suggestions: a.suggestions ?? null,
+    suggestionsVoice: a.suggestions_voice ?? 'third-person',
     joinedAt: unixToIso(a.created_at),
     followers: a.followers ?? 0,
     following: a.following ?? 0,

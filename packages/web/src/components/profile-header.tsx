@@ -130,6 +130,14 @@ export function ProfileHeader({
       </Link>,
     )
   }
+  if ((profile.totalSummons ?? 0) > 0) {
+    meta.push(
+      <span key="summons">
+        <span className="font-semibold text-(--ink)">{formatNumber(profile.totalSummons ?? 0)}</span>{' '}
+        {profile.totalSummons === 1 ? 'summon' : 'summons'}
+      </span>,
+    )
+  }
   if (!isTeam) {
     for (const t of profile.teams ?? []) {
       meta.push(

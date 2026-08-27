@@ -10,6 +10,7 @@ import {
   GH_CLAIM_RESULT_COOKIE,
 } from '@/components/mirror-notice'
 import { SkillCard } from '@/components/skill-card'
+import { SummonSuggestions } from '@/components/summon-suggestions'
 import { ProfileSkillsManager } from '@/components/profile-skills-manager'
 import { ProfileKitsSection } from '@/components/kits/profile-kits-section'
 import { ProfileActivity } from '@/components/profile-activity'
@@ -235,6 +236,12 @@ export default async function AuthorPage({
   // the skills they wrote. No subscriptions here — those live under Saved.
   const createdPanel = (
     <div className="space-y-10">
+      {/* Above the kits: the one action here that costs the visitor nothing. */}
+      <SummonSuggestions
+        author={profile.username}
+        suggestions={profile.suggestions ?? []}
+        voice={profile.suggestionsVoice ?? 'third-person'}
+      />
       <LibrarySection
         id="kits"
         level="eyebrow"

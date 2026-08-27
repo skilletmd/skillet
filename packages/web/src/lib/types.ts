@@ -462,6 +462,13 @@ export interface AuthorProfile {
   /** Public handles for connected GitHub / X accounts, for profile links. */
   socials?: { github?: string; twitter?: string }
   totalInstalls: number
+  /** Times anyone summoned this author. Never rendered at zero. */
+  totalSummons?: number
+  /** Suggested invocations: `null` = never generated, `[]` = nothing confident.
+   *  Both render no block; the distinction only matters to the backfill. */
+  suggestions?: Array<{ task: string; ref: string }> | null
+  /** An unclaimed mirror is described, never spoken for. */
+  suggestionsVoice?: 'first-person' | 'third-person'
   joinedAt: string
   /** Trust graph: follower count for this profile. */
   followers?: number
