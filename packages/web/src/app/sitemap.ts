@@ -16,7 +16,39 @@ import { skillHref, kitHref, profileHref, browseHref, browseAllHref, blogHref } 
 // read is guarded so a registry hiccup yields a smaller sitemap, never a build crash.
 
 const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://skillet.md'
-const CATALOG_LIMIT = 1000
+
+/**
+ * The catalog is PAGED, not fetched in one shot.
+ *
+ * This used to ask for `limit: 1000` and ship whatever came back. `GET /skills`
+ * clamps limit to 100 (`clampInt(req.query.limit, 50, 1, 100)`), so the request
+ * succeeded, returned a hundred rows, and the sitemap listed 100 of 1,467 public
+ * skills — 7% of the indexable catalog, with nothing anywhere reporting a
+ * problem. An over-large limit is not an error on either side; it is silently
+ * honoured down to the cap, which is exactly why this went unnoticed.
+ *
+ * So page to the reported `total` instead of trusting one response. PAGE_SIZE
+ * sits at the server cap: asking for more is not refused, just trimmed.
+ */
+const PAGE_SIZE = 100
+
+/** Stop even if `total` is wrong or the endpoint never drains. 100 pages is
+ *  10,000 entries, well past the catalog and well under the 50,000-URL limit a
+ *  single sitemap file is allowed. */
+const MAX_PAGES = 100
+
+async function pageAll<T>(
+  fetchPage: (offset: number) => Promise<{ rows: T[]; total: number }>,
+): Promise<T[]> {
+  const out: T[] = []
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const { rows, total } = await safe(fetchPage(page * PAGE_SIZE), { rows: [], total: 0 })
+    out.push(...rows)
+    // A short page means the end, whatever `total` claims.
+    if (rows.length < PAGE_SIZE || out.length >= total) break
+  }
+  return out
+}
 
 const abs = (path: string) => new URL(path, BASE).toString()
 
@@ -29,11 +61,19 @@ async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [skillCatalog, kitCatalog, authors] = await Promise.all([
-    safe(getSkillCatalog({ limit: CATALOG_LIMIT }), { skills: [], total: 0, limit: 0, offset: 0 }),
-    safe(getKitCatalog({ limit: CATALOG_LIMIT }), { items: [], total: 0, limit: 0, offset: 0 }),
+  const [skills, kits, authors] = await Promise.all([
+    pageAll(async (offset) => {
+      const c = await getSkillCatalog({ limit: PAGE_SIZE, offset })
+      return { rows: c.skills ?? [], total: c.total ?? 0 }
+    }),
+    pageAll(async (offset) => {
+      const c = await getKitCatalog({ limit: PAGE_SIZE, offset })
+      return { rows: c.items ?? [], total: c.total ?? 0 }
+    }),
     safe(getAllAuthorUsernames(), [] as string[]),
   ])
+  const skillCatalog = { skills }
+  const kitCatalog = { items: kits }
 
   // Trust anchors and the docs landing belong here: they are the pages a
   // person (or an AI answer engine) checks to decide whether this project is
