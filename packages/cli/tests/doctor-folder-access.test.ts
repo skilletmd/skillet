@@ -15,7 +15,7 @@
 import assert from 'node:assert/strict';
 import test, { before, after } from 'node:test';
 import { mkdirSync, rmSync, symlinkSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomBytes } from 'node:crypto';
 import { Command } from 'commander';
@@ -132,7 +132,9 @@ test('a project adapter is never reported, however the cwd resolves', async () =
   process.chdir(inside);
   try {
     const json = JSON.parse(await runDoctor(['--json'])) as { folder_access: FolderAccess };
-    const relative = json.folder_access.entries.filter((e) => !e.target_dir.startsWith('/'));
+    // isAbsolute, not a leading slash: a Windows absolute path is `C:\...`, so a
+  // slash test reads every entry as relative and fails there and nowhere else.
+  const relative = json.folder_access.entries.filter((e) => !isAbsolute(e.target_dir));
     assert.deepEqual(relative, [], 'no relative-path adapter root may be reported');
   } finally {
     process.chdir(cwd);
