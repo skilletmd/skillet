@@ -88,6 +88,8 @@ export {
 } from "./commands/edits-store.js";
 export {
   BUNDLED_ROUTE_SLUG,
+  BUNDLED_CREATE_SLUG,
+  BUNDLED_META_SLUGS,
   KNOWN_ROUTE_SURFACES,
   listRouteManifest,
   recordRouteInvocation,
@@ -114,6 +116,8 @@ export {
 } from "./commands/route-hooks/index.js";
 export {
   ensureBundledRouteSkill,
+  ensureBundledCreateSkill,
+  ensureBundledSkill,
   type EnsureBundledRouteResult,
 } from "./commands/bundled-route-skill.js";
 export {

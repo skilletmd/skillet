@@ -50,8 +50,20 @@ export const ROOT_SURFACE: SurfaceRow[] = [
     tier: 'root',
   },
   {
+    command: 'create',
+    usage: 'create <name>',
+    group: 'Skills into your kit',
+    tier: 'root',
+  },
+  {
     command: 'import',
     usage: 'import [source]',
+    group: 'Skills into your kit',
+    tier: 'group',
+  },
+  {
+    command: 'eval',
+    usage: 'eval [slug]',
     group: 'Skills into your kit',
     tier: 'group',
   },
@@ -159,6 +171,7 @@ export const ROOT_SURFACE: SurfaceRow[] = [
 /** Power-user commands surfaced in the root help footer, not as rows. */
 export const ROOT_FOOTER_POWER_COMMANDS = [
   'import',
+  'eval',
   'scan',
   'pending',
   'edits',

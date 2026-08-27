@@ -67,6 +67,8 @@ The full device surface, generated from the CLI's own command registration. The 
 | `skillet logout` | Sign out of this machine |
 | `skillet connect` | Link this machine with a pair code from skillet.md Settings |
 | `skillet web` | Open skillet.md in your browser (e.g. /settings) |
+| `skillet create` | Start a new skill: scaffold SKILL.md and its eval |
+| `skillet eval` | Run the static basic eval (evals/smoke.json) against kit skill(s) |
 | `skillet add` | Add a skill or kit from the library, GitHub, or a path |
 | `skillet add kit` | Subscribe to a kit and sync its skills |
 | `skillet import` | Bring skills you already have (in your agents or a folder) into your kit |

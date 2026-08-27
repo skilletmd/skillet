@@ -32,7 +32,9 @@ test('root help lists journey groups and root-tier commands from matrix', () => 
     assert.match(text, new RegExp(escaped));
   }
 
-  assert.equal(rootHelpRowCount(), 16);
+  // 17 since `create` earned a root row: it is the authoring front door, in the
+  // same group as add/search/list. `eval` stays in the footer, not a row.
+  assert.equal(rootHelpRowCount(), 17);
   assert.doesNotMatch(text, /kit create/);
   assert.doesNotMatch(text, /publish/);
   assert.doesNotMatch(text, /Trust/);

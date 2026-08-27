@@ -10,9 +10,36 @@ When the user invokes **`/skillet`** followed by a task (for example `/skillet p
 
 When the task instead begins with a **handle** as the first token — with or without a leading `@` (`/skillet mattpocock review my PR` or `/skillet @mattpocock …`) — we **summon** that person's public kit live from the registry and route against it: no install, no sync, no account. See "Summon a handle" below; it replaces the local-kit flow for that invocation.
 
+## First: `create` is a verb, not a handle
+
+When the **first token** of the invocation is `create` (`/skillet create`,
+`/skillet create a skill for our deploy ritual`), this is not a summon and not a
+local route. Load the bundled **`@skillet/create`** playbook and follow it
+instead of the phases below. Do not run the Searching/Picked/Using phases, and do
+not record a route for it.
+
+It sits in two places; read whichever exists:
+
+1. **Next to this skill on disk** — the sibling `skillet-create/SKILL.md` in the
+   same skills directory this file was loaded from. `skillet init` writes both
+   together, so this is the copy an anonymous install has.
+2. `~/.skillet/skills/@skillet/create/SKILL.md` (or `$SKILLET_DIR/skills/...`) —
+   the kit store copy, present once the machine has synced.
+
+It is deliberately absent from `skillet route manifest`: the CLI's own
+meta-skills are never routing candidates, so a path is how you reach it.
+
+If neither exists, the CLI predates the playbook. Say so in one line and run
+`skillet init` (no account needed) to install it, rather than improvising your
+own create flow.
+
+`create` is a reserved handle, so it can never name a person's kit. Every other
+first token is still treated as a handle (see "Summon a handle").
+
 ## When to use
 
 - The user explicitly invokes `/skillet` or asks Skillet to "use the right skill" for a task.
+- The invocation starts with `create` — hand off to the `@skillet/create` playbook (above).
 - The task should be handled by an existing kit skill rather than generic assistant behavior.
 - The invocation starts with a handle (first token, `@` optional) — summon that handle's public kit (the summon flow), even if the local kit is empty or the machine has never synced.
 

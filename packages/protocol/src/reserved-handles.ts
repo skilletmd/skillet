@@ -142,6 +142,10 @@ export const RESERVED_HANDLES: ReadonlySet<string> = new Set<string>([
   'session',
   'settings',
   'setting',
+  // `/create` is a live web route AND the first-token verb the bundled router
+  // dispatches on (`/skillet create`). A claimable `@create` would make that
+  // invocation ambiguous between the playbook and a person's kit.
+  'create',
   'profile',
   'profiles',
   'author',

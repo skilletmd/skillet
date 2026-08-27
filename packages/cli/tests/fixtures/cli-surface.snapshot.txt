@@ -10,6 +10,7 @@ Getting started
   web [path]            Open skillet.md in your browser (e.g. /settings)
 
 Skills into your kit
+  create <name>         Start a new skill: scaffold SKILL.md and its eval
   add [source]          Add a skill or kit from the library, GitHub, or a path
   search <keyword...>   Search the public skill library
   list                  List skills grouped by kit
@@ -28,7 +29,7 @@ This machine
   device                Your machines: which one this is, plus how to rename it
   doctor                Auth, sync state, pending updates, and paths
 
-More commands   import · scan · pending · edits · trust · pin
+More commands   import · eval · scan · pending · edits · trust · pin
 Details         skillet <command> --help
 
 # sync
@@ -480,6 +481,35 @@ Options
 
 Arguments
   path  
+
+
+# create
+skillet create   Start a new skill: scaffold SKILL.md and its eval
+
+Usage
+  skillet create [options] [name]
+
+Options
+  --description <text>  Seed the description (the field that decides when it loads)
+  --dir <path>          Where to create the directory (defaults to the current directory)
+  -h, --help            display help for command
+
+Arguments
+  name  
+
+
+# eval
+skillet eval   Run the static basic eval (evals/smoke.json) against kit skill(s)
+
+Usage
+  skillet eval [options] [slug]
+
+Options
+  --json                Emit machine-readable results
+  -h, --help            display help for command
+
+Arguments
+  slug  
 
 
 # add

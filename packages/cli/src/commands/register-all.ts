@@ -4,8 +4,10 @@ import { registerAddCommand } from "./add-cmd.js";
 import { registerAuthCommands, registerSessionAliasCommands } from "./auth.js";
 import { registerAvatarCommand } from "./avatar.js";
 import { registerConnectCommand } from "./connect.js";
+import { registerCreateCommand } from "./create-cmd.js";
 import { registerDoctorCommand } from "./doctor.js";
 import { registerEditsCommand } from "./edits.js";
+import { registerEvalCommand } from "./eval.js";
 import { registerExportCommand } from "./export.js";
 import { registerImportCommand } from "./import-cmd.js";
 import { registerInitCommand } from "./init.js";
@@ -77,6 +79,15 @@ export function registerAllCommands(program: Command, options?: RegisterCommands
   registerAvatarCommand(program);
   registerConnectCommand(program);
   registerWebCommand(program);
+  // `skillet create` — scaffold a new skill on disk. Anonymous and local: it
+  // writes files and stops, so it works with no account, like `init`/`search`.
+  registerCreateCommand(program);
+  // `skillet eval` — static fixture check against a kit skill. Reads the local
+  // store and touches no registry, so it sits at the device tier next to
+  // `usage`/`runtimes`. It was management-tier, which made the authoring loop
+  // (`create` → edit → `eval` → `upload`) cite a command that did not exist on
+  // a default install; the bundled @skillet/create playbook depends on it.
+  registerEvalCommand(program);
   registerAddCommand(program);
   registerImportCommand(program);
   registerExportCommand(program);

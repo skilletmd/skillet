@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   BUNDLED_ROUTE_SLUG,
   BUNDLED_ROUTE_MATERIALIZE_DIR,
+  BUNDLED_CREATE_SLUG,
+  BUNDLED_CREATE_MATERIALIZE_DIR,
 } from "../src/commands/route.js";
 import {
   materializeOptsForIdentity,
@@ -23,6 +25,16 @@ describe("skillMaterializeIdentity", () => {
       owner: "skillet",
       cwd: "/tmp/proj",
       dirName: "skillet",
+    });
+  });
+});
+
+describe("bundled create playbook identity", () => {
+  it("materializes as `skillet-create`, not `skillet--create`", () => {
+    expect(skillMaterializeIdentity(BUNDLED_CREATE_SLUG, "skillet")).toEqual({
+      adapterSlug: "create",
+      owner: "skillet",
+      dirName: BUNDLED_CREATE_MATERIALIZE_DIR,
     });
   });
 });

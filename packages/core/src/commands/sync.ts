@@ -16,8 +16,8 @@ import {
   stashBaselineVersion,
   clearBaselineStash,
 } from './edits-store.js'
-import { ensureBundledRouteSkill } from './bundled-route-skill.js'
-import { BUNDLED_ROUTE_SLUG } from './route.js'
+import { ensureBundledCreateSkill, ensureBundledRouteSkill } from './bundled-route-skill.js'
+import { BUNDLED_CREATE_SLUG, BUNDLED_ROUTE_SLUG } from './route.js'
 import { canonicalContentHash, type DecodedBundle, skillContentHash, stripSkilletBackupPaths } from '@skillet/protocol'
 import { parseSkillRef } from '../registry/identifier.js'
 import { materializeSlugDir } from '../bundle/write.js'
@@ -205,6 +205,17 @@ export interface SyncOptions {
    * pkg snapshot never carries `dist/bundled-skills`.
    */
   bundledRouteSkillMd?: string
+  /**
+   * Directory containing the bundled `@skillet/create` playbook that
+   * `/skillet create` loads. Same lifecycle as the router: shipped in the CLI,
+   * ensured on every sync so it exists with nothing synced.
+   */
+  bundledCreateSkillDir?: string
+  /**
+   * The create playbook's SKILL.md inlined at bundle time. Fallback for the
+   * packaged desktop sidecar, same reason as `bundledRouteSkillMd`.
+   */
+  bundledCreateSkillMd?: string
   /**
    * Explicit TCC initiation classification for this run (U3). 'user' lets the
    * run content-read protected-resolving roots (macOS may prompt once, with
@@ -1300,6 +1311,21 @@ async function syncInner(
       } catch {
         // Best-effort: an un-removable orphan dir is harmless — nothing keys it.
       }
+    }
+  }
+
+  if (opts.bundledCreateSkillDir) {
+    try {
+      await ensureBundledCreateSkill(opts.bundledCreateSkillDir, opts.bundledCreateSkillMd)
+      // Same pre-ensure-snapshot refresh as the router below: without it the
+      // first sync after a playbook change reads the fresh store bytes as local
+      // drift and skips materializing until the next sync.
+      const refreshed = await readState()
+      const createEntry = refreshed.skills[BUNDLED_CREATE_SLUG]
+      if (createEntry) state.skills[BUNDLED_CREATE_SLUG] = createEntry
+      else delete state.skills[BUNDLED_CREATE_SLUG]
+    } catch {
+      // Best-effort: the bundled meta-skill must not block sync.
     }
   }
 

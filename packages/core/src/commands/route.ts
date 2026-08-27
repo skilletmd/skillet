@@ -14,6 +14,14 @@ export const BUNDLED_ROUTE_SLUG = "@skillet/route";
 /** On-disk dir name for `@skillet/route` so Cursor exposes `/skillet`, not `/skillet--route`. */
 export const BUNDLED_ROUTE_MATERIALIZE_DIR = "skillet";
 
+/** The `/skillet create` playbook, bundled alongside the router. */
+export const BUNDLED_CREATE_SLUG = "@skillet/create";
+/** On-disk dir name for `@skillet/create` so agents expose `/skillet-create`. */
+export const BUNDLED_CREATE_MATERIALIZE_DIR = "skillet-create";
+
+/** Every meta-skill the CLI ships itself. Excluded from routing candidates. */
+export const BUNDLED_META_SLUGS = [BUNDLED_ROUTE_SLUG, BUNDLED_CREATE_SLUG] as const;
+
 export interface RouteManifestEntry {
   slug: string;
   name: string;
@@ -61,7 +69,8 @@ export function skillRefFromEntry(entry: SkillEntry): string {
 }
 
 function isBundledRouteEntry(entry: SkillEntry): boolean {
-  return entry.slug === BUNDLED_ROUTE_SLUG || skillRefFromEntry(entry) === BUNDLED_ROUTE_SLUG;
+  const ref = skillRefFromEntry(entry);
+  return BUNDLED_META_SLUGS.some((slug) => entry.slug === slug || ref === slug);
 }
 
 export function findSkillEntryByRef(ref: string, state: KitState): SkillEntry | null {
