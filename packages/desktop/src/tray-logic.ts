@@ -512,11 +512,15 @@ export function parkedNoticeCopy(notice: ParkedNotice): {
   const detail = notice.denied
     ? 'Allow Skillet in System Settings under Privacy and Security, then sync.'
     : notice.count === 1
-      ? 'Sync now to grant it.'
-      : 'Sync now to grant them.'
+      ? 'Allow access so Skillet can update it.'
+      : 'Allow access so Skillet can update them.'
+  // Not "Sync now". That names the mechanism rather than the outcome, and this
+  // notice sits on the same view as the hero refresh — two buttons reading
+  // "Sync now" that do different things. In Skillet, sync also PULLS from the
+  // registry, so it reads as the opposite of granting a local folder.
   const action: ParkedAction = notice.denied
     ? { label: 'Open System Settings', kind: 'settings' }
-    : { label: 'Sync now', kind: 'sync' }
+    : { label: 'Allow access', kind: 'sync' }
   return { title, detail, action }
 }
 
@@ -651,7 +655,7 @@ export function permissionRows(input: {
       rows.push({
         id: `folder:${anchor}`,
         label,
-        detail: `Skillet can sync ${who} here.`,
+        detail: `Skillet can update ${who} skills here.`,
         state: 'allowed',
         action: null,
       })
@@ -667,9 +671,14 @@ export function permissionRows(input: {
       rows.push({
         id: `folder:${anchor}`,
         label,
-        detail: `${who} lives here and needs your permission.`,
+        detail: `${who} keeps skills here. macOS asks before Skillet can read it.`,
         state: 'needs-access',
-        action: { label: 'Sync now', kind: 'folder-sync', anchor },
+        // The label says what the person gets, not how it happens. Pressing it
+        // runs a user-initiated sync because that is the invocation class
+        // allowed to probe, but "Sync now" describes Skillet's plumbing and,
+        // worse, sync PULLS from the registry — so it reads as the opposite of
+        // granting a local folder. Matches the Accessibility row's wording.
+        action: { label: 'Allow access', kind: 'folder-sync', anchor },
       })
     }
   }

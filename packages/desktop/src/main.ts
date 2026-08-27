@@ -1912,7 +1912,8 @@ function agentGlyph(name: string): string {
  * skip until a day has passed.
  *
  * `background` defaults to true (fail-closed, U3): only the explicit sync
- * affordances (the hero sync button, the parked-folder Sync now) pass false —
+ * affordances (the hero sync button, and the folder-access Allow access in the
+ * parked notice and Settings) pass false —
  * a user-initiated run may read agent folders that still need the macOS
  * folder-access grant, prompting once and recording the unlock. Automatic
  * syncs (launch, daily, tray-open check, SSE push, post-connect/publish)

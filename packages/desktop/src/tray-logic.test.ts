@@ -284,16 +284,16 @@ describe('parkedNotice', () => {
 })
 
 describe('parkedNoticeCopy', () => {
-  it('asks for a sync to grant access (singular and plural)', () => {
+  it('asks for access, not for a sync (singular and plural)', () => {
     expect(parkedNoticeCopy({ count: 1, denied: false })).toEqual({
       title: '1 agent folder needs access',
-      detail: 'Sync now to grant it.',
-      action: { label: 'Sync now', kind: 'sync' },
+      detail: 'Allow access so Skillet can update it.',
+      action: { label: 'Allow access', kind: 'sync' },
     })
     expect(parkedNoticeCopy({ count: 3, denied: false })).toEqual({
       title: '3 agent folders need access',
-      detail: 'Sync now to grant them.',
-      action: { label: 'Sync now', kind: 'sync' },
+      detail: 'Allow access so Skillet can update them.',
+      action: { label: 'Allow access', kind: 'sync' },
     })
   })
 
@@ -428,8 +428,13 @@ describe('permissionRows', () => {
     })
     const folder = rows.find((r) => r.id.startsWith('folder:'))
     expect(folder?.state).toBe('needs-access')
+    // "Sync now" named the MECHANISM (a user-initiated sync is what triggers
+    // the probe that makes macOS ask). It is not what the person is trying to
+    // do, and in Skillet "sync" pulls from the registry, so a permissions
+    // button reading "Sync now" suggests the opposite of what it does. It
+    // matches the Accessibility row directly above it instead.
     expect(folder?.action).toEqual({
-      label: 'Sync now',
+      label: 'Allow access',
       kind: 'folder-sync',
       anchor: '/Users/x/Documents',
     })
