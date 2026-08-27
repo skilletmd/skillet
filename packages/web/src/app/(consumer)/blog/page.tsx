@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { markdownAlternates } from '@/lib/markdown-alternate'
-import { getAllPosts } from '@/lib/blog'
+import { getEditorialPosts } from '@/lib/blog'
 import { blogHref } from '@/lib/urls'
 import { BlogIndex } from './blog-index'
 
@@ -28,6 +28,6 @@ export const metadata: Metadata = {
 }
 
 export default function BlogIndexPage() {
-  const posts = getAllPosts()
+  const posts = getEditorialPosts()
   return <BlogIndex posts={posts} />
 }

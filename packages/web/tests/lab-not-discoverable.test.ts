@@ -20,7 +20,7 @@ vi.mock('@/lib/registry', () => ({
   getKitCatalog: async () => ({ items: [], total: 0, limit: 0, offset: 0 }),
   getAllAuthorUsernames: async () => [],
 }))
-vi.mock('@/lib/blog', () => ({ getAllPosts: () => [] }))
+vi.mock('@/lib/blog', () => ({ getEditorialPosts: () => [], getStories: () => [] }))
 
 describe('/lab is kept out of every discovery surface', () => {
   it('is disallowed in robots.txt', async () => {

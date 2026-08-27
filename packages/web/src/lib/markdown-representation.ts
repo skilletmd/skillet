@@ -16,7 +16,7 @@ import 'server-only'
  */
 
 import { getDoc } from './docs'
-import { getAllPosts, getPost } from './blog'
+import { getEditorialPosts, getPost } from './blog'
 import { getAuthorProfile, getSkill, getSkillCatalog } from './registry'
 import type { Skill } from './types'
 import { fetchSkillBundleFile, getSkillBundleSummary } from './skill-bundle-content'
@@ -84,7 +84,7 @@ function docsMarkdown(slug: string[]): string | null {
 }
 
 function blogIndexMarkdown(): string {
-  const posts = getAllPosts()
+  const posts = getEditorialPosts()
   const lines = posts.map((post) => {
     const date = post.publishedAt ? ` (${post.publishedAt.slice(0, 10)})` : ''
     return `- [${post.title}](${abs(`/blog/${post.slug}`)})${date}: ${post.description}`

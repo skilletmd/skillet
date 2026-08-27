@@ -1,4 +1,4 @@
-import { getAllPosts } from '@/lib/blog'
+import { getEditorialPosts } from '@/lib/blog'
 import { buildBlogFeed } from '@/lib/blog-feed'
 
 // The blog's RSS feed. Same shape as app/robots.txt/route.ts: a directory named
@@ -12,7 +12,7 @@ import { buildBlogFeed } from '@/lib/blog-feed'
 const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://skillet.md'
 
 export async function GET() {
-  return new Response(buildBlogFeed(getAllPosts(), BASE), {
+  return new Response(buildBlogFeed(getEditorialPosts(), BASE), {
     headers: {
       'content-type': 'application/rss+xml; charset=utf-8',
       'cache-control': 'public, max-age=3600',

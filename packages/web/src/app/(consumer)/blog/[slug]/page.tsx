@@ -5,7 +5,7 @@ import { MarkdownContent } from '@/components/markdown-content'
 import { NotFoundBody } from '@/components/not-found-body'
 import { PostShare } from '@/components/post-share'
 import { Avatar } from '@/components/ui/avatar'
-import { getAllPosts, getPost, postTitleTag, type Post } from '@/lib/blog'
+import { getEditorialPosts, getPost, postTitleTag, STORY_TAG, type Post } from '@/lib/blog'
 import { blogHref } from '@/lib/urls'
 import { PAGE_CONTAINER_CLASS } from '@/lib/page-layout'
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://skillet.md'
@@ -26,7 +26,7 @@ function formatDate(iso: string | null): string {
 
 /** Most-related published posts: rank by shared tags, then recency. */
 function relatedPosts(current: Post, limit = 4): Post[] {
-  return getAllPosts()
+  return getEditorialPosts()
     .filter((p) => p.slug !== current.slug)
     .map((p) => ({ p, shared: p.tags.filter((t) => current.tags.includes(t)).length }))
     .sort((a, b) => b.shared - a.shared)
@@ -39,13 +39,22 @@ function relatedPosts(current: Post, limit = 4): Post[] {
 // impossible and an empty generateStaticParams crashes the build under Cache
 // Components. Posts render on-demand (and are still server-rendered for SEO).
 
+/** A blog post, never a story. Stories share the posts table but live at
+ *  /news/<slug>; resolving one here would serve the same content on a second
+ *  URL, in a layout built for a hand-written article. */
+function editorialPost(slug: string) {
+  const post = getPost(slug)
+  if (!post || post.tags.includes(STORY_TAG)) return null
+  return post
+}
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string }>
 }): Promise<Metadata> {
   const { slug } = await params
-  const post = getPost(slug)
+  const post = editorialPost(slug)
   // Unknown or draft slug. The 200 status is already on the wire (see
   // NotFoundBody), so noindex is what actually keeps this out of an index.
   if (!post) return { robots: { index: false, follow: false } }
@@ -90,7 +99,7 @@ export async function generateMetadata({
 
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const post = getPost(slug)
+  const post = editorialPost(slug)
   if (!post) return <NotFoundBody />
 
   const related = relatedPosts(post)

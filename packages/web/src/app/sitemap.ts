@@ -4,7 +4,7 @@ import {
   getKitCatalog,
   getAllAuthorUsernames,
 } from '@/lib/registry'
-import { getAllPosts } from '@/lib/blog'
+import { getEditorialPosts, getStories } from '@/lib/blog'
 import { CATEGORY_BY_KEY } from '@/lib/categories'
 import { DOC_NAV } from '@/lib/docs-nav'
 import { TOUR_STOPS, tourHref } from '@/lib/tour'
@@ -81,15 +81,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // they are the only ones carrying lastModified. The registry exposes nothing
   // equivalent for skills, kits, or profiles, and a fabricated date is worse
   // than none. Omit the key rather than emit an invalid date when both are null.
-  const blogRoutes = getAllPosts().map((post) => {
+  const blogRoutes = getEditorialPosts().map((post) => {
     const lastModified = post.updatedAt ?? post.publishedAt ?? undefined
     return lastModified
       ? { url: abs(blogHref(post.slug)), lastModified }
       : { url: abs(blogHref(post.slug)) }
   })
 
+  // Stories are posts too, but they live at /news/<slug>, not /blog/<slug>.
+  // Listing them under the blog path would offer search engines a second URL
+  // for the same content, and the blog path does not even render them.
+  const storyRoutes = getStories().map((post) => {
+    const lastModified = post.updatedAt ?? post.publishedAt ?? undefined
+    const url = abs(`/news/${post.slug}`)
+    return lastModified ? { url, lastModified } : { url }
+  })
+
   return [
     ...staticRoutes,
+    ...storyRoutes,
     ...categoryRoutes,
     ...skillRoutes,
     ...kitRoutes,
