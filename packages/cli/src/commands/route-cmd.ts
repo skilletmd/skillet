@@ -220,11 +220,21 @@ export function registerRouteCommand(program: Command): void {
     .description("Begin a local-kit route: candidates plus the rules for picking one")
     .action(async () => {
       const skills = await listRouteManifest();
+      // An empty kit is not a failure. It used to answer `kit_empty` with a
+      // non-zero exit and three chores (sync, add, or go to the website), which
+      // made the first `/skillet` anyone ever types the one that returns an
+      // error, at the exact moment they have a real task in hand. It is the
+      // same situation as a kit that has nothing fitting, so it takes the same
+      // path: search the library, use the best match read-only, credit the
+      // author, and let keeping it be their decision afterwards.
       if (skills.length === 0) {
         process.stdout.write(
-          JSON.stringify({ ok: false, error: "kit_empty", message: emptyKitMessage() }) + "\n",
+          JSON.stringify({
+            ok: true,
+            candidates: [],
+            instructions: routeInstructions("empty"),
+          }) + "\n",
         );
-        process.exitCode = ExitCode.ERROR;
         return;
       }
       // Only what picking needs. `path`, `slug`, and `owner` are all derivable

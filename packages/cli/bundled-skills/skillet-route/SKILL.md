@@ -69,7 +69,8 @@ reach across that boundary.
 The skill ref that routed, the runtime it fired on, and a few fixed non-content
 tags. Never your prompt, your task text, or your reasoning. On a whiff the router
 searches the public library without asking and names the keywords it sent; those
-keywords are short generic capability terms, never task text or identifiers.
-Installing anything still takes a number you type. See skillet.md/docs/privacy,
+keywords are short generic capability terms, never task text or identifiers. A
+library skill is read for that one task and nothing is installed; adding it to
+your kit is a separate step you ask for. See skillet.md/docs/privacy,
 and `skillet activity export` or `skillet activity clear` to see or delete
 everything recorded about you.
