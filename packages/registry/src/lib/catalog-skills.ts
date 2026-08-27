@@ -2,6 +2,7 @@
 // Mirrors the GET /v1/skills visibility filters and summary joins.
 import type { Prisma } from '@prisma/client'
 import type { PrismaDb } from '../db/prisma-client.js'
+import { buildMatcher, tokenClauses } from './search-match.js'
 import type { SkillSummaryRow } from '../routes/skill-summary.js'
 
 /** Sort keys accepted by the public catalog list. */
@@ -50,6 +51,8 @@ async function suspendedAuthorHandles(prisma: PrismaDb): Promise<string[]> {
     .filter((handle): handle is string => typeof handle === 'string' && handle.length > 0)
 }
 
+const CATALOG_QUERY_COLUMNS = ['slug', 'description'] as const
+
 function publicCatalogWhere(
   suspendedHandles: string[],
   opts: Pick<ListPublicCatalogSkillsPrismaOptions, 'q' | 'categories'>,
@@ -65,12 +68,13 @@ function publicCatalogWhere(
     where.author_id = { notIn: suspendedHandles }
   }
 
+  // A filter narrows, so every word must land somewhere. Ranking and the
+  // any-word fallback belong to /search, which returns scores; this endpoint
+  // pages and counts over the filter and has to stay stable across both.
   const q = opts.q?.trim()
   if (q) {
-    where.OR = [
-      { slug: { contains: q } },
-      { description: { contains: q } },
-    ]
+    const clauses = tokenClauses(buildMatcher(q), CATALOG_QUERY_COLUMNS)
+    if (clauses.length > 0) where.AND = clauses
   }
 
   if (opts.categories && opts.categories.length > 0) {

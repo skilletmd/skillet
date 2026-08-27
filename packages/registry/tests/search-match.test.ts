@@ -7,6 +7,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   buildMatcher,
+  matchesEveryToken,
   matchScore,
   normalizeText,
   queryTokens,
@@ -195,6 +196,42 @@ describe('matchScore — short tokens match at a word boundary', () => {
   it('still matches long tokens anywhere in a word', () => {
     assert.equal(score('lint', ['eslint-config']), SCORE_NAME)
     assert.equal(score('web', ['webhooks']), SCORE_PREFIX)
+  })
+})
+
+// The catalog list endpoints page and count over a SQL filter, so they narrow
+// with every word rather than ranking with a fallback.
+describe('matchesEveryToken', () => {
+  const matches = (q: string, fields: (string | null)[]) =>
+    matchesEveryToken(buildMatcher(q), fields)
+
+  it('requires every word to land somewhere', () => {
+    assert.equal(matches('web design', ['web-design-guidelines']), true)
+    assert.equal(matches('web design', ['web-component-design']), true)
+    assert.equal(matches('web design', ['design-md']), false)
+  })
+
+  it('spreads words across fields', () => {
+    assert.equal(matches('web design', ['web-tools', 'a design helper']), true)
+  })
+
+  it('holds short tokens to a word boundary', () => {
+    assert.equal(matches('ai', ['ai-tools']), true)
+    assert.equal(matches('ai', ['explain-code']), false)
+  })
+
+  it('treats an empty query as no filter', () => {
+    assert.equal(matches('', ['anything']), true)
+    assert.equal(matches('   ', ['anything']), true)
+  })
+
+  it('ignores null fields', () => {
+    assert.equal(matches('web', [null, 'web-tools']), true)
+    assert.equal(matches('web', [null]), false)
+  })
+
+  it('is case-insensitive', () => {
+    assert.equal(matches('Web Design', ['WEB-DESIGN-GUIDELINES']), true)
   })
 })
 

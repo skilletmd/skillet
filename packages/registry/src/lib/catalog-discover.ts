@@ -2,6 +2,10 @@
 // Category and facepile fields are derived in-process so we avoid sqlite-only
 // SQL dialects (strftime, correlated subqueries) on the cutover path.
 import type { PrismaDb } from '../db/prisma-client.js'
+import { buildMatcher, matchesEveryToken, tokenClauses } from './search-match.js'
+
+/** Columns the kit and people `q` filters match against. */
+const KIT_QUERY_COLUMNS = ['name', 'description'] as const
 
 export type DiscoverKitSort = 'installs' | 'new' | 'alpha'
 
@@ -80,11 +84,8 @@ async function loadDiscoverKitsPrisma(
       visibility: 'public',
       moderation_status: 'none',
       ...(suspended.length > 0 ? { owner_id: { notIn: suspended } } : {}),
-      ...(q
-        ? {
-            OR: [{ name: { contains: q } }, { description: { contains: q } }],
-          }
-        : {}),
+      // Every word must land somewhere: this is a filter, not a ranked search.
+      ...(q ? { AND: tokenClauses(buildMatcher(q), KIT_QUERY_COLUMNS) } : {}),
     },
     select: {
       id: true,
@@ -465,9 +466,8 @@ async function loadDiscoverPeoplePrisma(
   rows = rows.filter((r) => r.public_skills > 0 || r.followers > 0)
 
   if (q) {
-    rows = rows.filter(
-      (r) => r.id.toLowerCase().includes(q) || r.name.toLowerCase().includes(q),
-    )
+    const matcher = buildMatcher(q)
+    rows = rows.filter((r) => matchesEveryToken(matcher, [r.id, r.name]))
   }
   if (opts.categories && opts.categories.length > 0) {
     const allow = new Set(opts.categories)

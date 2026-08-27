@@ -156,4 +156,70 @@ describe('catalog mysql (U4 wave)', { skip: !hasDatabaseUrl }, () => {
       ['sha256:v1', 'sha256:v2'],
     )
   })
+
+  // The catalog `q` filter used to match the whole query as one substring, so a
+  // two-word filter answered empty while /search answered fine.
+  describe('the q filter matches word by word', () => {
+    it('finds a hyphenated slug from a two-word filter', async () => {
+      await reset()
+      await addSkillVersionPrisma(prisma, 'vercel', 'web-design-guidelines', 'sha256:cq1', 3000)
+      await addSkillVersionPrisma(prisma, 'alice', 'lint-tool', 'sha256:cq2', 3001)
+
+      const listed = await listPublicCatalogSkillsPrisma(prisma, {
+        limit: 20,
+        offset: 0,
+        q: 'web design',
+      })
+      assert.deepEqual(
+        listed.map((row) => row.id),
+        ['vercel:web-design-guidelines'],
+      )
+      assert.equal(await countPublicCatalogSkillsPrisma(prisma, { q: 'web design' }), 1)
+    })
+
+    it('narrows rather than widening: every word must land', async () => {
+      await reset()
+      await addSkillVersionPrisma(prisma, 'wshobson', 'web-component-design', 'sha256:cq3', 3000)
+      await addSkillVersionPrisma(prisma, 'stitch', 'design-md', 'sha256:cq4', 3001)
+
+      const listed = await listPublicCatalogSkillsPrisma(prisma, {
+        limit: 20,
+        offset: 0,
+        q: 'web design',
+      })
+      assert.deepEqual(
+        listed.map((row) => row.id),
+        ['wshobson:web-component-design'],
+        'design-md matches only one word and must not appear in a filter',
+      )
+    })
+
+    it('holds a short word to a word boundary', async () => {
+      await reset()
+      await addSkillVersionPrisma(prisma, 'alice', 'ai-tools', 'sha256:cq5', 3000)
+      await addSkillVersionPrisma(prisma, 'bob', 'explain-code', 'sha256:cq6', 3001)
+
+      const listed = await listPublicCatalogSkillsPrisma(prisma, { limit: 20, offset: 0, q: 'ai' })
+      assert.deepEqual(
+        listed.map((row) => row.id),
+        ['alice:ai-tools'],
+        'ai must not match the middle of explain',
+      )
+    })
+
+    it('keeps count and list agreeing on the same filter', async () => {
+      await reset()
+      await addSkillVersionPrisma(prisma, 'vercel', 'web-design-guidelines', 'sha256:cq7', 3000)
+      await addSkillVersionPrisma(prisma, 'alice', 'lint-tool', 'sha256:cq8', 3001)
+
+      for (const q of ['web design', 'ai', 'zzzznothing']) {
+        const listed = await listPublicCatalogSkillsPrisma(prisma, { limit: 50, offset: 0, q })
+        assert.equal(
+          await countPublicCatalogSkillsPrisma(prisma, { q }),
+          listed.length,
+          `count and list disagree for "${q}", which would break pagination`,
+        )
+      }
+    })
+  })
 })

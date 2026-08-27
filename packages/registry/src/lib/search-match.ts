@@ -184,6 +184,21 @@ export function matchScore(
   return score > 0 ? score : null
 }
 
+/**
+ * Does every word of the query appear somewhere in these fields?
+ *
+ * The boolean counterpart of {@link matchScore}, for the catalog list endpoints:
+ * they page and count over a SQL filter, so they narrow rather than rank. An
+ * empty query is not a filter and matches everything.
+ */
+export function matchesEveryToken(matcher: QueryMatcher, fields: readonly Field[]): boolean {
+  if (matcher.tokens.length === 0) return true
+  const hays = haystack(fields, matcher)
+  return matcher.tokens.every((token) =>
+    hays.some((hay) => occursIn(hay, token, matcher.degenerate)),
+  )
+}
+
 /** One `OR`-across-columns clause per token, for a Prisma `where`. */
 type ColumnFilter = { contains: string } | { startsWith: string }
 export type TokenClause<C extends string> = {
