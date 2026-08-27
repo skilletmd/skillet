@@ -1064,9 +1064,38 @@ fn request_accessibility() {
     #[cfg(target_os = "macos")]
     {
         macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
-        let _ = std::process::Command::new("open")
-            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
-            .spawn();
+        open_privacy_pane("Privacy_Accessibility");
+    }
+}
+
+/// Open one anchor of System Settings ▸ Privacy & Security.
+///
+/// Uses the MODERN pane id (`com.apple.settings.PrivacySecurity.extension`).
+/// The legacy `com.apple.preference.security` form still resolves for
+/// Accessibility, but Files and Folders has no legacy anchor at all, so one
+/// modern helper keeps both links on the same spelling instead of leaving a
+/// lone legacy string to rot next to a modern one.
+#[cfg(target_os = "macos")]
+fn open_privacy_pane(anchor: &str) {
+    let _ = std::process::Command::new("open")
+        .arg(format!(
+            "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?{anchor}"
+        ))
+        .spawn();
+}
+
+/// Files and Folders — the recovery route for a REFUSED folder grant.
+///
+/// macOS records a denial and never prompts again, so the tray's needs-access
+/// notice cannot fix a denied folder by re-running the sync however many times
+/// it is pressed. Leaving the app is the only move left, and until this existed
+/// there was nothing to leave to: the app shipped copy telling people to open
+/// System Settings with no way to take them there.
+#[tauri::command]
+fn open_folder_access_settings() {
+    #[cfg(target_os = "macos")]
+    {
+        open_privacy_pane("Privacy_FilesAndFolders");
     }
 }
 
@@ -1502,6 +1531,7 @@ pub fn run() {
             open_web,
             accessibility_granted,
             request_accessibility,
+            open_folder_access_settings,
             finish_onboarding
         ])
         .setup(|app| {

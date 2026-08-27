@@ -1816,10 +1816,14 @@ function paintTray(skills: Skill[], granted: boolean) {
     }
     void runSync({ background: false })
   })
-  // Parked-folder notice: Sync now is a grant affordance, so it too runs
-  // user-initiated.
-  document.getElementById('parkedsync')?.addEventListener('click', () => {
-    void runSync({ background: false })
+  // Parked-folder notice. Sync is a grant affordance, so it runs
+  // user-initiated (the only class assessTccRoot lets probe). Settings is the
+  // denied path: re-syncing cannot re-prompt a refused grant, so the button
+  // has to leave the app.
+  document.getElementById('parkedsync')?.addEventListener('click', (e) => {
+    const kind = (e.currentTarget as HTMLElement).dataset.kind
+    if (kind === 'settings') void invoke('open_folder_access_settings')
+    else void runSync({ background: false })
   })
   // Skill-stats ask: either answer marks the question answered account-side
   // (choose sync|local), so no surface re-asks; localStorage only remembers
@@ -1857,11 +1861,13 @@ function paintTray(skills: Skill[], granted: boolean) {
 }
 
 // Needs-access notice (U3/R7): one row, visible for as long as any agent
-// folder stays parked. Sync now runs a user-initiated sync, which is the flow
-// allowed to trigger the macOS folder-access prompt and record the grant.
+// folder stays parked. The label and the behaviour both come from
+// parkedNoticeCopy — an ungranted folder gets a user-initiated sync (the flow
+// allowed to trigger the macOS prompt and record the grant), a DENIED one gets
+// System Settings, because macOS never re-prompts after a refusal.
 function renderParkedNote(notice: ParkedNotice): string {
   const copy = parkedNoticeCopy(notice)
-  return `<div class="row action syncissue"><div class="bcol"><b>${escapeHtml(copy.title)}</b><span>${escapeHtml(copy.detail)}</span></div><span class="spacer"></span><button class="link" id="parkedsync">Sync now</button></div>`
+  return `<div class="row action syncissue"><div class="bcol"><b>${escapeHtml(copy.title)}</b><span>${escapeHtml(copy.detail)}</span></div><span class="spacer"></span><button class="link" id="parkedsync" data-kind="${copy.action.kind}">${escapeHtml(copy.action.label)}</button></div>`
 }
 
 // Transient post-sync note: per-skill failures the registry reported. Surfaces

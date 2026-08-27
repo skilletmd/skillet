@@ -284,10 +284,12 @@ describe('parkedNoticeCopy', () => {
     expect(parkedNoticeCopy({ count: 1, denied: false })).toEqual({
       title: '1 agent folder needs access',
       detail: 'Sync now to grant it.',
+      action: { label: 'Sync now', kind: 'sync' },
     })
     expect(parkedNoticeCopy({ count: 3, denied: false })).toEqual({
       title: '3 agent folders need access',
       detail: 'Sync now to grant them.',
+      action: { label: 'Sync now', kind: 'sync' },
     })
   })
 
@@ -295,6 +297,27 @@ describe('parkedNoticeCopy', () => {
     expect(parkedNoticeCopy({ count: 1, denied: true }).detail).toBe(
       'Allow Skillet in System Settings under Privacy and Security, then sync.',
     )
+  })
+
+  // U1/R3: macOS never re-prompts once a grant is refused, so the denied
+  // notice's action must open System Settings. Re-running the sync is the one
+  // thing that provably cannot help, and shipping it as the only affordance is
+  // what left a denied person with no way back.
+  it('offers System Settings, not another sync, once a grant was denied', () => {
+    expect(parkedNoticeCopy({ count: 2, denied: true }).action).toEqual({
+      label: 'Open System Settings',
+      kind: 'settings',
+    })
+  })
+
+  it('always offers an action that leads somewhere (R3)', () => {
+    for (const count of [1, 2, 7]) {
+      for (const denied of [false, true]) {
+        const { action } = parkedNoticeCopy({ count, denied })
+        expect(action.label.length).toBeGreaterThan(0)
+        expect(['sync', 'settings']).toContain(action.kind)
+      }
+    }
   })
 
   it('never uses an em-dash (product copy rule)', () => {
@@ -306,6 +329,7 @@ describe('parkedNoticeCopy', () => {
       const copy = parkedNoticeCopy(notice)
       expect(copy.title).not.toContain('—')
       expect(copy.detail).not.toContain('—')
+      expect(copy.action.label).not.toContain('—')
     }
   })
 })

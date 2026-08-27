@@ -484,9 +484,27 @@ export function parkedNotice(
   return { count: parked.length, denied: parked.some((a) => a.parkedDenied === true) }
 }
 
-/** Notice copy: one row, an action, no modes. The denied variant routes to
- *  System Settings because re-syncing cannot re-prompt a refused grant. */
-export function parkedNoticeCopy(notice: ParkedNotice): { title: string; detail: string } {
+/** What the notice's one button does. `sync` re-runs a user-initiated sync,
+ *  which is what earns an ungranted folder its one macOS prompt. `settings`
+ *  opens the Files and Folders pane, the only route left once a grant was
+ *  refused. */
+export type ParkedActionKind = 'sync' | 'settings'
+
+export type ParkedAction = { label: string; kind: ParkedActionKind }
+
+/** Notice copy: one row, an action, no modes.
+ *
+ *  The action is part of the copy, not the caller's choice. It used to be a
+ *  hardcoded "Sync now" in the renderer while only the DETAIL string branched
+ *  on `denied` — so a denied person read "allow Skillet in System Settings"
+ *  next to a button that ran the one operation macOS guarantees cannot help
+ *  (it never re-prompts after a refusal). Keeping label, detail, and behaviour
+ *  in one place is what stops that drift recurring. */
+export function parkedNoticeCopy(notice: ParkedNotice): {
+  title: string
+  detail: string
+  action: ParkedAction
+} {
   const title =
     notice.count === 1
       ? '1 agent folder needs access'
@@ -496,7 +514,10 @@ export function parkedNoticeCopy(notice: ParkedNotice): { title: string; detail:
     : notice.count === 1
       ? 'Sync now to grant it.'
       : 'Sync now to grant them.'
-  return { title, detail }
+  const action: ParkedAction = notice.denied
+    ? { label: 'Open System Settings', kind: 'settings' }
+    : { label: 'Sync now', kind: 'sync' }
+  return { title, detail, action }
 }
 
 /**
