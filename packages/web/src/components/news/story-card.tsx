@@ -30,6 +30,27 @@ export interface StoryCardSubject {
   name?: string | null
 }
 
+/**
+ * The card shows ONE sentence, never the whole summary.
+ *
+ * The writer drafts a full paragraph and the permalink prints all of it, but in
+ * a tile that paragraph ran five or six lines and three of them side by side
+ * became a wall. A card is an invitation to read the story, not the story: it
+ * has to be skimmable against nine siblings, and the first sentence is the one
+ * the writer already made carry the point.
+ *
+ * Splitting on the sentence rather than clamping with CSS is deliberate. A clamp
+ * cuts mid-word and trails an ellipsis into nothing; a sentence ends where the
+ * thought does. The clamp stays underneath only as a backstop for a first
+ * sentence that is itself enormous.
+ */
+function firstSentence(text: string): string {
+  const trimmed = text.trim()
+  // Require the space after the stop so "2.0" and "skills.sh" do not split it.
+  const end = trimmed.search(/[.!?]\s/)
+  return end === -1 ? trimmed : trimmed.slice(0, end + 1)
+}
+
 export function StoryCard({
   slug,
   headline,
@@ -51,7 +72,9 @@ export function StoryCard({
         <h3 className="text-base leading-snug font-semibold tracking-tight text-pretty text-(--ink) group-hover:text-(--accent)">
           {headline}
         </h3>
-        <p className="mt-2 text-sm leading-relaxed text-(--ink-2)">{summary}</p>
+        <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-(--ink-2)">
+          {firstSentence(summary)}
+        </p>
       </Link>
 
       {sources.length > 0 ? (

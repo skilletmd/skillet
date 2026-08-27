@@ -1,11 +1,16 @@
 /**
- * Skillet Daily chrome — the masthead and section kickers.
+ * Skillet News chrome — the masthead and section kickers.
  *
- * The grammar is carried over from the print brief (`spec/competition/_brief-template.html`):
- * an uppercase masthead over a heavy rule, and section kickers built from a mono
- * label, a mono sub, and a hairline that runs to the right edge. The palette is
- * *not* carried over — the print brief is burnt-orange on white paper, which
- * fights the product's near-black accent. Grammar travels, color does not.
+ * The kicker grammar is carried over from the print brief
+ * (`spec/competition/_brief-template.html`): a mono label, a mono sub, and a
+ * hairline running to the right edge. The palette is *not* carried over — the
+ * print brief is burnt-orange on white paper, which fights the product's
+ * near-black accent. Grammar travels, color does not.
+ *
+ * The masthead sits on `.docs-img-panel`, the same gradient the docs pages put
+ * behind their hero art, rather than a gradient of its own. A second warm wash
+ * tuned by eye would drift from that one the first time either moved; sharing
+ * the class means the two surfaces cannot disagree.
  */
 
 export function NewsMasthead({
@@ -19,9 +24,9 @@ export function NewsMasthead({
   standfirst: string
 }) {
   return (
-    <header>
-      <div className="flex flex-wrap items-baseline justify-between gap-4 border-b-2 border-(--ink) pb-3">
-        <h1 className="text-xl font-bold tracking-[0.03em] uppercase">Skillet Daily</h1>
+    <header className="docs-img-panel rounded-2xl px-6 py-7 sm:px-8 sm:py-9">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
+        <h1 className="text-3xl font-bold tracking-tight text-(--ink) sm:text-4xl">Skillet News</h1>
         <div className="flex items-baseline gap-4">
           {dateLabel && (
             <span className="font-mono text-xs text-(--ink-2) tabular-nums">{dateLabel}</span>
@@ -34,7 +39,7 @@ export function NewsMasthead({
           </a>
         </div>
       </div>
-      <p className="mt-4 max-w-[65ch] text-base leading-relaxed text-(--ink-2)">{standfirst}</p>
+      <p className="mt-3 max-w-[62ch] text-base leading-relaxed text-(--ink-2)">{standfirst}</p>
     </header>
   )
 }
