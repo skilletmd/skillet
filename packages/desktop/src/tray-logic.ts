@@ -581,6 +581,13 @@ export type PermissionAgentLike = {
   }
 }
 
+/** Does any permission need the user? Drives the Settings rail dot: a blocked
+ *  capability that only Settings reveals is one the user has to go and find,
+ *  and one they never find stays blocked. */
+export function permissionsNeedAttention(rows: PermissionRow[]): boolean {
+  return rows.some((row) => row.state !== 'allowed')
+}
+
 function folderName(anchor: string): string {
   const parts = anchor.split('/').filter(Boolean)
   return parts[parts.length - 1] ?? anchor

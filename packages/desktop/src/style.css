@@ -455,6 +455,24 @@ button.link { appearance: none; -webkit-appearance: none; background: none; bord
 }
 .set-perm-row { padding-top: 6px; padding-bottom: 6px; }
 .set-perm-ok { font-size: 12px; color: var(--ink-2); }
+/* A blocked capability is not a settings row. Grey status text next to Sign out
+   and Rename reads as information; this is a problem with a fix attached, so
+   the state carries color and the fix looks like the action in its row. */
+/* Dot carries the alarm, text carries the meaning. Amber TEXT on the light
+   surface fails contrast, so the status keeps full ink weight and the caution
+   token shows up as a mark beside it. */
+.set-perm-warn { color: var(--ink); font-weight: 500; display: flex; align-items: center; gap: 5px; }
+.set-perm-warn::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--caution); flex: none;
+}
+.set-perm-row.needs .nm { font-weight: 600; }
+.set-action-fix {
+  color: var(--accent); font-weight: 600;
+  background: var(--accent-bg); border-radius: 6px; padding: 4px 10px;
+}
+.set-action-fix:hover { background: var(--accent-bg); filter: brightness(0.96); }
+.set-action-fix:disabled { opacity: 0.55; }
 /* Onboarding folder-access note — only rendered when an agent folder actually
    sits somewhere macOS gates, which is rare. */
 .ob-folder-note {

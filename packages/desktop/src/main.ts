@@ -45,6 +45,7 @@ import {
   accessibilityActionLabel,
   permissionRows,
   onboardingFolderNote,
+  permissionsNeedAttention,
   heroStatusOverride,
   humanizeAppError,
   palettePhaseFrom,
@@ -1540,6 +1541,10 @@ function panelWithRail(active: RailKey, viewHtml: string): string {
   const badges = resolveRailBadges({
     pendingCount: trayPending?.length ?? 0,
     updateReady: updateReadyVersion != null,
+    // A missing permission is only visible inside Settings, so the path to
+    // Settings has to advertise it. Otherwise the one surface that can fix a
+    // denial is the one surface nothing points at.
+    permissionsNeedAttention: permissionsNeedAttention(currentPermissionRows()),
   })
   const pulse = badgePulse // consume once
   badgePulse = false
@@ -1930,6 +1935,12 @@ async function runSync(opts: { background?: boolean } = {}): Promise<void> {
   syncJustSucceeded = false
   await renderTray() // spinner
   trayAdapters = await getAdapters({ background })
+  // Re-scan detected agents too. A sync is exactly when folder access can
+  // CHANGE (a user-initiated one probes the root and records the grant; a
+  // denial suspends the marker), and the Permissions rows read this. Without
+  // the refresh the cached scan from launch stands forever, so granting access
+  // left the row reading "Needs access" and the button looked dead.
+  trayDetectedAgents = await getDetectedAgents()
   traySyncedAt = Date.now()
   try {
     localStorage.setItem('lastAutoSync', String(traySyncedAt))
@@ -2663,20 +2674,30 @@ const PERMISSION_STATE_TEXT: Record<string, string> = {
  * and dismissible, so before this a person who denied something and moved on
  * had no path back.
  */
-function renderPermissionsBlock(): string {
-  const rows = permissionRows({
+function currentPermissionRows() {
+  return permissionRows({
     isMac: isMacOsDesktop(),
     accessibilityGranted: lastGranted,
     accessibilityAsked: trayAxAsked,
     agents: trayDetectedAgents ?? [],
   })
+}
+
+function renderPermissionsBlock(): string {
+  const rows = currentPermissionRows()
   if (rows.length === 0) return ''
   const body = rows
     .map((row) => {
+      const problem = row.state !== 'allowed'
+      // A sync is the slowest thing behind these buttons (10s+ with a big kit).
+      // Without a pending state the press looks like it did nothing, which is
+      // exactly how a working grant read as a broken button.
+      const busy = traySyncing && row.action?.kind === 'folder-sync'
       const action = row.action
-        ? `<button type="button" class="set-action" data-perm="${escapeHtml(row.action.kind)}" data-anchor="${escapeHtml(row.action.anchor ?? '')}">${escapeHtml(row.action.label)}</button>`
+        ? `<button type="button" class="set-action${problem ? ' set-action-fix' : ''}" data-perm="${escapeHtml(row.action.kind)}" data-anchor="${escapeHtml(row.action.anchor ?? '')}"${busy ? ' disabled' : ''}>${escapeHtml(busy ? 'Checking…' : row.action.label)}</button>`
         : `<span class="set-perm-ok">${escapeHtml(PERMISSION_STATE_TEXT[row.state] ?? '')}</span>`
-      return `<div class="set-row set-perm-row"><div class="set-account-col"><span class="nm">${escapeHtml(row.label)}</span><span class="set-account-sub">${escapeHtml(row.state === 'allowed' ? row.detail : PERMISSION_STATE_TEXT[row.state] ?? row.detail)}</span></div><span class="spacer"></span>${action}</div>`
+      const sub = row.state === 'allowed' ? row.detail : (PERMISSION_STATE_TEXT[row.state] ?? row.detail)
+      return `<div class="set-row set-perm-row${problem ? ' needs' : ''}"><div class="set-account-col"><span class="nm">${escapeHtml(row.label)}</span><span class="set-account-sub${problem ? ' set-perm-warn' : ''}">${escapeHtml(sub)}</span></div><span class="spacer"></span>${action}</div>`
     })
     .join('')
   return `<div class="set-perms"><div class="set-perms-head">Permissions</div>${body}</div>`

@@ -19,6 +19,7 @@ import {
   accessibilityActionLabel,
   permissionRows,
   onboardingFolderNote,
+  permissionsNeedAttention,
   heroStatusOverride,
   humanizeAppError,
   palettePhaseFrom,
@@ -573,6 +574,31 @@ describe('onboardingFolderNote', () => {
     })
     expect(note!.title).not.toContain('—')
     expect(note!.detail).not.toContain('—')
+  })
+})
+
+describe('permissionsNeedAttention', () => {
+  const rows = (...states: string[]) =>
+    states.map((state, i) => ({
+      id: `r${i}`,
+      label: 'x',
+      detail: 'y',
+      state,
+      action: null,
+    })) as Parameters<typeof permissionsNeedAttention>[0]
+
+  it('is quiet when everything is allowed', () => {
+    expect(permissionsNeedAttention(rows('allowed', 'allowed'))).toBe(false)
+  })
+
+  it('is quiet with no rows at all (off macOS)', () => {
+    expect(permissionsNeedAttention([])).toBe(false)
+  })
+
+  it('fires for any state that is not allowed', () => {
+    for (const state of ['not-allowed', 'needs-access', 'denied']) {
+      expect(permissionsNeedAttention(rows('allowed', state))).toBe(true)
+    }
   })
 })
 
