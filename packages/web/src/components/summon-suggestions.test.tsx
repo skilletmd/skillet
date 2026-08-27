@@ -40,6 +40,6 @@ describe('SummonSuggestions', () => {
 
   it('names the source skill so a reader can see where a line came from', () => {
     render(<SummonSuggestions author="phuryn" suggestions={three.slice(0, 1)} />)
-    expect(screen.getByTitle('Copy — uses @phuryn/retro')).toBeTruthy()
+    expect(screen.getByTitle("Copy. Uses @phuryn/retro")).toBeTruthy()
   })
 })

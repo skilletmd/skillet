@@ -63,6 +63,10 @@
     "./protected-resource": {
       "import": "./dist/protected-resource.js",
       "types": "./dist/protected-resource.d.ts"
+    },
+    "./summon-suggestions": {
+      "import": "./dist/summon-suggestions.js",
+      "types": "./dist/summon-suggestions.d.ts"
     }
   },
   "scripts": {

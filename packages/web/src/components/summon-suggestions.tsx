@@ -13,7 +13,7 @@
  * still public, so pasting one resolves rather than misses.
  */
 import { useState } from 'react'
-import { summonSuggestionLine } from '@skillet/protocol'
+import { summonSuggestionLine } from '@skillet/protocol/summon-suggestions'
 
 interface Props {
   author: string
@@ -55,7 +55,7 @@ export function SummonSuggestions({ author, suggestions, voice = 'third-person' 
               <button
                 type="button"
                 onClick={() => void copy(line)}
-                title={`Copy — uses ${s.ref}`}
+                title={`Copy. Uses ${s.ref}`}
                 className="group flex w-full items-center justify-between gap-3 rounded-lg border border-(--rule) bg-(--surface) px-3 py-2 text-left transition-colors hover:border-(--ink-subtle)"
               >
                 <code className="min-w-0 truncate font-mono text-sm text-(--ink)">{line}</code>

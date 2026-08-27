@@ -1,4 +1,6 @@
 import type { FastifyInstance } from 'fastify';
+import { serializeSummonSuggestionSet } from '@skillet/protocol';
+import { validateEditedSuggestions } from '../suggestions/payload.js';
 import type { PrismaClient } from '@prisma/client';
 import { requireSession } from '../auth/middleware.js';
 import type { AvatarStore } from '../avatars/avatar-store.js';
@@ -28,6 +30,9 @@ interface UpdateProfileBody {
   /** Curated list of agent keys to show on the profile. `null` resets to uncurated
    *  (legacy fallback); `[]` shows nothing; an array curates exactly those keys. */
   shown_agents?: string[] | null;
+  /** The author's own three `/skillet @handle <task>` lines. `[]` clears them.
+   *  Any write here is terminal: regeneration never touches an edited set. */
+  suggestions?: Array<{ task: string; ref: string }>;
 }
 
 /**
@@ -280,7 +285,7 @@ export function registerProfileRoutes(
         user_id: string;
       };
 
-      const { name, avatar_url, bio, profile_url, x_handle, agents_public, shown_agents } =
+      const { name, avatar_url, bio, profile_url, x_handle, agents_public, shown_agents, suggestions } =
         req.body ?? {};
 
       const existing = await db.authors.findUnique({
@@ -305,6 +310,8 @@ export function registerProfileRoutes(
         x_handle?: string | null;
         agents_public?: number;
         shown_agents?: string | null;
+        suggestions?: string;
+        suggestions_edited_at?: number;
       } = {};
       if (name !== undefined) data.name = name;
       if (avatar_url !== undefined) {
@@ -332,6 +339,26 @@ export function registerProfileRoutes(
           }
           data.shown_agents = JSON.stringify(parsed);
         }
+      }
+      if (suggestions !== undefined) {
+        // A ref must be this author's own public skill. Otherwise an author
+        // could publish a line pointing at a private skill, or at someone
+        // else's work, and it would resolve to nothing or to the wrong person.
+        const owned = await db.skills.findMany({
+          where: { author_id: author, visibility: 'public', moderation_status: { not: 'unlisted' } },
+          select: { slug: true },
+        });
+        const ownedRefs = new Set(owned.map((r) => `@${author}/${r.slug}`));
+        const checked = validateEditedSuggestions(suggestions, ownedRefs);
+        if (!checked.ok) return reply.status(400).send({ error: checked.error });
+
+        // The signature is deliberately blank: an edited set is terminal, so
+        // nothing ever compares it against a current kit again.
+        data.suggestions = serializeSummonSuggestionSet({
+          suggestions: checked.suggestions,
+          kit_signature: '',
+        });
+        data.suggestions_edited_at = Math.floor(Date.now() / 1000);
       }
       if (Object.keys(data).length > 0) {
         await db.authors.update({ where: { id: author }, data });
