@@ -98,30 +98,133 @@ export async function summonHandle(handle: string): Promise<SummonResult> {
     : { kind: "ok", handle: h, candidates };
 }
 
+/** Below this the registry's relevance tier is a shared-word coincidence. */
+export const RELEVANCE_FLOOR = 0.5;
+
+/** How many ranked candidates are worth a hash lookup each. */
+const MAX_CANDIDATES = 3;
+
+interface SearchHit {
+  ref: string;
+  description: string | null;
+  score: number;
+  installs: number;
+  /** How many of the issued keyword queries returned this ref. */
+  matches: number;
+}
+
 /**
- * Cross-author search, for when the named handle has nothing that fits.
+ * Read `/search`, which answers a DIFFERENT shape from `/authors/:h/summon`:
+ * rows live under `groups.skills`, and they carry `author`/`slug` rather than a
+ * `ref`, with no `latest_hash` at all. `readCandidates` is built for the summon
+ * shape and drops everything here, so this needs its own reader.
+ */
+function readSearchHits(body: unknown): SearchHit[] {
+  const rows = ((body as { groups?: { skills?: unknown } })?.groups?.skills) as unknown;
+  if (!Array.isArray(rows)) return [];
+  const out: SearchHit[] = [];
+  for (const raw of rows) {
+    const s = raw as Record<string, unknown>;
+    const author = typeof s["author"] === "string" ? s["author"] : null;
+    const slug = typeof s["slug"] === "string" ? s["slug"] : null;
+    if (!author || !slug) continue;
+    out.push({
+      ref: `@${author}/${slug}`,
+      description: typeof s["description"] === "string" ? s["description"] : null,
+      score: typeof s["score"] === "number" ? s["score"] : 0,
+      installs: typeof s["install_count"] === "number" ? s["install_count"] : 0,
+      matches: 1,
+    });
+  }
+  return out;
+}
+
+/** The version `route use --hash` pins to. Search rows do not carry one. */
+async function latestHashFor(ref: string): Promise<string | null> {
+  const m = /^@?([^/@\s]+)\/([^/\s]+)$/.exec(ref);
+  if (!m) return null;
+  const url = `${base()}${REGISTRY_API}/skills/${encodeURIComponent(m[1]!)}/${encodeURIComponent(m[2]!)}`;
+  const res = await getJson(url);
+  if (!res.ok) return null;
+  const hash = (res.body as { latest_hash?: unknown })?.latest_hash;
+  return typeof hash === "string" && hash ? hash : null;
+}
+
+/**
+ * Cross-author search, for when the named handle has nothing that fits, and for
+ * a kit that is empty or has nothing fitting.
  *
  * The user came with a task, not a name, so a handle with no match is a reason
  * to look wider rather than to stop.
+ *
+ * One request PER KEYWORD, merged here. The registry matches `q` as a literal
+ * substring, so joining the keywords into one string asked it for a phrase no
+ * skill contains: every multi-keyword search returned nothing, which is every
+ * search the router issues (its instructions say to compose up to three
+ * keywords). `skillet search` has always fanned out this way; this path did not,
+ * and the divergence made the whole library fall-through silently empty.
+ *
+ * Ranking mirrors `skillet search`: match breadth first, since a ref that
+ * answers two of three keywords beats one that answers a single keyword well,
+ * then the registry's relevance tier, then installs.
  */
 export async function searchPublicSkills(keywords: string[]): Promise<SummonCandidate[]> {
-  const q = keywords.map((k) => k.trim()).filter(Boolean).slice(0, 3).join(" ");
-  if (!q) return [];
-  const url = `${base()}${REGISTRY_API}/search?q=${encodeURIComponent(q)}&types=skills`;
-  try {
-    const res = await fetch(url, {
-      headers: {
-        accept: "application/json",
-        // Attributes the query to the router's fallback. Carries nothing about
-        // the user or the task; the query text itself is never stored.
-        "x-skillet-search-source": "summon-fallback",
-      },
-    });
-    if (!res.ok) return [];
-    return readCandidates(await res.json());
-  } catch {
-    return [];
+  const queries = Array.from(
+    new Set(keywords.map((k) => k.trim().toLowerCase()).filter(Boolean)),
+  ).slice(0, 3);
+  if (queries.length === 0) return [];
+
+  const perQuery = await Promise.all(
+    queries.map(async (q) => {
+      const url = `${base()}${REGISTRY_API}/search?q=${encodeURIComponent(q)}&types=skills`;
+      try {
+        const res = await fetch(url, {
+          headers: {
+            accept: "application/json",
+            // Attributes the query to the router's fallback. Carries nothing
+            // about the user or the task; the query text itself is never stored.
+            "x-skillet-search-source": "summon-fallback",
+          },
+        });
+        if (!res.ok) return [] as SearchHit[];
+        return readSearchHits(await res.json());
+      } catch {
+        return [] as SearchHit[];
+      }
+    }),
+  );
+
+  const merged = new Map<string, SearchHit>();
+  for (const hits of perQuery) {
+    for (const hit of hits) {
+      const seen = merged.get(hit.ref);
+      if (!seen) {
+        merged.set(hit.ref, { ...hit });
+        continue;
+      }
+      seen.matches += 1;
+      if (hit.score > seen.score) seen.score = hit.score;
+      if (!seen.description && hit.description) seen.description = hit.description;
+    }
   }
+
+  // The floor is the difference between "no skill for this" and confidently
+  // handing over a skill that shares one word with the task. A miss the router
+  // admits to beats a wrong skill it applies.
+  const ranked = [...merged.values()]
+    .filter((h) => h.score >= RELEVANCE_FLOOR)
+    .sort((a, b) => b.matches - a.matches || b.score - a.score || b.installs - a.installs)
+    .slice(0, MAX_CANDIDATES);
+
+  const withHashes = await Promise.all(
+    ranked.map(async (h): Promise<SummonCandidate | null> => {
+      const latestHash = await latestHashFor(h.ref);
+      // No pinned version means no loadable candidate, however good it looks.
+      if (!latestHash) return null;
+      return { ref: h.ref, description: h.description, latestHash, via: null };
+    }),
+  );
+  return withHashes.filter((c): c is SummonCandidate => c !== null);
 }
 
 /**
