@@ -22,6 +22,11 @@ import { Command } from 'commander';
 
 const TEST_ROOT = join(tmpdir(), `skillet-doctor-access-${randomBytes(4).toString('hex')}`);
 process.env['HOME'] = TEST_ROOT;
+// os.homedir() reads USERPROFILE on Windows, not HOME, so seeding only HOME
+// leaves the detector scanning the real profile: it finds no runtime under
+// TEST_ROOT and the suite fails there and nowhere else. Same guard as
+// packages/core/tests/test-env-setup.ts.
+if (process.platform === 'win32') process.env['USERPROFILE'] = TEST_ROOT;
 process.env['SKILLET_DIR'] = join(TEST_ROOT, '.skillet');
 // TCC is macOS-only; force the policy so this holds on Linux CI too.
 process.env['SKILLET_TCC_POLICY'] = 'force';
