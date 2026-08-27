@@ -32,7 +32,8 @@
     "scan:corpus": "tsx src/scanner/corpus-cli.ts",
     "scan:export-snapshot": "tsx src/scanner/corpus-cli.ts export-snapshot",
     "scan:inventory": "tsx src/scanner/detector-inventory-cli.ts",
-    "classify:eval": "tsx src/classify/eval-cli.ts"
+    "classify:eval": "tsx src/classify/eval-cli.ts",
+    "backfill:suggestions": "tsx --env-file-if-exists=.env scripts/backfill-suggestions.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1069.0",
