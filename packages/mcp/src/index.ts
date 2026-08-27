@@ -16,6 +16,7 @@ export { isValidToken, tokenFromHeader, visibleSkills, createRegistryValidator, 
 export { ensureLoopbackToken, readLoopbackToken, loopbackTokenPath } from "./loopback-token.js";
 export { buildUri, parseUri, type ParsedUri } from "./resources.js";
 export { TOOLS, DEEP_RESEARCH_TOOLS, SUMMON_TOOLS } from "./handler.js";
+export { listPrompts, getPrompt, getPromptMessages, PROMPT_NAME } from "./prompts.js";
 export {
   localSkillSource,
   type SkillSource,

@@ -137,6 +137,31 @@ export interface McpTool {
 }
 
 /**
+ * A prompt the server advertises on `prompts/list` (2025-06-18 §Prompts).
+ *
+ * Prompts are user-controlled where tools are model-controlled: the client
+ * surfaces these as commands a person picks, which is what makes `/skillet`
+ * a visible, deliberate act on a chat surface instead of an inference.
+ */
+export interface McpPrompt {
+  name: string;
+  /** Optional human-readable display name. */
+  title?: string;
+  description?: string;
+  arguments?: {
+    name: string;
+    description?: string;
+    required?: boolean;
+  }[];
+}
+
+/** One message in a `prompts/get` result. Text is the only content we return. */
+export interface PromptMessage {
+  role: "user" | "assistant";
+  content: { type: "text"; text: string };
+}
+
+/**
  * A tool call's result. `content` is the unstructured, model-facing channel
  * (always present, back-compatible). `structuredContent` is the machine-facing
  * JSON object (2025-06-18+) that pairs with a tool's `outputSchema`; hosts that
