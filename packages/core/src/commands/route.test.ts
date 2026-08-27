@@ -14,6 +14,10 @@ let priorEnv: string | undefined;
 let priorActivity: string | undefined;
 
 async function seedKit() {
+  // Clear the store, not just kit state. The manifest treats anything readable
+  // on disk as a routing candidate (authored skills never get a state entry),
+  // so a skill dir left by an earlier test would leak into the next one.
+  await rm(join(dir, "skills"), { recursive: true, force: true });
   await store.writeState({
     version: 1,
     artifact_schema_version: 1,

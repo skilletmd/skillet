@@ -977,6 +977,14 @@ model skill_summon_counts {
   via_handle String @default("")
   day        Int
   count      Int    @default(0)
+  /// Subset of `count` from account-bound callers (a principal with a user_id).
+  /// A companion counter, NOT a key column: adding `authed` to the primary key
+  /// would break every in-flight upsert during the deploy window, and
+  /// emitSummonEvent is fire-and-forget so those summons would vanish silently.
+  /// Still aggregate-by-construction: no per-summoner row, no client id, no IP.
+  /// Rows written before this column existed read as 0, which is honest — the
+  /// caller class was not recorded then rather than known to be anonymous.
+  authed_count Int @default(0)
 
   @@id([skill_id, via_handle, day])
   @@index([day], map: "idx_skill_summon_counts_day")

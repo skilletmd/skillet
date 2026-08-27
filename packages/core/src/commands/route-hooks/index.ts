@@ -6,7 +6,9 @@ import { isHookCapableRuntime } from "./runtime-specs.js";
 export {
   hookRuntimesFromDetected,
   isHookCapableRuntime,
+  canInjectContext,
   HOOK_CAPABLE_RUNTIMES,
+  CONTEXT_INJECTING_RUNTIMES,
   type HookCapableRuntime,
 } from "./runtime-specs.js";
 export {

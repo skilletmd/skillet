@@ -16,14 +16,23 @@ export async function emitSummonEvent(opts: {
   skillId: string
   /** The handle the skill was summoned via (curator for saved picks); '' if absent. */
   viaHandle: string
+  /**
+   * True when the caller presented an account-bound principal. Bumps
+   * `authed_count` alongside `count`, so reach splits into engaged and
+   * anonymous without any per-summoner row. Absent counts as anonymous:
+   * the summon flow is designed to work with no account, so the
+   * unauthenticated case is the normal one, not an error.
+   */
+  authed?: boolean
 }): Promise<void> {
   const bare = opts.viaHandle.replace(/^@/, '')
   const via = SLUG_RE.test(bare) ? bare : ''
   const day = Math.floor(Date.now() / 86_400_000) // unix day number
+  const authed = opts.authed === true ? 1 : 0
   await opts.prisma.skill_summon_counts.upsert({
     where: { skill_id_via_handle_day: { skill_id: opts.skillId, via_handle: via, day } },
-    create: { skill_id: opts.skillId, via_handle: via, day, count: 1 },
-    update: { count: { increment: 1 } },
+    create: { skill_id: opts.skillId, via_handle: via, day, count: 1, authed_count: authed },
+    update: { count: { increment: 1 }, authed_count: { increment: authed } },
   })
   // PostHog (deferred): when POSTHOG_KEY is configured, ALSO capture a
   // `skill.summoned` event here with { skill_ref, via_handle, runtime, authed }

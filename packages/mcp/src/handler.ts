@@ -112,6 +112,11 @@ export const TOOLS: McpTool[] = [
           description:
             "Optional. The handle you summoned to find this skill, when it is not the skill's own author. Credits the summon to that person.",
         },
+        summoned: {
+          type: "boolean",
+          description:
+            "Set true when this read came from a summon, including a skill the summoned handle wrote themselves. Counts toward the author's public summon total; `via` only adds curator credit on top.",
+        },
       },
       required: ["slug"],
     },
@@ -178,9 +183,13 @@ export async function callTool(
         // public and uncredentialed, so this costs no access the caller did not
         // already have; non-public skills stay behind the registry's read ACL.
         if (discovery) {
+          const via = optionalString(args, "via");
           const pub = await discovery.readPublicSkill(slug, {
             hash: optionalString(args, "hash"),
-            via: optionalString(args, "via"),
+            via,
+            // A summon marked either way counts. `via` alone still implies a
+            // summon so clients on the pre-`summoned` contract keep counting.
+            summoned: optionalBoolean(args, "summoned") || Boolean(via),
           });
           if (pub) {
             const publicResult = {
@@ -404,6 +413,11 @@ function optionalString(args: unknown, key: string): string | undefined {
   if (args === null || typeof args !== "object") return undefined;
   const val = (args as Record<string, unknown>)[key];
   return typeof val === "string" && val.length > 0 ? val : undefined;
+}
+
+function optionalBoolean(args: unknown, key: string): boolean {
+  if (args === null || typeof args !== "object") return false;
+  return (args as Record<string, unknown>)[key] === true;
 }
 
 function extractString(args: unknown, key: string): string {

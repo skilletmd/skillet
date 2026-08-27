@@ -716,6 +716,10 @@ Commands
   manifest [options]            List kit skills for agent routing (metadata only, no SKILL.md bodies)
   begin [options]               Record a /skillet invocation (metadata only)
   hook [options]                Agent hook entrypoint for /skillet
+  start                         Begin a local-kit route: candidates plus the rules for picking one
+  summon <handle>               Route against a handle's public kit, fetched live. No install, no account
+  search <keyword...>           Search every author's public skills, for the summon fall-through
+  use [options] <skill-ref>     Load a picked skill and record the route
   record [options] <skill-ref>  Record a routed skill pick
   help [command]                display help for command
 
@@ -759,6 +763,58 @@ Usage
 Options
   --runtime <runtime>   Agent name, e.g. cursor, claude-code, codex
   -h, --help            display help for command
+
+
+# route start
+skillet route start   Begin a local-kit route: candidates plus the rules for picking one
+
+Usage
+  skillet route start [options]
+
+Options
+  -h, --help            display help for command
+
+
+# route summon
+skillet route summon   Route against a handle's public kit, fetched live. No install, no account
+
+Usage
+  skillet route summon [options] <handle>
+
+Options
+  -h, --help            display help for command
+
+Arguments
+  handle  
+
+
+# route search
+skillet route search   Search every author's public skills, for the summon fall-through
+
+Usage
+  skillet route search [options] <keyword...>
+
+Options
+  -h, --help            display help for command
+
+Arguments
+  keyword  
+
+
+# route use
+skillet route use   Load a picked skill and record the route
+
+Usage
+  skillet route use [options] <skill-ref>
+
+Options
+  --runtime <runtime>   Agent name, e.g. cursor, claude-code, codex
+  --hash <hash>         Summon candidate version; loads from the registry when not local
+  --via <handle>        The handle that surfaced this skill, when not its author
+  -h, --help            display help for command
+
+Arguments
+  skill-ref  
 
 
 # route record

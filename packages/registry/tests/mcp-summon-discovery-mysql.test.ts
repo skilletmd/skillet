@@ -328,6 +328,54 @@ describe('a cloud summon moves the same counter the URL path moves', { skip: !ha
     })
   })
 
+  // U2 / R13. The gate used to be `via`, which is ABSENT for a skill the
+  // summoned handle wrote themselves. That is the common case, so an authored
+  // summon over MCP counted nothing while the identical summon over HTTP
+  // counted one: HTTP gates on `src=summon` with `via` optional. The existing
+  // coverage above only exercises the curated path, where `via` is set, so it
+  // passed under the bug.
+  it('counts an AUTHORED summon, where there is no curator to credit', async () => {
+    await withDb(async (prisma, store) => {
+      await seedSkill(prisma, store, { author: 'authored', slug: 'own-work' })
+
+      await discovery(prisma, store).readPublicSkill('@authored/own-work', { summoned: true })
+
+      assert.equal(await reach(prisma, 'authored:own-work'), 1)
+      const rows = await prisma.skill_summon_counts.findMany({ where: { skill_id: 'authored:own-work' } })
+      // No curator, so no via. The author still gets the credit.
+      assert.equal(rows[0]?.via_handle, '')
+    })
+  })
+
+  // A client still on the pre-`summoned` contract sends `via` and nothing else.
+  // Narrowing the guard to the marker alone would zero those clients' credit
+  // the moment this ships, so `via` keeps implying a summon through the
+  // transition.
+  it('keeps counting for a client that sends via but not the summon marker', async () => {
+    await withDb(async (prisma, store) => {
+      await seedSkill(prisma, store, { author: 'legacy', slug: 'old-client' })
+
+      await discovery(prisma, store).readPublicSkill('@legacy/old-client', { via: 'curator' })
+
+      assert.equal(await reach(prisma, 'legacy:old-client'), 1)
+    })
+  })
+
+  // U3 / R15. The split is a companion column, so `count` keeps its meaning and
+  // no public total moves. An anonymous caller is the normal case here.
+  it('files an anonymous summon under the anonymous side of the split', async () => {
+    await withDb(async (prisma, store) => {
+      await seedSkill(prisma, store, { author: 'anon', slug: 'split-check' })
+
+      await discovery(prisma, store).readPublicSkill('@anon/split-check', { summoned: true })
+
+      assert.equal(await reach(prisma, 'anon:split-check'), 1)
+      const rows = await prisma.skill_summon_counts.findMany({ where: { skill_id: 'anon:split-check' } })
+      assert.equal(rows[0]?.count, 1)
+      assert.equal(rows[0]?.authed_count, 0, 'no principal means anonymous, not authed')
+    })
+  })
+
   it('records only a short handle, never free text', async () => {
     await withDb(async (prisma, store) => {
       await seedSkill(prisma, store, { author: 'matt', slug: 'typescript' })

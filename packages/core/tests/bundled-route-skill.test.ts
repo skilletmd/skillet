@@ -33,9 +33,9 @@ describe("bundled route skill asset", () => {
     const bundle = await readBundleFromDir(BUNDLED_DIR);
     expect(bundle.has("SKILL.md")).toBe(true);
     const body = Buffer.from(bundle.get("SKILL.md")!).toString("utf8");
-    expect(body).toMatch(/Searching/);
-    expect(body).toMatch(/skillet route manifest/);
-    expect(body).toMatch(/skillet route record/);
+    expect(body).toMatch(/skillet route start/);
+    expect(body).toMatch(/skillet route summon/);
+    expect(body).toMatch(/skillet route use/);
     expect(body).toMatch(/user-invocable:\s*true/);
   });
 });
@@ -84,10 +84,30 @@ describe("ensureBundledRouteSkill", () => {
     const state = await readState();
     expect(state.skills[BUNDLED_ROUTE_SLUG]).toBeDefined();
     const body = await readFile(skillContentPath(BUNDLED_ROUTE_SLUG), "utf8");
-    expect(body).toMatch(/skillet route manifest/);
+    expect(body).toMatch(/skillet route start/);
   });
 
   it("throws when neither the dir nor inline content is available", async () => {
     await expect(ensureBundledRouteSkill("/no/such/dir")).rejects.toThrow();
+  });
+});
+
+// U7 / R1. The body loads on EVERY /skillet, so its size is a per-invocation
+// tax. The instruction blocks the verbs return are not: each is read only on
+// the one path that needs it.
+describe("router stub size", () => {
+  it("keeps the always-loaded body under the routing budget", async () => {
+    const body = await readFile(join(BUNDLED_DIR, "SKILL.md"), "utf8");
+    const approxTokens = Math.round(body.length / 4);
+    expect(approxTokens).toBeLessThan(1000);
+  });
+
+  it("delegates rather than inlining the paths it no longer owns", async () => {
+    const body = await readFile(join(BUNDLED_DIR, "SKILL.md"), "utf8");
+    // The summon flow and the library fall-through moved into verb responses.
+    expect(body).not.toMatch(/x-skillet-search-source/);
+    expect(body).not.toMatch(/authors\/\{handle\}\/summon/);
+    // The create branch stays: it routes to a playbook, not through a verb.
+    expect(body).toMatch(/`create` is a verb, not a handle/);
   });
 });
