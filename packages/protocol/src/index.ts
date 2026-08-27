@@ -181,4 +181,5 @@ export { parseAttentionStreamEvent } from './attention-events.js'
 export type { DeviceSyncRequiredEvent, DeviceSyncStreamEvent } from './device-sync-events.js'
 export { parseDeviceSyncStreamEvent } from './device-sync-events.js'
 export * from './covers.js';
+export * from './summon-suggestions.js';
 export * from './category-guess.js';

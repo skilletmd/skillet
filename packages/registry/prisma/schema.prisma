@@ -70,6 +70,9 @@ model authors {
   x_handle                                                               String?
   source_owner_type                                                      String?
   shown_agents                                                           String? @db.Text
+  suggestions                                                            String? @db.Text
+  suggestions_generated_at                                               Int?
+  suggestions_edited_at                                                  Int?
   kit_subscriptions                                                      kit_subscriptions[]
   kit_versions                                                           kit_versions[]
   kits                                                                   kits[]
