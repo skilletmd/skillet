@@ -272,12 +272,21 @@ export async function collectDoctorReport(
  * raised the macOS consent dialog would be a diagnostic nobody could run
  * safely. Only protected roots are listed, so a normal install reports an
  * empty list and the human formatter prints nothing.
+ *
+ * Project adapters are skipped, matching the TCC gate in sync(). Their
+ * targetDir is a RELATIVE path under the project cwd (`.cursor/rules`), so
+ * resolving it here would describe wherever the command happened to run. Any
+ * checkout inside ~/Documents would then report every project adapter as
+ * needing folder access, which is both wrong and unactionable: sync never
+ * parks a project adapter, and the consent that matters belongs to the repo,
+ * not to Skillet.
  */
 function collectFolderAccess(adapters: Adapter[]): DoctorReportFolderAccess {
   const { context } = detectTccInvocation();
   const entries: DoctorReportFolderAccessEntry[] = [];
   const seenAnchors = new Set<string>();
   for (const adapter of adapters) {
+    if (adapter.kind === 'project') continue;
     const access = describeTccRoot(adapter.targetDir, context);
     if (!access.protected) continue;
     // One row per adapter, but never two rows for one anchor+root pair —

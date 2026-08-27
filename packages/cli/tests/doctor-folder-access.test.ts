@@ -115,6 +115,25 @@ test('a protected root names its anchor and its denied state', async () => {
   assert.ok(human.includes('denied'), 'human output should name the denied state');
 });
 
+test('a project adapter is never reported, however the cwd resolves', async () => {
+  // Project adapters carry a RELATIVE targetDir (`.cursor/rules`) under the
+  // project cwd. Resolving it here describes wherever the command ran, so a
+  // checkout that happens to live inside ~/Documents made doctor report every
+  // project adapter as needing folder access. sync() never parks a project
+  // adapter, so the row was both wrong and unactionable.
+  const cwd = process.cwd();
+  const inside = join(DOCUMENTS, 'some-checkout');
+  mkdirSync(join(inside, '.cursor', 'rules'), { recursive: true });
+  process.chdir(inside);
+  try {
+    const json = JSON.parse(await runDoctor(['--json'])) as { folder_access: FolderAccess };
+    const relative = json.folder_access.entries.filter((e) => !e.target_dir.startsWith('/'));
+    assert.deepEqual(relative, [], 'no relative-path adapter root may be reported');
+  } finally {
+    process.chdir(cwd);
+  }
+});
+
 test('the report carries no device label', async () => {
   const json = JSON.parse(await runDoctor(['--json'])) as { device: { label: string | null } };
   // Machine identity never leaves the machine (see CLAUDE.md).
