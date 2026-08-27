@@ -29,7 +29,34 @@ export interface SuggestionCluster {
   size: number
   /** The skill whose description the phrasing step reads. */
   representative: ClusterableSkill
+  /**
+   * The cluster's top few skills, best-ranked first, `representative` included.
+   *
+   * The phrasing step chooses among these rather than being handed one. Rank
+   * alone picks the WRONG skill often enough to matter: the most-adopted skill
+   * in a cluster is very often the kit's own plumbing — a setup step, an
+   * install guide, a help card, a shared-patterns module — and none of those
+   * has a task a stranger would ever type. Ranked first on production:
+   * `caveman-help` ("quick-reference card for all modes"), `gws-shared`
+   * ("shared patterns for authentication, global flags"), `codex` ("OpenAI
+   * Codex CLI wrapper"). Faithfully phrased, those produce "show caveman
+   * commands" and "run codex", which are the tool's name, not anyone's want.
+   *
+   * Giving the model the runners-up lets it skip past the plumbing to a real
+   * piece of work. `representative` stays the fallback for a pick it cannot
+   * make, and every ref still comes from a skill that exists.
+   */
+  candidates: ClusterableSkill[]
 }
+
+/**
+ * How many of a cluster's skills the phrasing step gets to choose between.
+ *
+ * Four, not the whole cluster: past the top few the skills are long-tail and
+ * the prompt grows with every author. Enough to get past the plumbing, not
+ * enough to turn phrasing into a search.
+ */
+export const CLUSTER_CANDIDATES = 4
 
 /**
  * A cluster smaller than this is one person's side project, not an area they
@@ -80,7 +107,13 @@ export function clusterSkills(
   const clusters: SuggestionCluster[] = []
   for (const [category, members] of byCategory) {
     if (members.length < minSize) continue
-    clusters.push({ category, size: members.length, representative: pickRepresentative(members) })
+    const ranked = rankMembers(members)
+    clusters.push({
+      category,
+      size: members.length,
+      representative: ranked[0]!,
+      candidates: ranked.slice(0, CLUSTER_CANDIDATES),
+    })
   }
 
   // Bigger cluster first; ties broken by category name so the same kit always
@@ -96,13 +129,18 @@ export function clusterSkills(
  * in front of.
  */
 export function pickRepresentative(members: ClusterableSkill[]): ClusterableSkill {
+  return rankMembers(members)[0]!
+}
+
+/** The same order `pickRepresentative` reads its answer off the front of. */
+export function rankMembers(members: ClusterableSkill[]): ClusterableSkill[] {
   return [...members].sort(
     (a, b) =>
       (b.install_count ?? 0) - (a.install_count ?? 0) ||
       (b.summon_count ?? 0) - (a.summon_count ?? 0) ||
       (b.created_at ?? 0) - (a.created_at ?? 0) ||
       (a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0),
-  )[0]!
+  )
 }
 
 /**

@@ -4,6 +4,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  CLUSTER_CANDIDATES,
   MIN_CLUSTER_SIZE,
   clusterSkills,
   effectiveCategory,
@@ -78,6 +79,43 @@ describe('clusterSkills', () => {
     for (const c of clusterSkills([...many('frontend', 4), ...many('devops', 4)])) {
       assert.equal(c.representative.category, c.category);
     }
+  });
+
+  it('carries the top candidates, best first, so phrasing can skip the plumbing', () => {
+    // The top-ranked skill in a cluster is routinely the kit's own setup or
+    // help card. Phrasing needs the runners-up to get past it.
+    const members = [
+      { ref: '@a/help', slug: 'help', description: 'reference card', category: 'devops', install_count: 90 },
+      { ref: '@a/deploy', slug: 'deploy', description: 'ship it', category: 'devops', install_count: 40 },
+      { ref: '@a/rollback', slug: 'rollback', description: 'undo it', category: 'devops', install_count: 10 },
+    ];
+    const [cluster] = clusterSkills(members);
+    assert.equal(cluster!.representative.slug, 'help');
+    assert.deepEqual(cluster!.candidates.map((c) => c.slug), ['help', 'deploy', 'rollback']);
+  });
+
+  it('caps candidates rather than sending the whole cluster', () => {
+    const members = Array.from({ length: 9 }, (_, i) => ({
+      ref: `@a/s${i}`,
+      slug: `s${i}`,
+      description: 'deploy things',
+      category: 'devops',
+      install_count: 100 - i,
+    }));
+    const [cluster] = clusterSkills(members);
+    assert.equal(cluster!.candidates.length, CLUSTER_CANDIDATES);
+  });
+
+  it('every candidate is drawn from the cluster it belongs to', () => {
+    const [cluster] = clusterSkills([
+      ...Array.from({ length: 4 }, (_, i) => ({
+        ref: `@a/d${i}`, slug: `d${i}`, description: 'deploy', category: 'devops',
+      })),
+      ...Array.from({ length: 3 }, (_, i) => ({
+        ref: `@a/f${i}`, slug: `f${i}`, description: 'css', category: 'frontend',
+      })),
+    ]);
+    for (const c of cluster!.candidates) assert.equal(c.category, cluster!.category);
   });
 });
 
