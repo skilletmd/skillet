@@ -29,7 +29,8 @@ type Person = {
   reply: { pre: string; post: string }
 }
 
-const PEOPLE: readonly Person[] = [
+/** The cast that plays when too few real authors qualify. */
+const FALLBACK_PEOPLE: readonly Person[] = [
   {
     handle: 'addyosmani',
     name: 'Addy Osmani',
@@ -71,6 +72,9 @@ const PEOPLE: readonly Person[] = [
     reply: { pre: 'On it, my ', post: ' skill will get your feature out the door.' },
   },
 ]
+
+/** Below this many eligible authors, play the hardcoded script instead. */
+const MIN_CAST = 3
 
 // Texting rhythm, in ms.
 const SYSTEM_MS = 1000
@@ -129,7 +133,46 @@ function seedPerson(person: Person, startId: number): Message[] {
 // Contained in a soft card with a "your agent" window chrome so it reads as a
 // thing you're looking at, not text you read through. Reduced-motion shows a
 // static pair of exchanges.
-export function SummonDemo() {
+/**
+ * Turn stored suggestions into the hero's cast.
+ *
+ * `reply` has no generated equivalent: the hardcoded entries carry hand-written
+ * sentences precisely so the script does not read as one template. That charm
+ * is the cost of being true about real authors, and it is worth paying — a
+ * hand-written line can claim something an author does not actually do, and the
+ * current script does exactly that.
+ *
+ * `specialty` is the link text, so it is the slug read back as words.
+ */
+export interface SuggestionRow {
+  handle: string
+  name: string
+  task: string
+  slug: string
+}
+
+export function peopleFromSuggestions(rows: SuggestionRow[]): Person[] {
+  return rows.map((r) => ({
+    handle: r.handle,
+    name: r.name,
+    specialty: r.slug.replace(/[-_]+/g, ' '),
+    task: r.task,
+    slug: r.slug,
+    reply: { pre: 'On it, using my ', post: ' skill.' },
+  }))
+}
+
+/**
+ * `people` overrides the hardcoded cast when enough real authors qualify.
+ *
+ * All-or-nothing by design: a half-real cast is harder to reason about than
+ * either, and the hardcoded script is the floor this can never render below.
+ */
+export function SummonDemo({ people }: { people?: SuggestionRow[] } = {}) {
+  // Mapped here, not by the caller: this module is `'use client'`, so a server
+  // component cannot invoke its functions -- only pass it plain data.
+  const cast = people ? peopleFromSuggestions(people) : []
+  const PEOPLE = cast.length >= MIN_CAST ? cast : FALLBACK_PEOPLE
   const reduce = useReducedMotion()
   const [msgs, setMsgs] = useState<Message[]>(() => [
     ...seedPerson(PEOPLE[0]!, 0),
