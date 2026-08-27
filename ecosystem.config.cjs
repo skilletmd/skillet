@@ -212,6 +212,12 @@ apps.push({
   max_memory_restart: "512M",
 });
 
+// Off unless a host asks for it. The sweep needs TWITTERAPI_IO_KEY to be worth
+// running at all: without one the collector reaches Hacker News and nothing
+// else, and it publishes that thin result as the day's edition. A host that has
+// the key opts in with SKILLET_NEWS_NIGHTLY=1; everywhere else the brief is
+// produced off-box and posted to /api/admin/stories.
+if ((process.env.SKILLET_NEWS_NIGHTLY ?? webDotEnv.SKILLET_NEWS_NIGHTLY) === "1") {
 apps.push({
   // Nightly Skillet Daily: collect the day's external signal, then write the
   // stories from it. One-shot process relaunched by cron — autorestart stays
@@ -261,5 +267,6 @@ apps.push({
   watch: false,
   max_memory_restart: "512M",
 });
+}
 
 module.exports = { apps };
