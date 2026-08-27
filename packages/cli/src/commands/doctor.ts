@@ -77,6 +77,28 @@ function formatDoctorHuman(report: Awaited<ReturnType<typeof collectDoctorReport
   lines.push(`  SKILLET_DIR override: ${report.env.skillet_dir_override ? "yes" : "no"}`);
   lines.push("");
 
+  // Only when something is actually protected. A normal install has no root
+  // under Documents/Desktop/Downloads, and a row per adapter saying "fine"
+  // would be noise in the case that is almost always the case.
+  if (report.folder_access.entries.length > 0) {
+    lines.push("Folder access");
+    lines.push(`  reporting for: ${report.folder_access.context}`);
+    for (const entry of report.folder_access.entries) {
+      const state =
+        entry.grant === "active"
+          ? "allowed"
+          : entry.grant === "suspended"
+            ? "denied"
+            : "not granted";
+      lines.push(`  ${entry.name}: ${state}`);
+      lines.push(`    folder: ${entry.target_dir}`);
+      if (entry.anchor) {
+        lines.push(`    macOS protects: ${entry.anchor}`);
+      }
+    }
+    lines.push("");
+  }
+
   lines.push("Paths");
   lines.push(`  skillet dir: ${report.paths.skillet_dir}`);
   lines.push(`  state: ${report.paths.state_file}`);
