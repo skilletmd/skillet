@@ -1,13 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { MarkdownContent } from '@/components/markdown-content'
-import { getAllPosts, type Post } from '@/lib/blog'
+import { getStories, type Post } from '@/lib/blog'
 import { PAGE_CONTAINER_CLASS } from '@/lib/page-layout'
-import { getDiscoverFeed } from '@/lib/registry'
 import { getRegistryStats } from '@/lib/registry-stats'
-import { getSignalItems } from '@/lib/news-signal'
 import { NewsKicker, NewsMasthead } from './news-chrome'
-import { NewsFeed } from './news-feed'
+import { NewsStories } from './news-stories'
 import { NewsTopics } from './news-topics'
 
 const TITLE = 'Skillet Daily · agent skills, every weekday'
@@ -24,20 +21,6 @@ export const metadata: Metadata = {
   openGraph: { title: TITLE, description: DESCRIPTION, type: 'website', url: '/news' },
   twitter: { card: 'summary_large_image', title: TITLE, description: DESCRIPTION },
 }
-
-/** The tag that marks a blog post as an edition of the Daily. Editions ride the
- *  existing blog CMS — drafts, publish gate, and RSS already work there — so the
- *  editorial half of this page needs no new authoring surface. */
-const DAILY_TAG = 'daily'
-
-function latestEdition(): Post | null {
-  const editions = getAllPosts().filter((p) => p.tags.includes(DAILY_TAG))
-  return editions[0] ?? null
-}
-
-/** Posts per edition. Roughly a week of genuinely skill-about posts at current
- *  collection width; more than this and the day stops feeling curated. */
-const FEED_POSTS = 24
 
 /**
  * The EDITION's date, never today's.
@@ -63,31 +46,30 @@ function editionDate(post: Post | null): string | null {
 const dateStyle = { month: 'long', day: 'numeric', year: 'numeric' } as const
 
 export default async function NewsPage() {
-  const edition = latestEdition()
-  const [feed, stats] = await Promise.all([getDiscoverFeed(), getRegistryStats()])
-  const posts = getSignalItems(FEED_POSTS)
+  const stats = await getRegistryStats()
+  const stories = getStories()
+  // A daily leads with the day it is dated. Everything older is still reachable
+  // by permalink and RSS, so the archive below is a courtesy, not the record.
+  const latestDate = stories[0]?.publishedAt?.slice(0, 10) ?? null
+  const today = stories.filter((s) => s.publishedAt?.slice(0, 10) === latestDate)
+  const earlier = stories.filter((s) => s.publishedAt?.slice(0, 10) !== latestDate).slice(0, 12)
 
   return (
     <div className={PAGE_CONTAINER_CLASS}>
       <NewsMasthead
-        dateLabel={editionDate(edition)}
+        dateLabel={editionDate(stories[0] ?? null)}
         standfirst="What moved in agent skills yesterday, and what changed in the registry. One page, every weekday. We publish Skillet, and we cover everyone."
       />
 
-      <NewsKicker label="Today's Five" sub="what mattered" />
-      {edition ? (
-        <article className="max-w-[68ch]">
-          <MarkdownContent content={edition.content} />
-        </article>
-      ) : (
-        <p className="max-w-[68ch] rounded-xl border border-dashed border-(--line) p-6 text-sm text-(--ink-2)">
-          No edition published yet. Editions are blog posts tagged <code>{DAILY_TAG}</code>. Write
-          one in the admin blog editor and it lands here.
-        </p>
-      )}
+      <NewsKicker label="Today" sub={`${today.length} ${today.length === 1 ? 'story' : 'stories'}`} />
+      <NewsStories stories={today} />
 
-      <NewsKicker label="The feed" sub="what people are saying · what just landed" />
-      <NewsFeed posts={posts} drops={feed?.events ?? []} dropLimit={6} />
+      {earlier.length > 0 ? (
+        <>
+          <NewsKicker label="Earlier" sub="the last few editions" />
+          <NewsStories stories={earlier} />
+        </>
+      ) : null}
 
       <NewsKicker label="By topic" sub="follow one, get its wire" />
       <NewsTopics stats={stats.categories} />

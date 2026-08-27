@@ -28,6 +28,7 @@ import { timeAgo } from '@/lib/feed-format'
 import type { FeedSurfaceView } from './feed-lens'
 import { feedEventKey, mergeFeedHead } from './feed-head-merge'
 import { storyKicker } from '@/lib/story-kind.mjs'
+import { StoryCard } from '@/components/news/story-card'
 
 const HEAD_POLL_MS = 30_000
 
@@ -274,77 +275,14 @@ function StoryEventRow({ event }: { event: FeedStoryEvent }) {
           <RelativeTime at={event.at} />
         </p>
 
-        <div className="mt-2 overflow-hidden rounded-xl border border-(--line) bg-(--surface)">
-          {/* The headline is the permalink. A story nobody can link to is a
-              story nobody forwards, which is the whole point of writing one. */}
-          <Link href={`/news/${event.id}`} className="group block px-4 pt-4 pb-3">
-            <h3 className="text-base leading-snug font-semibold tracking-tight text-pretty text-(--ink) group-hover:text-(--accent)">
-              {event.headline}
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-(--ink-2)">{event.summary}</p>
-          </Link>
-
-          <div className="px-4 pb-4">
-            <p className="font-mono text-2xs tracking-[0.08em] uppercase text-(--ink-2)">
-              {event.sources.length} {event.sources.length === 1 ? 'source' : 'sources'}
-            </p>
-            <ul className="pt-1">
-              {event.sources.map((src) => (
-                <li key={src.url}>
-                  <a
-                    href={src.url}
-                    className="group flex items-center gap-2 py-1.5 text-xs hover:text-(--accent)"
-                  >
-                    {/* Face only. A network badge pinned to a 20px avatar
-                        never sat cleanly on the circle, and the mark reads
-                        better as its own column on the right. */}
-                    <Avatar
-                      src={src.avatarUrl ?? null}
-                      name={src.label || src.handle}
-                      colorKey={src.handle}
-                      size="xxs"
-                    />
-                    <span className="truncate font-medium">@{src.handle}</span>
-                    <span className="truncate text-(--ink-2)">{src.label}</span>
-                    <span className="ml-auto flex shrink-0 items-center gap-2">
-                      {src.detail ? (
-                        <span className="font-mono text-2xs whitespace-nowrap text-(--ink-2)">
-                          {src.detail}
-                        </span>
-                      ) : null}
-                      <span className="text-(--ink-2)">
-                        {src.network === 'web' ? (
-                          <span
-                            aria-hidden="true"
-                            className="grid h-3.5 w-3.5 place-items-center rounded-sm border border-(--line) font-mono text-2xs"
-                          >
-                            W
-                          </span>
-                        ) : (
-                          <NetworkIcon network={src.network} />
-                        )}
-                      </span>
-                    </span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* A skills card that describes a skill and offers no way to get it
-              is a dead end: the reader we just convinced has nowhere to go.
-              The only division on the card, because it is the only thing on it
-              that is an action rather than reading. */}
-          {event.subject?.slug || event.subject?.repo ? (
-            <PendingSkillAttachment
-              slug={event.subject.slug ?? event.subject.repo!.split('/')[1]!}
-              // No "via @handle on X": the sources sit directly above in the
-              // same card, so this row spends its one line on the repo instead.
-              repo={event.subject.repo}
-              category={event.subject.category}
-              name={event.subject.name}
-            />
-          ) : null}
+        <div className="mt-2">
+          <StoryCard
+            slug={event.id}
+            headline={event.headline}
+            summary={event.summary}
+            sources={event.sources}
+            subject={event.subject}
+          />
         </div>
       </div>
     </li>
