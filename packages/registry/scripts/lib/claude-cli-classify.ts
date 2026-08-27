@@ -9,11 +9,12 @@
  * decision. Keyed by skill id (not slug) so cross-author slug collisions can't
  * mismatch a result.
  */
-import { spawn } from 'node:child_process';
 import { CATEGORY_KEYS, isCategoryKey, type CategoryKey } from '../../src/categories.js';
+// Subprocess handling moved to claude-cli.ts when suggestion phrasing needed the
+// same transport. Re-exported so existing importers of this module are unchanged.
+import { runClaudeCli, claudeCliAvailable } from './claude-cli.js';
 
-// Same tier the API classifier uses — cheap + fast for a single-token decision.
-const CLI_MODEL = 'claude-haiku-4-5-20251001';
+export { claudeCliAvailable };
 
 export interface ClassifyItem {
   id: string;
@@ -75,35 +76,6 @@ export function parseBatchResult(resultText: string): Map<string, string> {
   return out;
 }
 
-/** Run one `claude -p` invocation and return its `result` text. */
-function runClaudeCli(prompt: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      'claude',
-      ['-p', prompt, '--output-format', 'json', '--model', CLI_MODEL],
-      { stdio: ['ignore', 'pipe', 'pipe'] },
-    );
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (d) => (stdout += d));
-    child.stderr.on('data', (d) => (stderr += d));
-    child.on('error', reject);
-    child.on('close', (code) => {
-      if (code !== 0) {
-        reject(new Error(`claude exited ${code}: ${stderr.trim().slice(0, 200)}`));
-        return;
-      }
-      try {
-        const env = JSON.parse(stdout) as { result?: string };
-        resolve(env.result ?? '');
-      } catch {
-        // Non-JSON stdout (older CLI, or a plain-text fallback) — use as-is.
-        resolve(stdout);
-      }
-    });
-  });
-}
-
 /**
  * Classify one batch of skills via the CLI. Returns id → valid CategoryKey for
  * every skill the model resolved to a real taxonomy key; skills it omitted or
@@ -120,13 +92,4 @@ export async function classifyBatchViaClaudeCli(
     if (isCategoryKey(category)) result.set(id, category);
   }
   return result;
-}
-
-/** True when the `claude` CLI is available on PATH (checked before a run). */
-export function claudeCliAvailable(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const child = spawn('claude', ['--version'], { stdio: 'ignore' });
-    child.on('error', () => resolve(false));
-    child.on('close', (code) => resolve(code === 0));
-  });
 }
