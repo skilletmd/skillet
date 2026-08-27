@@ -14,7 +14,7 @@ Welcome to Skillet. This skill walks you through the four moments that make Skil
 npx skilletmd
 ```
 
-That's it. Skillet installs, scans for skill directories it already knows about (`~/.claude/skills`, `.cursor/rules`, `.windsurf/rules`, etc.), and shows you what it found. Sign in at skillet.md first — passwordless, an email link — then the wizard links this machine with a pair code from skillet.md → Settings → Devices and runs your first sync. Pairing never uploads your local skills; uploading is a separate, deliberate step.
+That's it. Skillet installs, scans for skill directories it already knows about (`~/.agents/skills`, `~/.claude/skills`, `.cursor/rules`, etc.), and shows you what it found. Sign in at skillet.md first — passwordless, an email link — then the wizard links this machine with a pair code from skillet.md → Settings → Devices and runs your first sync. Pairing never uploads your local skills; uploading is a separate, deliberate step.
 
 If you have no skills yet, that's fine — skip to Step 3.
 

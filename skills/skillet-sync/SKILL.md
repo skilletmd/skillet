@@ -64,11 +64,13 @@ Skillet writes each skill to the correct location for each runtime:
 
 | Runtime | Location |
 |---|---|
+| Codex (universal baseline) | `~/.agents/skills/<slug>/SKILL.md` |
 | Claude Code | `~/.claude/skills/<slug>/SKILL.md` |
-| Codex | `~/.codex/skills/<slug>.md` |
-| OpenClaw | `~/.optic/skills/<slug>/SKILL.md` |
+| OpenClaw | `~/.openclaw/skills/<slug>/SKILL.md` |
+| Hermes | `~/.hermes/skills/<slug>/SKILL.md` |
 | Cursor | `.cursor/rules/<slug>.mdc` |
-| Windsurf | `.windsurf/rules/<slug>.md` |
+| Devin Desktop | `~/.codeium/windsurf/skills/<slug>/SKILL.md` |
+| Devin CLI | `~/.config/devin/skills/<slug>/SKILL.md` |
 
 Writes are atomic (temp file + rename). Existing files are backed up before any overwrite.
 

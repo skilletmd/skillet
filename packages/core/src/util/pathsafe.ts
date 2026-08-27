@@ -327,11 +327,18 @@ export const MATERIALIZATION_ROOT_ALLOWLIST: readonly string[] = buildAllowlist(
  * declaring `targetDir: ".."` or an absolute path.
  *
  * Compile-time constant — NOT user-configurable.
+ *
+ * `.windsurf/rules` was removed after the 2026-06 Devin Desktop rebrand moved
+ * that runtime to a global skills folder (`~/.codeium/windsurf/skills`, in
+ * MATERIALIZATION_ROOT_ALLOWLIST). Leaving it here was worse than dead weight:
+ * `validateRoot` in adapters/manifest.ts checks a project root against this
+ * list, so a manifest still advertising `.windsurf/rules` passed verification
+ * and would have pointed clients at a directory Devin Desktop never reads.
+ * An entry here is a claim that some shipped adapter writes there.
  */
 export const PROJECT_TARGET_ALLOWLIST: readonly string[] = Object.freeze([
   ".cursor/rules",
   ".agents/skills",
-  ".windsurf/rules",
 ]);
 
 export function assertSafe(root: string, targetPath: string): void {

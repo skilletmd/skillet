@@ -15,82 +15,17 @@
 
 import type { FastifyInstance } from 'fastify';
 import { createHash, createPrivateKey, createPublicKey, sign } from 'node:crypto';
+import { ADAPTER_TABLE } from '@skillet/protocol/adapter-table';
+import type { AdapterEntry } from '@skillet/protocol/adapter-table';
 
-export type AdapterKind = 'global' | 'project';
-export type AdapterLayout = 'skill-md' | 'mdc' | 'rules-file';
-
-export interface AdapterEntry {
-  detect: string;
-  key: string;
-  kind: AdapterKind;
-  layout: AdapterLayout;
-  root: string;
-  version: string;
-}
-
-// Canonical adapter table — must match AdapterLayout in manifest.ts and MATERIALIZATION_ROOT_ALLOWLIST.
-// Fields are in alphabetical order so JSON.stringify produces stable canonical bytes.
-const ADAPTER_ENTRIES: AdapterEntry[] = [
-  {
-    detect: '~/.claude',
-    key: 'claude-code',
-    kind: 'global',
-    layout: 'skill-md',
-    root: '~/.claude/skills',
-    version: '1.0.0',
-  },
-  {
-    detect: '~/.agents or ~/.codex (legacy back-compat)',
-    key: 'codex',
-    kind: 'global',
-    layout: 'skill-md',
-    root: '~/.agents/skills',
-    version: '1.0.0',
-  },
-  {
-    detect: '/Applications/Cursor.app or ~/.cursor',
-    key: 'cursor',
-    kind: 'project',
-    layout: 'mdc',
-    root: '.cursor/rules',
-    version: '1.0.0',
-  },
-  {
-    detect: '~/.config/devin or /Applications/Devin.app',
-    key: 'devin',
-    kind: 'global',
-    layout: 'skill-md',
-    root: '~/.config/devin/skills',
-    version: '1.0.0',
-  },
-  {
-    detect: '~/.hermes',
-    key: 'hermes',
-    kind: 'global',
-    layout: 'skill-md',
-    root: '~/.hermes/skills',
-    version: '1.0.0',
-  },
-  {
-    detect: '~/.openclaw',
-    key: 'openclaw',
-    kind: 'global',
-    layout: 'skill-md',
-    root: '~/.openclaw/skills',
-    version: '1.0.0',
-  },
-  {
-    detect: '.windsurf/rules or AGENTS.md in project tree',
-    key: 'windsurf',
-    kind: 'project',
-    layout: 'rules-file',
-    root: '.windsurf/rules',
-    version: '1.0.0',
-  },
-];
+// Types and the table itself come from @skillet/protocol. The registry used to
+// keep its own copy of both; that second source of truth is exactly what let
+// the windsurf entry go stale through the Devin Desktop rebrand. Serve the
+// shared table, never a local transcription of it.
+export type { AdapterKind, AdapterLayout, AdapterEntry } from '@skillet/protocol/adapter-table';
 
 // Pre-sorted by key; object key order is alphabetical for stable JSON.
-const CANONICAL_ADAPTERS: AdapterEntry[] = [...ADAPTER_ENTRIES].sort((a, b) =>
+const CANONICAL_ADAPTERS: AdapterEntry[] = [...ADAPTER_TABLE].sort((a, b) =>
   a.key.localeCompare(b.key),
 );
 

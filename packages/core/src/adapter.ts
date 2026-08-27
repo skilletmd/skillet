@@ -3,7 +3,7 @@ import type { DecodedBundle } from '@skillet/protocol';
 /**
  * Where this adapter writes:
  * - "global": a single absolute root per host (e.g. `~/.claude/skills`).
- * - "project": a path *inside the current project cwd* (e.g. `.windsurf/rules`).
+ * - "project": a path *inside the current project cwd* (e.g. `.cursor/rules`).
  *
  * Project adapters resolve their absolute root via `projectRoot(cwd)` and
  * are validated against `PROJECT_TARGET_ALLOWLIST` instead of the global
@@ -26,7 +26,7 @@ export interface Adapter {
    * Hermes, OpenClaw.
    *
    * "project" — per-project directory under the current working tree.
-   * Example: Windsurf (`.windsurf/rules`). Project adapters MUST also
+   * Example: Cursor (`.cursor/rules`). Project adapters MUST also
    * implement `projectRoot(cwd)`.
    */
   kind?: AdapterKind;
@@ -35,7 +35,7 @@ export interface Adapter {
    * materializes into (e.g. `~/.claude/skills`).
    *
    * For `kind === "project"`: a stable POSIX-relative path under the
-   * project cwd (e.g. `.windsurf/rules`) — used as the allowlist key and
+   * project cwd (e.g. `.cursor/rules`) — used as the allowlist key and
    * for display. The absolute path comes from `projectRoot(cwd)`.
    */
   targetDir: string;

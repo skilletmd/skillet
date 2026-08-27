@@ -141,6 +141,8 @@ export { RESERVED_HANDLES, isReservedHandle, BRAND_PREFIXES } from './reserved-h
 export type { SlugifyOptions } from './slugify.js'
 export { slugify } from './slugify.js'
 
+export type { AdapterKind, AdapterLayout, AdapterEntry } from './adapter-table.js'
+export { ADAPTER_TABLE, adapterEntry } from './adapter-table.js'
 export { RESERVED_SKILL_SLUGS, isReservedSkillSlug, isValidSkillSlug, SKILL_SLUG_RE } from './reserved-skill-slugs.js'
 
 export type { TriggersValidationResult } from './triggers.js'

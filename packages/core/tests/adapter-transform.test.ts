@@ -1,7 +1,7 @@
 /**
  * Adapter interface: kind + project root + transform hook.
  *
- * Foundation tests for the project-scoped adapter shape (Windsurf) and the
+ * Foundation tests for the project-scoped adapter shape (Cursor) and the
  * SKILL.md → native-format translation hook.
  */
 
@@ -30,12 +30,16 @@ function bundle(entries: Record<string, string | Buffer>): DecodedBundle {
   return m;
 }
 
+// A stand-in for the generic project-adapter machinery. Modeled on Cursor,
+// the only project-kind runtime that ships: windsurf became a global skills
+// folder in the 2026-06 Devin Desktop rebrand and `.windsurf/rules` left
+// PROJECT_TARGET_ALLOWLIST with it.
 function mkProjectAdapter(overrides: Partial<Adapter> = {}): Adapter {
   return {
-    name: "windsurf",
+    name: "cursor",
     kind: "project",
-    targetDir: ".windsurf/rules",
-    projectRoot: (cwd: string) => join(cwd, ".windsurf", "rules"),
+    targetDir: ".cursor/rules",
+    projectRoot: (cwd: string) => join(cwd, ".cursor", "rules"),
     detect: async () => true,
     materialize: async () => [],
     targetPath: () => "",
@@ -78,7 +82,7 @@ describe("AdapterKind defaults", () => {
     const a = mkProjectAdapter();
     expect(() => resolveAdapterRoot(a)).toThrow(/cwd is required/);
     expect(resolveAdapterRoot(a, { cwd: "/tmp/proj" })).toBe(
-      join("/tmp/proj", ".windsurf", "rules"),
+      join("/tmp/proj", ".cursor", "rules"),
     );
   });
 
@@ -96,9 +100,15 @@ describe("AdapterKind defaults", () => {
 // ----------------------------------------------------------------------
 
 describe("PROJECT_TARGET_ALLOWLIST", () => {
-  it("lists the v1 project roots (Windsurf, Cursor)", () => {
-    expect(PROJECT_TARGET_ALLOWLIST).toContain(".windsurf/rules");
+  it("lists the project roots a shipped adapter actually writes", () => {
     expect(PROJECT_TARGET_ALLOWLIST).toContain(".cursor/rules");
+    expect(PROJECT_TARGET_ALLOWLIST).toContain(".agents/skills");
+  });
+
+  it("no longer allows the retired Windsurf rules dir", () => {
+    // Devin Desktop reads ~/.codeium/windsurf/skills. An adapter manifest
+    // advertising the old project root must fail verification, not pass it.
+    expect(PROJECT_TARGET_ALLOWLIST).not.toContain(".windsurf/rules");
   });
 
   it("is frozen (not mutable at runtime)", () => {
@@ -366,17 +376,17 @@ describe("writeFilesToRoot", () => {
 // End-to-end: project-scoped adapter using kind + projectRoot + transform
 // ----------------------------------------------------------------------
 
-describe("end-to-end: project-scoped Windsurf-style adapter", () => {
+describe("end-to-end: project-scoped rule-writing adapter", () => {
   it("validates, resolves root from cwd, transforms, and writes the rule", async () => {
     const tmp = join(tmpdir(), `skillet-e2e-${randomBytes(4).toString("hex")}`);
     const projectCwd = join(tmp, "proj");
     await mkdir(projectCwd, { recursive: true });
     try {
       const a: Adapter = {
-        name: "windsurf",
+        name: "cursor",
         kind: "project",
-        targetDir: ".windsurf/rules",
-        projectRoot: (cwd) => join(cwd, ".windsurf", "rules"),
+        targetDir: ".cursor/rules",
+        projectRoot: (cwd) => join(cwd, ".cursor", "rules"),
         detect: async () => true,
         transform: skillMdToRule(),
         async materialize(slug, src, opts = {}) {
@@ -402,7 +412,7 @@ describe("end-to-end: project-scoped Windsurf-style adapter", () => {
         { cwd: projectCwd, owner: null },
       );
 
-      const expected = join(projectCwd, ".windsurf", "rules", "my-skill.md");
+      const expected = join(projectCwd, ".cursor", "rules", "my-skill.md");
       expect(written).toContain(expected);
       expect(await readFile(expected, "utf8")).toMatch(
         /^---\ndescription: Skillet skill my-skill/,

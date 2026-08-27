@@ -85,8 +85,8 @@ export async function writeBundleToDir(
  *
  * Unlike `writeBundleToDir`, no `<owner>--<slug>` directory prefix is
  * implied — the adapter chooses the layout. Used by project-scoped
- * adapters (Windsurf) whose runtime native format is a flat set of
- * rule files (e.g. `.windsurf/rules/<slug>.md`).
+ * adapters (Cursor) whose runtime native format is a flat set of
+ * rule files (e.g. `.cursor/rules/<slug>.mdc`).
  *
  * Same atomicity + path-escape guarantees as `writeBundleToDir`. Caller is
  * responsible for validating `root` (e.g. via `validateProjectAdapterRoot`

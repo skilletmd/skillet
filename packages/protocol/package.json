@@ -52,6 +52,10 @@
       "import": "./dist/scan-vocabulary.js",
       "types": "./dist/scan-vocabulary.d.ts"
     },
+    "./adapter-table": {
+      "import": "./dist/adapter-table.js",
+      "types": "./dist/adapter-table.d.ts"
+    },
     "./reserved-skill-slugs": {
       "import": "./dist/reserved-skill-slugs.js",
       "types": "./dist/reserved-skill-slugs.d.ts"

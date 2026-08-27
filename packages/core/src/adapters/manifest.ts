@@ -18,22 +18,16 @@ import { resolve, join, normalize, sep } from 'node:path';
 import { skilletReleasePublicKey } from '../signing/index.js';
 import { verifyEnvelope, type Signature } from '../signing/envelope.js';
 import { isEd25519Signature } from '../signing/session-attest.js';
+import type { AdapterEntry } from '@skillet/protocol/adapter-table';
 import {
   MATERIALIZATION_ROOT_ALLOWLIST,
   PROJECT_TARGET_ALLOWLIST,
 } from '../util/pathsafe.js';
 
-export type AdapterKind = 'global' | 'project';
-export type AdapterLayout = 'skill-md' | 'mdc' | 'rules-file';
-
-export interface AdapterEntry {
-  detect: string;
-  key: string;
-  kind: AdapterKind;
-  layout: AdapterLayout;
-  root: string;
-  version: string;
-}
+// Wire types come from @skillet/protocol, which also owns the canonical table
+// the registry serves. Re-exported here so existing importers of
+// `@skillet/core` keep working.
+export type { AdapterKind, AdapterLayout, AdapterEntry } from '@skillet/protocol/adapter-table';
 
 export interface AdapterManifest {
   adapters: AdapterEntry[];
