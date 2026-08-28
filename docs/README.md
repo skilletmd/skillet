@@ -8,7 +8,7 @@ Maintainer and operator documentation for the Skillet monorepo. Start here.
 > runs, its contracts, and its policies.
 
 Repo-wide conventions and build reality are in the root
-[CLAUDE.md](../CLAUDE.md); domain vocabulary in [CONCEPTS.md](../CONCEPTS.md).
+[CLAUDE.md](../CLAUDE.md); domain vocabulary in [CONCEPTS.md](CONCEPTS.md).
 
 ## Guides
 

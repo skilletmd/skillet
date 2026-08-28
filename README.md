@@ -120,7 +120,7 @@ materialization serves both.
 | | |
 | --- | --- |
 | [Docs index](docs/README.md) | Everything, organized |
-| [Concepts](CONCEPTS.md) | The vocabulary: skills, kits, adapters, devices |
+| [Concepts](docs/CONCEPTS.md) | The vocabulary: skills, kits, adapters, devices |
 | [Private kits](docs/private-kits.md) | Team and CI access |
 | [Operating a registry](docs/operating-a-registry.md) | Run your own: deploy, migrations, security invariants |
 | [Registry API](docs/registry-api.md) | Generated HTTP route map |

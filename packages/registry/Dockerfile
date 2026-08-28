@@ -5,7 +5,7 @@ RUN npm install -g pnpm@9
 WORKDIR /app
 
 # Copy workspace manifests for dependency resolution
-COPY package.json pnpm-workspace.yaml pnpm.config.yaml tsconfig.base.json ./
+COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/protocol/package.json ./packages/protocol/
 COPY packages/registry/package.json ./packages/registry/
 

@@ -2,8 +2,9 @@
 
 Guidance for agents (and humans) working in this repo. Conventions, setup, and
 commit format live in [CONTRIBUTING.md](CONTRIBUTING.md); domain vocabulary in
-[CONCEPTS.md](CONCEPTS.md); review guidance in [REVIEW.md](REVIEW.md). This
-file holds what you'd otherwise learn the hard way.
+[docs/CONCEPTS.md](docs/CONCEPTS.md); review guidance in
+[docs/REVIEW.md](docs/REVIEW.md). This file holds what you'd otherwise learn
+the hard way.
 
 Skillet is a registry + sync system for agent skills: publish a skill once,
 run it in every agent runtime. Monorepo (pnpm workspaces):
@@ -160,7 +161,7 @@ Package `test` scripts build their workspace deps first, so a bare
 
 - Admin-**unlisted** skills still appear inside kits they're already a member
   of. Deliberate v1 scope: kit membership is an existing link, not discovery,
-  and quarantine already blocks downloads regardless. See CONCEPTS.md.
+  and quarantine already blocks downloads regardless. See docs/CONCEPTS.md.
 - A profile's "N installs" counts **public adopters** (kit-saves +
   subscriptions), not raw installs — installer identity is private. Single
   source of truth: `adopterHandlesSql()` in the registry.
