@@ -19,6 +19,7 @@ import { isAbsolute, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomBytes } from 'node:crypto';
 import { Command } from 'commander';
+import { symlinksAvailable } from './symlink-support.js';
 
 const TEST_ROOT = join(tmpdir(), `skillet-doctor-access-${randomBytes(4).toString('hex')}`);
 process.env['HOME'] = TEST_ROOT;
@@ -103,7 +104,10 @@ test('doctor reports folder access, and stays quiet when nothing is protected', 
   );
 });
 
-test('a protected root names its anchor and its denied state', async () => {
+// The fixture is a symlink, and Windows gates symlink() behind a privilege an
+// ordinary contributor shell does not hold. Every other symlink-built suite
+// opts out the same way; this one was missed. See symlink-support.
+test('a protected root names its anchor and its denied state', { skip: !symlinksAvailable }, async () => {
   // ~/.claude/skills becomes a symlink into ~/Documents — the real-world shape
   // (iCloud "Desktop & Documents Folders" moves a dotfolder under an anchor).
   symlinkSync(DECOY, CLAUDE_SKILLS, 'dir');
