@@ -32,7 +32,7 @@
     "pm2:logs:registry": "pnpm exec pm2 logs registry",
     "pm2:status": "pnpm exec pm2 status",
     "evals": "pnpm --filter @skillet/protocol exec node --import tsx/esm --test test/eval.test.ts",
-    "clean": "pnpm -r clean",
+    "clean": "pnpm -r run clean",
     "prepare": "husky",
     "test:scripts": "node --test scripts/*.test.cjs",
     "gen:api-docs": "node scripts/gen-api-docs.mjs",
