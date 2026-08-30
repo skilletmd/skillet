@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import { cookies } from 'next/headers'
 import { signIn } from '@/auth'
+import { readAuthGithubCredentials } from '@/lib/oauth-env'
 import { requireSession } from '@/lib/require-session'
 import { readSessionCookie } from '@/lib/session-cookie'
 import { fetchRegistryWhoami } from '@/lib/registry-session'
@@ -48,6 +49,12 @@ async function GithubSettingsPageContent({
   searchParams: Promise<{ error?: string; connected?: string; linked?: string }>
 }) {
   const session = await requireSession('/settings/github')
+
+  // No GitHub OAuth credentials means Auth.js never registered the provider, so
+  // signIn('github') would fall through its unknown-provider path and bounce the
+  // user to /login (and from there to the post-login default) with no error.
+  // Say so instead of rendering a button that silently goes nowhere.
+  const githubConfigured = readAuthGithubCredentials() != null
 
   const sp = await searchParams
   const jar = await cookies()
@@ -158,17 +165,21 @@ async function GithubSettingsPageContent({
           }
           caption="Read-only. Skillet never modifies your code."
           action={
-            <form
-              action={async () => {
-                'use server'
-                await signIn('github', { redirectTo: '/settings/github?linked=github' })
-              }}
-            >
-              <Button type="submit" variant="primary" size="lg">
-                <GitHubIcon className="h-[18px] w-[18px]" />
-                Connect GitHub
-              </Button>
-            </form>
+            githubConfigured ? (
+              <form
+                action={async () => {
+                  'use server'
+                  await signIn('github', { redirectTo: '/settings/github?linked=github' })
+                }}
+              >
+                <Button type="submit" variant="primary" size="lg">
+                  <GitHubIcon className="h-[18px] w-[18px]" />
+                  Connect GitHub
+                </Button>
+              </form>
+            ) : (
+              <Notice tone="danger">{ERRORS.github_unconfigured}</Notice>
+            )
           }
         />
       )}
