@@ -5,7 +5,7 @@
 // network and the browser BFF proxy blocks the /auth/web + /auth/link paths and
 // strips the x-skillet-web-* signing headers. The BFF proves itself with an HMAC
 // request signature (see ./web-internal-sig.ts), NOT a raw shared secret.
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyBaseLogger, FastifyInstance, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '@prisma/client';
 import type { DatabaseSync } from '../db/sqlite-handle.js'
 import { mintToken } from './tokens.js';
@@ -109,11 +109,25 @@ async function captureGithubTokenPrisma(
   userId: string,
   identity: WebIdentityInput,
   rawToken: string | undefined,
+  log: FastifyBaseLogger,
 ): Promise<void> {
   if (identity.provider !== 'github') return;
   const token = rawToken?.trim();
   if (!token) return;
-  await storeUserGithubTokenPrisma(prisma, userId, token);
+  try {
+    await storeUserGithubTokenPrisma(prisma, userId, token);
+  } catch (err) {
+    // The identity row is already committed by the time we get here, so letting
+    // this throw 500s the link AFTER the account is linked: the user is told
+    // "Connected GitHub." while every token-backed surface (owned repos, the
+    // GitHub login on the connection card) stays empty, with nothing on the page
+    // to explain it. A missing SKILLET_REPO_TOKEN_KEY did exactly that in
+    // production. Swallow and log instead, per this function's contract.
+    log.error(
+      { err, user_id: userId },
+      'github token capture failed; account linked without a stored token',
+    );
+  }
 }
 
 export function mintSessionForUser(
@@ -167,7 +181,7 @@ export function registerWebAuthRoutes(
 
       if (prisma) {
         const user = await upsertIdentityUserPrisma(prisma, identity);
-        await captureGithubTokenPrisma(prisma, user.user_id, identity, req.body?.provider_token);
+        await captureGithubTokenPrisma(prisma, user.user_id, identity, req.body?.provider_token, req.log);
         const session = await mintSessionForUserPrisma(prisma, user.user_id);
         return reply.send({
           session_token: session.session_token,
@@ -274,7 +288,7 @@ export function registerWebAuthRoutes(
           return reply.code(409).send({ error: 'identity_already_linked' });
         }
         const user = await upsertIdentityUserPrisma(prisma, identity, req.principal.user_id);
-        await captureGithubTokenPrisma(prisma, user.user_id, identity, req.body?.provider_token);
+        await captureGithubTokenPrisma(prisma, user.user_id, identity, req.body?.provider_token, req.log);
         return reply.send({
           user_id: user.user_id,
           handle: user.handle,
