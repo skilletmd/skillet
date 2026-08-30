@@ -31,6 +31,16 @@ function encryptionKey(): Buffer {
   return scryptSync(secret, 'skillet-repo-salt', 32);
 }
 
+/**
+ * Whether a real repo-token encryption key is configured. Boot-time posture
+ * check only: `encryptionKey` still fails closed at the point of use. Prod ran
+ * without the key and nothing said so until a user clicked Connect GitHub, at
+ * which point the token write threw AFTER the identity was already linked.
+ */
+export function repoTokenKeyConfigured(): boolean {
+  return (process.env.SKILLET_REPO_TOKEN_KEY ?? '').trim().length > 0;
+}
+
 /** AES-256-GCM → base64(iv | authTag | ciphertext). */
 export function encryptToken(plain: string): string {
   const iv = randomBytes(12);

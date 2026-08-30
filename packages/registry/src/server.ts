@@ -48,6 +48,7 @@ import { registerHttpSecurity } from './http-security.js'
 import { registerOpenApiRoutes } from './routes/openapi.js'
 import { registerOAuthMetadataRoutes } from './routes/oauth-metadata.js'
 import { registerErrorEnvelope } from './error-envelope.js'
+import { repoTokenKeyConfigured } from './sync/repo-auth.js'
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -395,6 +396,20 @@ export async function buildServer(opts: ServerOptions = {}): Promise<{
       )
     }
   }
+  // Same posture check, one deploy-breaking config lower: without this key the
+  // registry cannot store a GitHub token, so connect-your-repo and the GitHub
+  // connection card silently degrade to "linked, but empty". Warn rather than
+  // refuse to boot, because a deployment that never connects a repo does not
+  // need the key at all.
+  if (!devAuth && !repoTokenKeyConfigured()) {
+    console.warn(
+      'repo-token: SKILLET_REPO_TOKEN_KEY is not set, so GitHub tokens cannot be ' +
+        'stored. Connecting GitHub will link the account but leave owned repos and ' +
+        'the connection card empty. Set it to a high-entropy secret, and never ' +
+        'change it once tokens exist (they become undecryptable).',
+    )
+  }
+
   if (internalOrigin && !devAuth) {
     app.addHook('onRequest', async (req, reply) => {
       if (!isInternalOnlyPath(req.url)) return
