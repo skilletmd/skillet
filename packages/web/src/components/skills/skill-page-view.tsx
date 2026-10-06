@@ -16,6 +16,7 @@ import { SkillCard } from '@/components/skill-card'
 import { Eyebrow } from '@/components/ui/eyebrow'
 import { UsedBy } from '@/components/kits/used-by'
 import { WorksWithRail } from '@/components/works-with-rail'
+import { ArenaRecord } from '@/components/arena/arena-record'
 import { PAGE_CONTAINER_CLASS } from '@/lib/page-layout'
 import { AddToKitButton } from '@/components/add-to-kit-button'
 import { SkillDelivery } from '@/components/skills/skill-delivery'
@@ -625,6 +626,8 @@ export async function SkillPageView({
                     cover), so the rail keeps only the quieter identity facts. */}
               </div>
             </section>
+
+            <ArenaRecord author={author} slug={slug} />
 
             {/* Desktop only — on mobile this lives up under the hero (below).
                 The wrapper makes the inner section a first-child, so restore its

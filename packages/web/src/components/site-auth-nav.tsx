@@ -29,6 +29,7 @@ interface ProfileUpdatedEvent extends Event {
 // pointing at the logo two inches away is a row that teaches nothing.
 export const NAV_LINKS: { href: string; label: string; icon: ReactNode }[] = [
   { href: browseHref(), label: 'Browse', icon: <BrowseGlyph /> },
+  { href: '/arena', label: 'Arena', icon: <ArenaGlyph /> },
   { href: '/docs', label: 'Docs', icon: <DocsGlyph className="h-4 w-4" /> },
 ]
 
@@ -68,6 +69,25 @@ export function DocsGlyph({ className = 'h-5 w-5' }: { className?: string }) {
     >
       <path d="M2 3.5h6a3 3 0 0 1 3 3V20a2.5 2.5 0 0 0-2.5-2.5H2z" />
       <path d="M22 3.5h-6a3 3 0 0 0-3 3V20a2.5 2.5 0 0 1 2.5-2.5H22z" />
+    </svg>
+  )
+}
+
+/** Two panes side by side — Arena, where two versions go head to head. */
+export function ArenaGlyph({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <rect x="2.5" y="4" width="8" height="16" rx="2" />
+      <rect x="13.5" y="4" width="8" height="16" rx="2" />
     </svg>
   )
 }

@@ -26,6 +26,7 @@ import { PROTECTED_RESOURCE_WELL_KNOWN } from '@skillet/protocol/protected-resou
 import { CATEGORY_BY_KEY, isCategoryKey } from './categories'
 import { DOC_NAV } from './docs-nav'
 import { TOUR_SLUGS } from './tour'
+import { ARENA_ROUND_SLUGS } from './arena/rounds'
 
 /**
  * The registry's claim-gate handle grammar. Kept as a literal rather than
@@ -59,6 +60,9 @@ export const KNOWN_TOP_LEVEL_SEGMENTS: ReadonlySet<string> = new Set([
   'about',
   'admin',
   'api',
+  'arena',
+  // Example screenshots for the arena preview's vote pairs.
+  'arena-demo',
   'blog',
   'browse',
   'connect',
@@ -234,6 +238,17 @@ export function classifyRoute(pathname: string): RouteVerdict {
     if (segments.length === 3 && second === 'topic' && isCategoryKey(third)) {
       return { kind: 'known' }
     }
+    return { kind: 'unknown' }
+  }
+
+  // /arena is the round list; /arena/<round> is one round and
+  // /arena/<round>/vote its voting screen. Only real rounds resolve, decided
+  // here for the same PPR reason as /news topics.
+  if (first === 'arena') {
+    if (segments.length === 1) return { kind: 'known' }
+    if (!ARENA_ROUND_SLUGS.has(second!)) return { kind: 'unknown' }
+    if (segments.length === 2) return { kind: 'known' }
+    if (segments.length === 3 && third === 'vote') return { kind: 'known' }
     return { kind: 'unknown' }
   }
 
