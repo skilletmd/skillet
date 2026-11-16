@@ -45,7 +45,6 @@ export const ADDITIONAL_ADAPTERS: Adapter[] = [
   claudeCodeAdapter,
   openclawAdapter,
   hermesAdapter,
-  cursorAdapter,
   windsurfAdapter,
   devinAdapter,
 ];
@@ -57,15 +56,17 @@ export const ALL_ADAPTERS: Adapter[] = [
 ];
 
 /**
- * Agents that READ the universal `~/.agents/skills` baseline rather than
- * materializing into their own directory. opencode reads that path (same as the
- * Codex baseline), so it must NOT join the materializing set — that would
- * double-write and double-count one materialization. Instead it is surfaced
- * here for detection/labeling in `skillet runtimes` (and the desktop tray
- * facepile) so users see opencode as a runtime whose skills live in the shared
- * baseline dir. Detection is opencode-specific (`~/.config/opencode`).
+ * Agents that READ the universal `.agents/skills` baseline rather than
+ * materializing into their own directory. opencode and Cursor both read that
+ * path (global and per repo, same as the Codex baseline), so they must NOT join
+ * the materializing set — that would double-write and double-count one
+ * materialization, and Cursor would list every skill twice. Instead they are
+ * surfaced here for detection/labeling in `skillet runtimes` (and the desktop
+ * tray facepile) so users see them as runtimes whose skills live in the shared
+ * baseline dir. Detection is agent-specific (`~/.config/opencode`, the Cursor
+ * app bundle or `~/.cursor`).
  */
-export const BASELINE_READER_ADAPTERS: Adapter[] = [opencodeAdapter];
+export const BASELINE_READER_ADAPTERS: Adapter[] = [opencodeAdapter, cursorAdapter];
 
 export function statusGlyph(status: AdapterResult["status"]): string {
   switch (status) {

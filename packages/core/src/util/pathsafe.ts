@@ -335,9 +335,13 @@ export const MATERIALIZATION_ROOT_ALLOWLIST: readonly string[] = buildAllowlist(
  * list, so a manifest still advertising `.windsurf/rules` passed verification
  * and would have pointed clients at a directory Devin Desktop never reads.
  * An entry here is a claim that some shipped adapter writes there.
+ *
+ * `.cursor/rules` left the same way in November 2026. Cursor reads the
+ * `.agents/skills` baseline in both scopes, so the rules writer was retired
+ * (Cursor is a baseline reader now) and a manifest still advertising
+ * `.cursor/rules` must fail verification too.
  */
 export const PROJECT_TARGET_ALLOWLIST: readonly string[] = Object.freeze([
-  ".cursor/rules",
   ".agents/skills",
 ]);
 

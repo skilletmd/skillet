@@ -12,10 +12,6 @@ import {
 import { inlinedCreateSkillMd, inlinedRouteSkillMd } from '../bundled-route-content.js'
 import { resolveBundledCreateSkillDir, resolveBundledRouteSkillDir } from '../bundled-route-path.js'
 
-// Cursor reads the global ~/.agents/skills baseline rather than its own dir
-// (mirrors the runtimes command).
-const GLOBAL_AGENTS_SKILLS = new Set(['cursor'])
-
 /** The bundled router SKILL.md, from the pkg-inlined copy or the on-disk source. */
 async function routeSkillMd(): Promise<string> {
   const inlined = inlinedRouteSkillMd()
@@ -44,10 +40,7 @@ async function detectRuntimeTargets(): Promise<Array<{ label: string; targetDir:
           adapter.name === 'codex' && existsSync(join(homedir(), '.codex'))
             ? 'Codex'
             : runtimeLabel(adapter.name)
-        out.push({
-          label,
-          targetDir: GLOBAL_AGENTS_SKILLS.has(adapter.name) ? agentsSkills : adapter.targetDir,
-        })
+        out.push({ label, targetDir: adapter.targetDir })
       }
     } catch {
       // Non-fatal: skip adapters whose detect() throws.

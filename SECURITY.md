@@ -20,7 +20,7 @@ A malicious skill reaching a subscriber's agent runtime is the dominant risk. Co
 2. **Signature binding (v2)** — signatures attest author, ref, version, and content hash (legacy v1 content-hash-only signatures remain accepted during migration).
 3. **Trust policy** — auto-apply is scoped to pinned authors; session-attested and unpinned authors require explicit review.
 4. **Bundle shape allowlist** — dotfiles, `.git/`, hooks, and agent-control filenames are rejected at validate time.
-5. **Adapter hardening** — Cursor `.mdc` emission uses YAML block scalars; managed agent-instruction files are not silently mutated by skill content.
+5. **Adapter hardening** — every runtime receives the skill folder byte for byte, with no generated frontmatter; managed agent-instruction files are not silently mutated by skill content.
 
 ## Known limitations & trust assumptions
 

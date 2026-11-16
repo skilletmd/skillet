@@ -142,7 +142,7 @@ describe("MATERIALIZATION_ROOT_ALLOWLIST", () => {
     );
   });
 
-  it("does NOT include ~/.cursor/skills (cursor is now project-scoped, uses .cursor/rules)", () => {
+  it("does NOT include ~/.cursor/skills (Cursor is a baseline reader: it loads ~/.agents/skills)", () => {
     expect(MATERIALIZATION_ROOT_ALLOWLIST).not.toContain(
       join(home, ".cursor", "skills"),
     );

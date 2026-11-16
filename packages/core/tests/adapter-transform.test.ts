@@ -30,16 +30,17 @@ function bundle(entries: Record<string, string | Buffer>): DecodedBundle {
   return m;
 }
 
-// A stand-in for the generic project-adapter machinery. Modeled on Cursor,
-// the only project-kind runtime that ships: windsurf became a global skills
-// folder in the 2026-06 Devin Desktop rebrand and `.windsurf/rules` left
-// PROJECT_TARGET_ALLOWLIST with it.
+// A stand-in for the generic project-adapter machinery. Modeled on the Codex
+// repo adapter, the only project-kind writer that ships: windsurf became a
+// global skills folder in the 2026-06 Devin Desktop rebrand and
+// `.windsurf/rules` left PROJECT_TARGET_ALLOWLIST with it; Cursor became a
+// baseline reader in 2026-11 and `.cursor/rules` followed.
 function mkProjectAdapter(overrides: Partial<Adapter> = {}): Adapter {
   return {
-    name: "cursor",
+    name: "codex-project",
     kind: "project",
-    targetDir: ".cursor/rules",
-    projectRoot: (cwd: string) => join(cwd, ".cursor", "rules"),
+    targetDir: ".agents/skills",
+    projectRoot: (cwd: string) => join(cwd, ".agents", "skills"),
     detect: async () => true,
     materialize: async () => [],
     targetPath: () => "",
@@ -82,7 +83,7 @@ describe("AdapterKind defaults", () => {
     const a = mkProjectAdapter();
     expect(() => resolveAdapterRoot(a)).toThrow(/cwd is required/);
     expect(resolveAdapterRoot(a, { cwd: "/tmp/proj" })).toBe(
-      join("/tmp/proj", ".cursor", "rules"),
+      join("/tmp/proj", ".agents", "skills"),
     );
   });
 
@@ -101,8 +102,13 @@ describe("AdapterKind defaults", () => {
 
 describe("PROJECT_TARGET_ALLOWLIST", () => {
   it("lists the project roots a shipped adapter actually writes", () => {
-    expect(PROJECT_TARGET_ALLOWLIST).toContain(".cursor/rules");
     expect(PROJECT_TARGET_ALLOWLIST).toContain(".agents/skills");
+  });
+
+  it("no longer allows the retired Cursor rules dir", () => {
+    // Cursor reads the `.agents/skills` baseline directly. A manifest still
+    // advertising the old `.cursor/rules` root must fail verification.
+    expect(PROJECT_TARGET_ALLOWLIST).not.toContain(".cursor/rules");
   });
 
   it("no longer allows the retired Windsurf rules dir", () => {
@@ -383,10 +389,10 @@ describe("end-to-end: project-scoped rule-writing adapter", () => {
     await mkdir(projectCwd, { recursive: true });
     try {
       const a: Adapter = {
-        name: "cursor",
+        name: "codex-project",
         kind: "project",
-        targetDir: ".cursor/rules",
-        projectRoot: (cwd) => join(cwd, ".cursor", "rules"),
+        targetDir: ".agents/skills",
+        projectRoot: (cwd) => join(cwd, ".agents", "skills"),
         detect: async () => true,
         transform: skillMdToRule(),
         async materialize(slug, src, opts = {}) {
@@ -412,7 +418,7 @@ describe("end-to-end: project-scoped rule-writing adapter", () => {
         { cwd: projectCwd, owner: null },
       );
 
-      const expected = join(projectCwd, ".cursor", "rules", "my-skill.md");
+      const expected = join(projectCwd, ".agents", "skills", "my-skill.md");
       expect(written).toContain(expected);
       expect(await readFile(expected, "utf8")).toMatch(
         /^---\ndescription: Skillet skill my-skill/,

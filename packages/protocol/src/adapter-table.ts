@@ -29,12 +29,14 @@ export type AdapterKind = 'global' | 'project';
  * On-disk shape the runtime reads.
  *
  * - `skill-md`   — a `<slug>/SKILL.md` folder, the agentskills.io layout
- * - `mdc`        — Cursor's single `.mdc` rule file with its own frontmatter
+ * - `mdc`        — the single `.mdc` rule file the Cursor adapter emitted
  * - `rules-file` — a flattened single `.md` rule, frontmatter stripped
  *
- * No shipped adapter emits `rules-file` any more (Devin Desktop was the last,
- * and moved to `skill-md` in the rebrand). The member stays because this is a
- * wire enum: a client pinned to an older release still has to parse it.
+ * No shipped adapter emits `mdc` or `rules-file` any more. Devin Desktop moved
+ * to `skill-md` in the rebrand, and Cursor left the table in November 2026
+ * when it became a baseline reader (it loads `.agents/skills` directly). The
+ * members stay because this is a wire enum: a client pinned to an older
+ * release still has to parse them.
  */
 export type AdapterLayout = 'skill-md' | 'mdc' | 'rules-file';
 
@@ -59,11 +61,11 @@ export interface AdapterEntry {
 /**
  * The runtimes Skillet materializes into, in the order the CLI iterates them.
  *
- * `opencode` is deliberately absent. It READS the universal `~/.agents/skills`
- * baseline that the codex entry already writes, so listing it would describe a
- * materialization that never happens and double-count one write. It is
- * surfaced for detection and labeling only (`BASELINE_READER_ADAPTERS` in
- * packages/cli/src/cli-context.ts).
+ * `opencode` and `cursor` are deliberately absent. Both READ the universal
+ * `.agents/skills` baseline that the codex entry already writes (global and
+ * per repo), so listing them would describe a materialization that never
+ * happens and double-count one write. They are surfaced for detection and
+ * labeling only (`BASELINE_READER_ADAPTERS` in packages/cli/src/cli-context.ts).
  */
 export const ADAPTER_TABLE: readonly AdapterEntry[] = Object.freeze([
   {
@@ -96,14 +98,6 @@ export const ADAPTER_TABLE: readonly AdapterEntry[] = Object.freeze([
     kind: 'global',
     layout: 'skill-md',
     root: '~/.hermes/skills',
-    version: '1.0.0',
-  },
-  {
-    detect: '/Applications/Cursor.app or ~/.cursor',
-    key: 'cursor',
-    kind: 'project',
-    layout: 'mdc',
-    root: '.cursor/rules',
     version: '1.0.0',
   },
   {

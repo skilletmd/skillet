@@ -10,11 +10,6 @@ import {
   BASELINE_READER_ADAPTERS,
 } from '../cli-context.js'
 
-// Agents that read the global ~/.agents/skills baseline rather than their own dir
-// (Cursor's per-project .cursor/rules adapter is legacy; it loads the global
-// baseline too). Point the tray's folder link at where skills actually live.
-const GLOBAL_AGENTS_SKILLS = new Set(['cursor'])
-
 /**
  * `skillet runtimes --json` — list the agent runtimes detected on THIS machine and
  * where their skills materialize. Pure LOCAL detection (each adapter's `detect()`),
@@ -61,24 +56,22 @@ export function registerRuntimesCommand(program: Command): void {
               adapter.name === 'codex' && existsSync(join(homedir(), '.codex'))
                 ? 'Codex'
                 : runtimeLabel(adapter.name)
-            const targetDir = GLOBAL_AGENTS_SKILLS.has(adapter.name)
-              ? agentsSkills
-              : adapter.targetDir
             runtimes.push({
               name: adapter.name,
               label,
-              targetDir,
-              access: describeTccRoot(targetDir, context),
+              targetDir: adapter.targetDir,
+              access: describeTccRoot(adapter.targetDir, context),
             })
           }
         } catch {
           // Non-fatal — skip adapters whose detect() throws.
         }
       }
-      // Baseline-reader agents (opencode) read the universal ~/.agents/skills
-      // dir instead of materializing their own — surface them as detected
-      // runtimes pointing at that shared dir, without adding them to the
-      // materializing set. Their detect() is agent-specific (~/.config/opencode).
+      // Baseline-reader agents (opencode, Cursor) read the universal
+      // ~/.agents/skills dir instead of materializing their own — surface them
+      // as detected runtimes pointing at that shared dir, without adding them
+      // to the materializing set. Their detect() is agent-specific
+      // (~/.config/opencode, the Cursor app bundle or ~/.cursor).
       for (const adapter of BASELINE_READER_ADAPTERS) {
         if (seen.has(adapter.name)) continue
         try {

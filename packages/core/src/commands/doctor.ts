@@ -274,7 +274,7 @@ export async function collectDoctorReport(
  * empty list and the human formatter prints nothing.
  *
  * Project adapters are skipped, matching the TCC gate in sync(). Their
- * targetDir is a RELATIVE path under the project cwd (`.cursor/rules`), so
+ * targetDir is a RELATIVE path under the project cwd (`.agents/skills`), so
  * resolving it here would describe wherever the command happened to run. Any
  * checkout inside ~/Documents would then report every project adapter as
  * needing folder access, which is both wrong and unactionable: sync never

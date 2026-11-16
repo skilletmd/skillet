@@ -84,9 +84,10 @@ export async function writeBundleToDir(
  * Write a flat map of POSIX-relative paths under `root`.
  *
  * Unlike `writeBundleToDir`, no `<owner>--<slug>` directory prefix is
- * implied — the adapter chooses the layout. Used by project-scoped
- * adapters (Cursor) whose runtime native format is a flat set of
- * rule files (e.g. `.cursor/rules/<slug>.mdc`).
+ * implied — the adapter chooses the layout. For adapters whose runtime
+ * wants something other than a skill folder (the Cursor adapter used it for
+ * its flat `.cursor/rules/<slug>.mdc` rules until Cursor read skills folders).
+ * No shipped adapter needs it today.
  *
  * Same atomicity + path-escape guarantees as `writeBundleToDir`. Caller is
  * responsible for validating `root` (e.g. via `validateProjectAdapterRoot`

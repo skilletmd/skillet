@@ -5,16 +5,16 @@
 // "edited vs unedited" check (and the whole trash decision) is wrong. The signal
 // for a non-verbatim adapter is a `transform` method that rewrites the bundle.
 //
-// Today only Cursor transforms (project-scoped), and prune skips project
-// adapters entirely. (Windsurf/Devin Desktop became a global verbatim
-// materializer in the June 2026 rebrand — it no longer transforms.) This test
-// fails the moment a GLOBAL adapter gains a transform, forcing whoever adds it
-// to teach reconcilePrune adapter-aware removal first — rather than silently
-// breaking file deletion.
+// Today no shipped adapter transforms. Cursor's project-scoped .mdc writer did
+// until November 2026 (prune skipped it as a project adapter); Cursor is a
+// baseline reader now. Windsurf/Devin Desktop became a global verbatim
+// materializer in the June 2026 rebrand. This test fails the moment a GLOBAL
+// adapter gains a transform, forcing whoever adds it to teach reconcilePrune
+// adapter-aware removal first — rather than silently breaking file deletion.
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { Adapter } from "@skillet/core";
-import { ALL_ADAPTERS } from "../src/cli-context.js";
+import { ALL_ADAPTERS, BASELINE_READER_ADAPTERS } from "../src/cli-context.js";
 
 function isProject(a: Adapter): boolean {
   return (a.kind ?? "global") === "project";
@@ -39,10 +39,23 @@ test("the contract actually bites — a synthetic global transformer is caught",
   assert.equal(caught, true);
 });
 
-test("cursor (the only transforming adapter) is project-scoped (prune skips it)", () => {
-  const a = ALL_ADAPTERS.find((x) => x.name === "cursor");
-  assert.ok(a, `cursor adapter missing from ALL_ADAPTERS`);
-  assert.equal(a!.kind, "project", `cursor must be project-scoped`);
+test("cursor is a baseline reader: out of the materializing set, and it never transformed bytes there", () => {
+  // Cursor reads the universal `.agents/skills` baseline, so it materializes
+  // nothing of its own and prune never meets a Cursor-shaped file. The old
+  // project-scoped .mdc writer (the one transforming adapter) is gone.
+  assert.equal(
+    ALL_ADAPTERS.find((x) => x.name === "cursor"),
+    undefined,
+    `cursor must not be in ALL_ADAPTERS`,
+  );
+  const reader = BASELINE_READER_ADAPTERS.find((x) => x.name === "cursor");
+  assert.ok(reader, `cursor adapter missing from BASELINE_READER_ADAPTERS`);
+  assert.equal(typeof reader!.transform, "undefined", `cursor writes bundles verbatim`);
+});
+
+test("no shipped adapter transforms at all any more", () => {
+  const transforming = ALL_ADAPTERS.filter((a) => typeof a.transform === "function").map((a) => a.name);
+  assert.deepEqual(transforming, [], `transforming adapters: ${transforming.join(", ")}`);
 });
 
 test("windsurf/Devin Desktop is now a global verbatim materializer (no transform)", () => {

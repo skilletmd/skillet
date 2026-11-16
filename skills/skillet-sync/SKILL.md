@@ -68,7 +68,7 @@ Skillet writes each skill to the correct location for each runtime:
 | Claude Code | `~/.claude/skills/<slug>/SKILL.md` |
 | OpenClaw | `~/.openclaw/skills/<slug>/SKILL.md` |
 | Hermes | `~/.hermes/skills/<slug>/SKILL.md` |
-| Cursor | `.cursor/rules/<slug>.mdc` |
+| Cursor | reads `~/.agents/skills/<slug>/SKILL.md` and a repo's `.agents/skills/` (no separate copy) |
 | Devin Desktop | `~/.codeium/windsurf/skills/<slug>/SKILL.md` |
 | Devin CLI | `~/.config/devin/skills/<slug>/SKILL.md` |
 

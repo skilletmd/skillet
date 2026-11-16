@@ -1,6 +1,6 @@
 import { readFile, readdir, lstat, rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join, relative, sep, basename } from 'node:path'
+import { join, relative, sep, basename, dirname, resolve } from 'node:path'
 import matter from 'gray-matter'
 import { readBundleFromDir } from '../bundle/read.js'
 import { skilletDir } from '../session-token.js'
@@ -20,7 +20,7 @@ import { ensureBundledCreateSkill, ensureBundledRouteSkill } from './bundled-rou
 import { BUNDLED_CREATE_SLUG, BUNDLED_ROUTE_SLUG } from './route.js'
 import { canonicalContentHash, type DecodedBundle, skillContentHash, stripSkilletBackupPaths } from '@skillet/protocol'
 import { parseSkillRef } from '../registry/identifier.js'
-import { materializeSlugDir } from '../bundle/write.js'
+import { isSkilletSlugDirName, materializeSlugDir } from '../bundle/write.js'
 import { atomicWrite } from '../util/atomic.js'
 import { AdapterSkipError, type Adapter } from '../adapter.js'
 import {
@@ -1170,6 +1170,62 @@ async function cleanupLegacyWindsurfArtifacts(cwd: string): Promise<void> {
   }
 }
 
+// The frontmatter the OLD Cursor adapter generated for every rule it wrote. A
+// fingerprint, not a marker: that adapter never stamped its files, so the exact
+// generated header is what proves a rule is ours. `globs` was always this
+// literal and `alwaysApply` always false.
+const CURSOR_RULE_FINGERPRINT = '\nglobs: ["**/*"]\nalwaysApply: false\n---\n'
+
+/**
+ * Remove the `.cursor/rules/<owner>--<slug>.mdc` rules (and their sibling
+ * supporting-file dirs) the OLD Cursor adapter wrote, now that Cursor reads the
+ * universal `.agents/skills` baseline directly. Left in place they load the
+ * same skill twice. The old adapter wrote into the nearest ancestor of the sync
+ * cwd that had `.cursor/rules`, so the sweep walks up the same way and touches
+ * one dir. Recognition-gated and never removes user content: a rule goes only
+ * if it is named like a Skillet skill dir AND still carries the generated
+ * header; a dir goes only beside a rule that just went.
+ */
+export async function cleanupLegacyCursorRules(startCwd: string): Promise<void> {
+  let dir = resolve(startCwd)
+  let rulesDir: string | null = null
+  while (rulesDir === null) {
+    const candidate = join(dir, '.cursor', 'rules')
+    try {
+      if ((await lstat(candidate)).isDirectory()) rulesDir = candidate
+    } catch {
+      // not here; keep walking
+    }
+    if (rulesDir === null) {
+      const parent = dirname(dir)
+      if (parent === dir) return
+      dir = parent
+    }
+  }
+  let entries: string[]
+  try {
+    entries = await readdir(rulesDir)
+  } catch {
+    return
+  }
+  for (const name of entries) {
+    if (!name.endsWith('.mdc')) continue
+    const stem = name.slice(0, -'.mdc'.length)
+    if (!isSkilletSlugDirName(stem)) continue
+    const filePath = join(rulesDir, name)
+    try {
+      const content = await readFile(filePath, 'utf8')
+      if (!content.startsWith('---\ndescription: ') || !content.includes(CURSOR_RULE_FINGERPRINT)) {
+        continue
+      }
+      await rm(filePath, { force: true })
+      await rm(join(rulesDir, stem), { recursive: true, force: true })
+    } catch {
+      // unreadable → leave it; never guess
+    }
+  }
+}
+
 /**
  * Remove Skillet-managed materializations from Codex's LEGACY `~/.codex/skills`
  * root. Codex moved to `~/.agents/skills` in June 2026 but still reads the old
@@ -1815,6 +1871,8 @@ async function syncInner(
   if (active.some((a) => a.name === 'windsurf')) {
     await cleanupLegacyWindsurfArtifacts(cwd).catch(() => {})
   }
+  // Old Cursor rule files near this cwd, now that Cursor reads the baseline.
+  await cleanupLegacyCursorRules(cwd).catch(() => {})
 
   for (const [slug, entry] of Object.entries(state.skills)) {
     if (slugFilter) {

@@ -125,14 +125,14 @@ test('a protected root names its anchor and its denied state', { skip: !symlinks
 });
 
 test('a project adapter is never reported, however the cwd resolves', async () => {
-  // Project adapters carry a RELATIVE targetDir (`.cursor/rules`) under the
+  // Project adapters carry a RELATIVE targetDir (`.agents/skills`) under the
   // project cwd. Resolving it here describes wherever the command ran, so a
   // checkout that happens to live inside ~/Documents made doctor report every
   // project adapter as needing folder access. sync() never parks a project
   // adapter, so the row was both wrong and unactionable.
   const cwd = process.cwd();
   const inside = join(DOCUMENTS, 'some-checkout');
-  mkdirSync(join(inside, '.cursor', 'rules'), { recursive: true });
+  mkdirSync(join(inside, '.agents', 'skills'), { recursive: true });
   process.chdir(inside);
   try {
     const json = JSON.parse(await runDoctor(['--json'])) as { folder_access: FolderAccess };

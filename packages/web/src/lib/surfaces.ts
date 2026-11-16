@@ -14,7 +14,6 @@ export type Persistence = 'persistent' | 'on-demand' | 'sandboxed'
 export type Channel = 'cli' | 'desktop' | 'plugin' | 'ci'
 export type Mechanism =
   | 'dir' // materialize into a local skills directory
-  | 'project-rules' // project-scoped rules files (.cursor/rules, …)
   | 'mcp' // reached live over an MCP server
   | 'native-api' // /v1/skills programmatic upload — Responses API / Codex execution env (dev/CI), NOT a ChatGPT chat surface
   | 'export' // frozen export / custom GPT / project upload
@@ -58,8 +57,6 @@ function deliveryFor(surface: Surface, mechanism: Mechanism): string {
   switch (mechanism) {
     case 'dir':
       return surface.channel === 'desktop' ? 'Desktop' : 'CLI'
-    case 'project-rules':
-      return 'CLI'
     case 'env':
       return 'Env'
     case 'mcp':
@@ -132,10 +129,10 @@ export const SURFACES: Surface[] = [
   {
     name: 'Cursor',
     channel: 'cli',
-    mechanism: ['project-rules'],
+    mechanism: ['dir'],
     persistence: 'persistent',
     status: 'operational',
-    notes: 'Project-scoped .cursor/rules/*.mdc (SKILL.md translated to .mdc)',
+    notes: 'Reads the universal ~/.agents/skills folder and a repo\'s .agents/skills; no Cursor-only copy',
   },
   {
     name: 'Devin Desktop',
