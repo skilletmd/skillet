@@ -8,7 +8,7 @@
     height: 40px;
     align-items: center;
     gap: 6px;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     border: 1px solid var(--p-line);
     background: var(--p-surface);
     padding: 0 14px;
@@ -44,7 +44,7 @@
     min-height: 148px;
     flex-direction: column;
     overflow: hidden;
-    border-radius: 20px;
+    border-radius: var(--radius-2xl);
     border: 1px solid transparent;
     background: var(--p-surface);
     box-shadow:
@@ -70,7 +70,7 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    border-radius: 20px;
+    border-radius: var(--radius-2xl);
     border: 1.5px dashed color-mix(in srgb, var(--p-ink-2) 45%, transparent);
     color: var(--p-ink-2);
   }
@@ -85,7 +85,7 @@
     position: absolute;
     inset: 0 0 auto 0;
     height: 112px;
-    border-radius: 16px;
+    border-radius: var(--radius-2xl);
     border: 1px solid var(--p-line);
     background: var(--p-surface);
     padding: 12px;
@@ -95,13 +95,13 @@
   .bar {
     height: 8px;
     overflow: hidden;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: color-mix(in srgb, var(--p-ink) 8%, transparent);
   }
 
   .barFill {
     height: 100%;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(--fill, var(--p-ink));
     transform-origin: left;
     animation: barGrow 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -115,7 +115,7 @@
   .phone {
     position: relative;
     overflow: hidden;
-    border-radius: 44px;
+    border-radius: var(--radius-2xl);
     background: var(--p-bg);
     box-shadow:
       0 0 0 1px rgb(var(--p-shade) / 0.1),
