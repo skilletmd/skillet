@@ -71,6 +71,10 @@
     "./jobs": {
       "import": "./dist/jobs.js",
       "types": "./dist/jobs.d.ts"
+    },
+    "./kit-map": {
+      "import": "./dist/kit-map.js",
+      "types": "./dist/kit-map.d.ts"
     }
   },
   "scripts": {
