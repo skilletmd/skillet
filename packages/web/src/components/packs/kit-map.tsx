@@ -7,6 +7,7 @@ import { Avatar } from '@/components/ui/avatar'
 import { Check, Plus } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import { humanizeSlug } from '@/lib/humanize-slug'
+import { jobById, type JobId, type SectionId } from '@skillet/protocol/jobs'
 import {
   PICKS,
   TAKE_MARKETING,
@@ -37,18 +38,19 @@ export function KitMap() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [fresh, setFresh] = useState<string | null>(null)
+  const [fresh, setFresh] = useState<JobId | null>(null)
 
   const total = sections.reduce((n, sec) => n + sec.slots.length, 0)
   const filled = sections.reduce((n, sec) => n + filledCount(sec), 0)
   const all = [...sections, TAYLOR_TOOLS]
   const openSec = all.find((sec) => sec.id === openId) ?? null
 
-  const updateSlot = (secId: string, job: string, next: (sl: MapSlot) => MapSlot) => {
+  const updateSlot = (id: JobId, next: (sl: MapSlot) => MapSlot) => {
+    const secId = jobById(id).section
     setSections((prev) =>
-      prev.map((sec) => (sec.id !== secId ? sec : { ...sec, slots: sec.slots.map((sl) => (sl.job === job ? next(sl) : sl)) })),
+      prev.map((sec) => (sec.id !== secId ? sec : { ...sec, slots: sec.slots.map((sl) => (sl.id === id ? next(sl) : sl)) })),
     )
-    setFresh(`${secId}/${job}`)
+    setFresh(id)
   }
 
   const share = async () => {
@@ -100,9 +102,9 @@ export function KitMap() {
             id: sec.id,
             color: sec.color,
             cells: sec.slots.map((sl) => ({
-              key: sl.job,
+              key: sl.id,
               filled: isFilled(sl),
-              wave: fresh === `${sec.id}/${sl.job}` ? 0 : undefined,
+              wave: fresh === sl.id ? 0 : undefined,
             })),
           }))}
         />
@@ -135,13 +137,13 @@ export function KitMap() {
           sec={openSec}
           open={openId !== null}
           onClose={() => setOpenId(null)}
-          onPick={(job, skill) => updateSlot(openSec.id, job, (sl) => ({ ...sl, skills: [skill] }))}
-          onCombine={(job) =>
-            updateSlot(openSec.id, job, (sl) => ({
+          onPick={(id, skill) => updateSlot(id, (sl) => ({ ...sl, skills: [skill] }))}
+          onCombine={(id) =>
+            updateSlot(id, (sl) => ({
               ...sl,
               skills: [
                 {
-                  name: `Your ${sl.job.toLowerCase()}`,
+                  name: `Your ${sl.name.toLowerCase()}`,
                   by: `Combined from ${sl.skills.length}`,
                   avatarUrl: TAYLOR_AVATAR,
                   runs: sl.skills.reduce((n, k) => n + k.runs, 0),
@@ -150,8 +152,8 @@ export function KitMap() {
             }))
           }
           onTake={() => {
-            for (const [job, skill] of Object.entries(TAKE_MARKETING)) {
-              updateSlot('marketing', job, (sl) => (isFilled(sl) ? sl : { ...sl, skills: [skill] }))
+            for (const [id, skill] of Object.entries(TAKE_MARKETING) as [JobId, MapSkill][]) {
+              updateSlot(id, (sl) => (isFilled(sl) ? sl : { ...sl, skills: [skill] }))
             }
           }}
         />
@@ -159,14 +161,14 @@ export function KitMap() {
       <AddTray
         open={adding}
         onClose={() => setAdding(false)}
-        onAdd={(section, job, skill) => updateSlot(section, job, (sl) => ({ ...sl, skills: [...sl.skills, skill] }))}
+        onAdd={(id, skill) => updateSlot(id, (sl) => ({ ...sl, skills: [...sl.skills, skill] }))}
         sectionName={(id) => all.find((sec) => sec.id === id)?.name ?? id}
       />
     </div>
   )
 }
 
-function KitSection({ sec, fresh, onOpen, wide }: { sec: MapSection; fresh: string | null; onOpen: () => void; wide?: boolean }) {
+function KitSection({ sec, fresh, onOpen, wide }: { sec: MapSection; fresh: JobId | null; onOpen: () => void; wide?: boolean }) {
   const label = wide ? `${sec.slots.reduce((m, sl) => m + sl.skills.length, 0)} skills` : `${filledCount(sec)} of ${sec.slots.length}`
   return (
     <SectionCard sec={sec} label={label} onOpen={onOpen}>
@@ -174,11 +176,11 @@ function KitSection({ sec, fresh, onOpen, wide }: { sec: MapSection; fresh: stri
         const lead = sl.skills[0]
         return (
           <JobChip
-            key={`${sl.job}-${sl.skills.length}`}
-            job={sl.job}
+            key={`${sl.id}-${sl.skills.length}`}
+            job={sl.name}
             filled={isFilled(sl)}
             avatar={lead ? { src: lead.avatarUrl, name: lead.by } : undefined}
-            className={isFilled(sl) && fresh === `${sec.id}/${sl.job}` ? s.rise : undefined}
+            className={isFilled(sl) && fresh === sl.id ? s.rise : undefined}
             extra={
               hasExtras(sl) ? (
                 <span className="rounded-full bg-[var(--tile)] px-1.5 text-xs leading-5 font-bold text-[var(--tile-ink)]">
@@ -206,12 +208,12 @@ function SectionTray({
   sec: MapSection
   open: boolean
   onClose: () => void
-  onPick: (job: string, skill: MapSkill) => void
-  onCombine: (job: string) => void
+  onPick: (id: JobId, skill: MapSkill) => void
+  onCombine: (id: JobId) => void
   onTake: () => void
 }) {
   const empties = sec.slots.filter((sl) => !isFilled(sl)).length
-  const canTake = sec.id === 'marketing' && sec.slots.some((sl) => !isFilled(sl) && TAKE_MARKETING[sl.job])
+  const canTake = sec.id === 'marketing' && sec.slots.some((sl) => !isFilled(sl) && TAKE_MARKETING[sl.id])
   return (
     <Tray open={open} onOpenChange={(o) => !o && onClose()} title={sec.name} style={secVars(sec)}>
       <p className="text-sm text-[var(--p-ink-2)]">
@@ -223,11 +225,11 @@ function SectionTray({
       </p>
       <ul className="mt-2 divide-y divide-[var(--p-line)]">
         {sec.slots.map((sl) => {
-          const pick = PICKS[sl.job]
+          const pick = PICKS[sl.id]
           return (
-            <li key={sl.job} className="flex items-start justify-between gap-3 py-3">
+            <li key={sl.id} className="flex items-start justify-between gap-3 py-3">
               <div className="min-w-0">
-                <p className="text-base font-bold">{sl.job}</p>
+                <p className="text-base font-bold">{sl.name}</p>
                 {isFilled(sl) ? (
                   <>
                     {sl.skills.slice(0, 4).map((k) => (
@@ -246,11 +248,11 @@ function SectionTray({
                 )}
               </div>
               {hasExtras(sl) ? (
-                <button type="button" className={cn(s.pill, s.pillPrimary, 'h-10 min-w-0 shrink-0 px-4 text-sm')} onClick={() => onCombine(sl.job)}>
+                <button type="button" className={cn(s.pill, s.pillPrimary, 'h-10 min-w-0 shrink-0 px-4 text-sm')} onClick={() => onCombine(sl.id)}>
                   Combine
                 </button>
               ) : !isFilled(sl) && pick ? (
-                <button type="button" className={cn(s.pill, s.pillSecondary, 'h-10 min-w-0 shrink-0 px-4 text-sm')} onClick={() => onPick(sl.job, pick)}>
+                <button type="button" className={cn(s.pill, s.pillSecondary, 'h-10 min-w-0 shrink-0 px-4 text-sm')} onClick={() => onPick(sl.id, pick)}>
                   Add
                 </button>
               ) : null}
@@ -275,8 +277,8 @@ function AddTray({
 }: {
   open: boolean
   onClose: () => void
-  onAdd: (section: string, job: string, skill: MapSkill) => void
-  sectionName: (id: string) => string
+  onAdd: (id: JobId, skill: MapSkill) => void
+  sectionName: (id: SectionId) => string
 }) {
   const [link, setLink] = useState('')
   const [pending, setPending] = useState(false)
@@ -309,10 +311,10 @@ function AddTray({
     setPending(true)
     setError('')
     await new Promise((r) => setTimeout(r, 650))
-    const { section, job } = sortSkillLink(link)
+    const job = jobById(sortSkillLink(link))
     const name = humanizeSlug(parts[parts.length - 1])
-    onAdd(section, job, { name, by: parts[0], avatarUrl: `https://github.com/${parts[0]}.png`, runs: 0 })
-    setPlaced(`${sectionName(section)} · ${job}`)
+    onAdd(job.id, { name, by: parts[0], avatarUrl: `https://github.com/${parts[0]}.png`, runs: 0 })
+    setPlaced(`${sectionName(job.section)} · ${job.name}`)
     setPending(false)
   }
 

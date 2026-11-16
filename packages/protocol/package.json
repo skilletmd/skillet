@@ -67,6 +67,10 @@
     "./summon-suggestions": {
       "import": "./dist/summon-suggestions.js",
       "types": "./dist/summon-suggestions.d.ts"
+    },
+    "./jobs": {
+      "import": "./dist/jobs.js",
+      "types": "./dist/jobs.d.ts"
     }
   },
   "scripts": {

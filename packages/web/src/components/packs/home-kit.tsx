@@ -7,7 +7,8 @@ import { Avatar } from '@/components/ui/avatar'
 import { Check } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import { CATALOG_SIZE, HOME_PICKS, STACKS, type HomeSkill } from '@/lib/packs/home-picks'
-import { TAYLOR_KIT, TAYLOR_TOOLS, type MapSkill } from '@/lib/packs/kit-map'
+import { SECTION_HUES, TAYLOR_KIT, TAYLOR_TOOLS, type MapSkill } from '@/lib/packs/kit-map'
+import { JOB_SECTIONS, TOOLS_SECTION, type JobId, type JobSection } from '@skillet/protocol/jobs'
 import { CountUp, Coverage, JobChip, SectionCard, SkillLine, landDelay, secVars, type Hue } from './kit-parts'
 import k from './kit.module.css'
 import s from './packs.module.css'
@@ -19,61 +20,40 @@ import { Tray } from './tray'
  * skills in first, so the picks only fill what you are missing.
  */
 
-type Key = string
-const keyOf = (secId: string, job: string): Key => `${secId}/${job}`
-const splitKey = (key: Key) => {
-  const at = key.indexOf('/')
-  return [key.slice(0, at), key.slice(at + 1)] as const
-}
+/** A job's protocol id, such as `writing.editing`. The maps below are keyed by it. */
+type Key = JobId
 
-interface FrameSection extends Hue {
-  id: string
-  name: string
-  jobs: { job: string; many: boolean }[]
-}
+type FrameSection = JobSection & Hue
 
-/** The framework with nobody's skills in it. */
-const FRAME: FrameSection[] = TAYLOR_KIT.map((sec) => ({
-  id: sec.id,
-  name: sec.name,
-  color: sec.color,
-  ink: sec.ink,
-  jobs: sec.slots.map((sl) => ({ job: sl.job, many: Boolean(sl.many) })),
-}))
-const TOOLS: FrameSection = {
-  id: TAYLOR_TOOLS.id,
-  name: TAYLOR_TOOLS.name,
-  color: TAYLOR_TOOLS.color,
-  ink: TAYLOR_TOOLS.ink,
-  jobs: TAYLOR_TOOLS.slots.map((sl) => ({ job: sl.job, many: true })),
-}
+/** The framework with nobody's skills in it: protocol's jobs in the web's colours. */
+const frame = (sec: JobSection): FrameSection => ({ ...sec, ...SECTION_HUES[sec.id] })
+const FRAME: FrameSection[] = JOB_SECTIONS.map(frame)
+const TOOLS: FrameSection = frame(TOOLS_SECTION)
 const ALL = [...FRAME, TOOLS]
 const TOTAL = FRAME.reduce((n, sec) => n + sec.jobs.length, 0)
 
 /** Platforms is picked by stack, not by one skill. */
-const isStacks = (secId: string, job: string) => secId === 'development' && job === 'Platforms'
+const isStacks = (key: Key) => key === 'development.platforms'
 
 /** What "Find my gaps" finds: the skills on this Mac, read Nov 12. */
-const THIS_MAC: Record<Key, MapSkill[]> = Object.fromEntries(
+const THIS_MAC: Record<string, MapSkill[]> = Object.fromEntries(
   [...TAYLOR_KIT, TAYLOR_TOOLS].flatMap((sec) =>
-    sec.slots.filter((sl) => sl.skills.length > 0).map((sl) => [keyOf(sec.id, sl.job), sl.skills] as const),
+    sec.slots.filter((sl) => sl.skills.length > 0).map((sl) => [sl.id, sl.skills] as const),
   ),
 )
 const THIS_MAC_SKILLS = Object.values(THIS_MAC).reduce((n, list) => n + list.length, 0)
 
-const picksFor = (secId: string, job: string): HomeSkill[] => HOME_PICKS[secId]?.[job] ?? []
+const picksFor = (key: Key): HomeSkill[] => HOME_PICKS[key]
 
 /** The makers behind each job's first pick, most picks first. */
 const MAKERS = (() => {
   const by = new Map<string, { name: string; avatarUrl: string; n: number }>()
-  for (const jobs of Object.values(HOME_PICKS)) {
-    for (const list of Object.values(jobs)) {
-      const first = list[0]
-      if (!first) continue
-      const m = by.get(first.handle) ?? { name: first.by, avatarUrl: first.avatarUrl, n: 0 }
-      m.n += 1
-      by.set(first.handle, m)
-    }
+  for (const list of Object.values(HOME_PICKS)) {
+    const first = list[0]
+    if (!first) continue
+    const m = by.get(first.handle) ?? { name: first.by, avatarUrl: first.avatarUrl, n: 0 }
+    m.n += 1
+    by.set(first.handle, m)
   }
   return [...by.values()].sort((a, b) => b.n - a.n)
 })()
@@ -82,32 +62,28 @@ const runsText = (n: number) => (n === 0 ? 'never ran' : n === 1 ? '1 run' : `${
 const skillsText = (n: number) => `${n} ${n === 1 ? 'skill' : 'skills'}`
 
 export function HomeKit() {
-  const [taken, setTaken] = useState<Record<Key, HomeSkill>>({})
-  const [choice, setChoice] = useState<Record<Key, number>>({})
+  const [taken, setTaken] = useState<Record<string, HomeSkill>>({})
+  const [choice, setChoice] = useState<Record<string, number>>({})
   const [mine, setMine] = useState(false)
-  const [wave, setWave] = useState<Record<Key, number>>({})
+  const [wave, setWave] = useState<Record<string, number>>({})
   const [openId, setOpenId] = useState<string | null>(null)
   const [finding, setFinding] = useState(false)
   const [adding, setAdding] = useState(false)
 
   const pickOf = (key: Key): HomeSkill | undefined => {
-    const [secId, job] = splitKey(key)
-    const list = picksFor(secId, job)
+    const list = picksFor(key)
     return list[choice[key] ?? 0] ?? list[0]
   }
   const yoursOf = (key: Key): MapSkill[] => (mine ? (THIS_MAC[key] ?? []) : [])
   const isFilled = (key: Key) => Boolean(taken[key]) || yoursOf(key).length > 0
 
-  const filled = FRAME.reduce((n, sec) => n + sec.jobs.filter((j) => isFilled(keyOf(sec.id, j.job))).length, 0)
+  const filled = FRAME.reduce((n, sec) => n + sec.jobs.filter((j) => isFilled(j.id)).length, 0)
   /** Empty jobs with a pick behind them, in reading order. */
   const openIn = (secs: FrameSection[]) =>
     secs.flatMap((sec) =>
       sec.jobs
-        .map((j) => keyOf(sec.id, j.job))
-        .filter((key) => {
-          const [secId, job] = splitKey(key)
-          return !isStacks(secId, job) && !isFilled(key) && picksFor(secId, job).length > 0
-        }),
+        .map((j) => j.id)
+        .filter((key) => !isStacks(key) && !isFilled(key) && picksFor(key).length > 0),
     )
   const fillable = openIn(ALL)
   const toAdd = Object.values(taken)
@@ -132,8 +108,7 @@ export function HomeKit() {
     })
   const swap = (key: Key, index: number) => {
     setChoice((prev) => ({ ...prev, [key]: index }))
-    const [secId, job] = splitKey(key)
-    const pick = picksFor(secId, job)[index]
+    const pick = picksFor(key)[index]
     if (taken[key] && pick) {
       setTaken((prev) => ({ ...prev, [key]: pick }))
       setWave({ [key]: 0 })
@@ -143,7 +118,7 @@ export function HomeKit() {
     setMine(true)
     // Your own skill wins its job; a pick you took for that job goes back.
     setTaken((prev) => Object.fromEntries(Object.entries(prev).filter(([key]) => !THIS_MAC[key])))
-    const order = ALL.flatMap((sec) => sec.jobs.map((j) => keyOf(sec.id, j.job))).filter((key) => THIS_MAC[key])
+    const order = ALL.flatMap((sec) => sec.jobs.map((j) => j.id)).filter((key) => THIS_MAC[key])
     setWave(Object.fromEntries(order.map((key, n) => [key, n])))
     setFinding(false)
   }
@@ -158,7 +133,7 @@ export function HomeKit() {
   const fillLabel = mine ? `Fill ${fillable.length} ${fillable.length === 1 ? 'gap' : 'gaps'}` : 'Fill my kit'
 
   const card = (sec: FrameSection, wide = false) => {
-    const keys = sec.jobs.map((j) => keyOf(sec.id, j.job))
+    const keys = sec.jobs.map((j) => j.id)
     const skills = keys.reduce((n, key) => n + yoursOf(key).length + (taken[key] ? 1 : 0), 0)
     return (
       <SectionCard
@@ -167,8 +142,7 @@ export function HomeKit() {
         label={wide ? skillsText(skills) : `${keys.filter(isFilled).length} of ${keys.length}`}
         onOpen={() => setOpenId(sec.id)}
       >
-        {sec.jobs.map(({ job, many }) => {
-          const key = keyOf(sec.id, job)
+        {sec.jobs.map(({ id: key, name: job, many }) => {
           const yours = yoursOf(key)
           const pick = taken[key]
           const lead = yours[0] ? { src: yours[0].avatarUrl, name: yours[0].by } : pick ? { src: pick.avatarUrl, name: pick.by } : undefined
@@ -176,7 +150,7 @@ export function HomeKit() {
           const fresh = on && wave[key] !== undefined
           return (
             <JobChip
-              key={`${job}-${on}`}
+              key={`${key}-${on}`}
               job={job}
               filled={on}
               avatar={lead}
@@ -261,10 +235,7 @@ export function HomeKit() {
           groups={FRAME.map((sec) => ({
             id: sec.id,
             color: sec.color,
-            cells: sec.jobs.map((j) => {
-              const key = keyOf(sec.id, j.job)
-              return { key: j.job, filled: isFilled(key), wave: wave[key] }
-            }),
+            cells: sec.jobs.map((j) => ({ key: j.id, filled: isFilled(j.id), wave: wave[j.id] })),
           }))}
         />
 
@@ -342,22 +313,18 @@ function SectionSheet({
   open: boolean
   onClose: () => void
   yoursOf: (key: Key) => MapSkill[]
-  taken: Record<Key, HomeSkill>
-  choice: Record<Key, number>
+  taken: Record<string, HomeSkill>
+  choice: Record<string, number>
   isFilled: (key: Key) => boolean
   onTake: (keys: Key[]) => void
   onDrop: (key: Key) => void
   onSwap: (key: Key, index: number) => void
 }) {
-  const keys = sec.jobs.map((j) => keyOf(sec.id, j.job))
-  const addable = keys.filter((key) => {
-    const [secId, job] = splitKey(key)
-    return !isStacks(secId, job) && !isFilled(key) && picksFor(secId, job).length > 0
-  })
+  const keys = sec.jobs.map((j) => j.id)
+  const addable = keys.filter((key) => !isStacks(key) && !isFilled(key) && picksFor(key).length > 0)
   const allFilled = keys.every(isFilled)
   const pickName = (key: Key) => {
-    const [secId, job] = splitKey(key)
-    const list = picksFor(secId, job)
+    const list = picksFor(key)
     return (list[choice[key] ?? 0] ?? list[0])?.name ?? 'the pick'
   }
 
@@ -381,10 +348,9 @@ function SectionSheet({
       )}
 
       <ul className="mt-2 divide-y divide-[var(--p-line)]">
-        {sec.jobs.map(({ job }) => {
-          const key = keyOf(sec.id, job)
+        {sec.jobs.map(({ id: key, name: job }) => {
           const yours = yoursOf(key)
-          const list = picksFor(sec.id, job)
+          const list = picksFor(key)
           const at = choice[key] ?? 0
           const pick = taken[key] ?? list[at] ?? list[0]
           const isTaken = Boolean(taken[key])
@@ -392,7 +358,7 @@ function SectionSheet({
           const clash = (name: string) => list.filter((sk) => sk.name === name).length > 1
 
           let body
-          if (isStacks(sec.id, job)) {
+          if (isStacks(key)) {
             body = (
               <>
                 {yours.slice(0, 2).map((sk) => (
@@ -463,12 +429,12 @@ function SectionSheet({
           }
 
           return (
-            <li key={job} className="flex items-start justify-between gap-3 py-3.5">
+            <li key={key} className="flex items-start justify-between gap-3 py-3.5">
               <div className="min-w-0 flex-1">
                 <p className="text-base font-bold">{job}</p>
                 {body}
               </div>
-              {!isStacks(sec.id, job) && yours.length === 0 && pick && (
+              {!isStacks(key) && yours.length === 0 && pick && (
                 <button
                   type="button"
                   aria-pressed={isTaken}
