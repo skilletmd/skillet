@@ -14,8 +14,8 @@
     "@skillet/registry": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
-    "tsx": "^4.11.0"
+    "@types/node": "^24.19.2",
+    "tsx": "^4.23.15"
   },
   "license": "Apache-2.0"
 }

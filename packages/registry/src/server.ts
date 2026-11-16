@@ -44,7 +44,7 @@ import { registerSearchRoutes } from './routes/search.js'
 import { registerConnectPairRoutes } from './routes/connect-pair.js'
 import { registerMcpRoutes } from './routes/mcp.js'
 import { registerConnectedRepoRoutes } from './routes/connected-repos.js'
-import { registerHttpSecurity } from './http-security.js'
+import { compileTrustProxy, registerHttpSecurity } from './http-security.js'
 import { registerOpenApiRoutes } from './routes/openapi.js'
 import { registerOAuthMetadataRoutes } from './routes/oauth-metadata.js'
 import { registerErrorEnvelope } from './error-envelope.js'
@@ -280,7 +280,11 @@ export async function buildServer(opts: ServerOptions = {}): Promise<{
   // magic-link cap. Default OFF (XFF ignored) so an un-proxied deployment cannot
   // be spoofed; enable per topology via TRUST_PROXY. Programmatic opts win for
   // tests / embedders.
-  const trustProxy = opts.trustProxy ?? resolveTrustProxy(process.env.TRUST_PROXY)
+  // A hop count is compiled for Fastify 5.12, which otherwise treats a bare
+  // number as trust nothing (see compileTrustProxy).
+  const trustProxy = compileTrustProxy(
+    opts.trustProxy ?? resolveTrustProxy(process.env.TRUST_PROXY),
+  )
   // §2.1 caps the bundle at 25 MB. With base64 overhead (~33%) we need ~34 MB
   // of headroom on the JSON body endpoint; the protocol-level validator returns
   // the proper `bundle_too_large` 422 inside the request.

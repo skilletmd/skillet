@@ -7,6 +7,7 @@ import { describe, it, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import {
+  compileTrustProxy,
   isLoopbackIp,
   isUnkeyedLoopbackClient,
   registerHttpSecurity,
@@ -19,7 +20,10 @@ const HEAVY_URL = '/api/v1/skills/alice/cool-skill/download';
 const LIGHT_URL = '/api/hc';
 
 async function securityApp(trustProxy: boolean | number = false) {
-  const app = Fastify({ logger: false, trustProxy });
+  // Same compile the server applies: Fastify 5.12 reads a bare hop count as
+  // trust nothing, which would turn the forwarded-client cases below into
+  // loopback and quietly pass the wrong thing.
+  const app = Fastify({ logger: false, trustProxy: compileTrustProxy(trustProxy) });
   await registerHttpSecurity(app);
   app.get(LIGHT_URL, async () => ({ ok: true }));
   app.get(HEAVY_URL, async () => ({ ok: true }));

@@ -8,7 +8,7 @@
  * counts against that client.
  */
 
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest, FastifyServerOptions } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import { loadMcpRateLimitConfig } from './ratelimit/mcp.js';
@@ -408,6 +408,24 @@ export async function registerHttpSecurity(app: FastifyInstance): Promise<void> 
   // After the three charge hooks: it reads what they stashed, once, on the way
   // out, when the handler's Cache-Control is finally visible.
   registerRateLimitHeaders(app);
+}
+
+/**
+ * Fastify's `trustProxy` for a resolved `TRUST_PROXY` value.
+ *
+ * Fastify 5.12 dropped `number` from the `trustProxy` type and makes a bare
+ * number fail closed (trust nothing). Compile the hop count to the function
+ * 5.10 compiled it to, so `TRUST_PROXY=<n>` keeps meaning n hops: the socket
+ * peer is hop 0, each X-Forwarded-For entry one more. Fastify's reason for the
+ * change holds here too: a hop count cannot validate the immediate peer, so an
+ * origin reachable without the proxy in front can be fed forged
+ * X-Forwarded-For headers. Name the proxy (`loopback`, an address or a CIDR)
+ * where the topology is known.
+ */
+export function compileTrustProxy(
+  value: boolean | number | string,
+): FastifyServerOptions['trustProxy'] {
+  return typeof value === 'number' ? (_address: string, hop: number) => hop < value : value;
 }
 
 /**

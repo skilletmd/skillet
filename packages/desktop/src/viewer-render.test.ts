@@ -1,3 +1,8 @@
+// @vitest-environment jsdom
+// DOMPurify 3.4.x mis-sanitizes inside happy-dom (3.4.0 is the last release
+// that works there: headings lose their tags, <script> and javascript: hrefs
+// survive), so this file runs under jsdom. The rest of the desktop suite stays
+// on happy-dom. The real viewer runs in the Tauri webview, a real browser.
 import { describe, it, expect } from 'vitest'
 import {
   renderMarkdownToSafeHtml,
@@ -32,9 +37,7 @@ describe('renderMarkdownToSafeHtml (AE5 — markdown → sanitized HTML)', () =>
   })
 
   it('strips a script tag injected in the markdown', () => {
-    // A raw <script> never survives sanitization. (In the happy-dom test env
-    // DOMPurify empties the whole string here; the real WebKit/Chromium webview
-    // keeps the sibling content — either way, no <script> reaches innerHTML.)
+    // A raw <script> never survives sanitization; the sibling content does.
     const html = renderMarkdownToSafeHtml('ok\n\n<script>alert(1)</script>')
     expect(html).not.toContain('<script')
   })

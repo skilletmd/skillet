@@ -1,7 +1,7 @@
 {
   "name": "@skillet/registry",
   "version": "0.1.0",
-  "description": "Skillet registry backend \u2014 versioning, kits, profiles, ETag/304 sync",
+  "description": "Skillet registry backend — versioning, kits, profiles, ETag/304 sync",
   "type": "module",
   "engines": {
     "node": ">=24"
@@ -36,24 +36,24 @@
     "backfill:suggestions": "tsx --env-file-if-exists=.env scripts/backfill-suggestions.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1069.0",
-    "@fastify/cors": "^11.0.0",
-    "@fastify/helmet": "^13.0.0",
-    "@fastify/rate-limit": "^11.0.0",
-    "@prisma/client": "^6.19.0",
+    "@aws-sdk/client-s3": "^3.1169.0",
+    "@fastify/cors": "^11.4.3",
+    "@fastify/helmet": "^13.2.0",
+    "@fastify/rate-limit": "^11.2.2",
+    "@prisma/client": "^6.19.3",
     "@skillet/mcp": "workspace:*",
     "@skillet/protocol": "workspace:*",
-    "acorn": "^8.17.0",
+    "acorn": "^8.19.0",
     "acorn-walk": "^8.3.5",
-    "fastify": "^5.8.3",
+    "fastify": "^5.12.8",
     "gpt-tokenizer": "^3.4.0",
-    "prisma": "^6.19.0",
-    "typescript": "^5.4.0"
+    "prisma": "^6.19.3",
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
-    "fflate": "^0.8.2",
-    "tsx": "^4.11.0"
+    "@types/node": "^24.19.2",
+    "fflate": "^0.8.3",
+    "tsx": "^4.23.15"
   },
   "license": "Apache-2.0"
 }

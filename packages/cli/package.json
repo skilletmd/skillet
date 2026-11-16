@@ -20,14 +20,14 @@
     "directory": "packages/cli"
   },
   "dependencies": {
-    "@clack/prompts": "^1.6.0",
+    "@clack/prompts": "^1.9.0",
     "@skillet/adapters-claude-code": "workspace:*",
     "@skillet/adapters-codex": "workspace:*",
     "@skillet/adapters-cursor": "workspace:*",
     "@skillet/adapters-devin": "workspace:*",
     "@skillet/adapters-hermes": "workspace:*",
-    "@skillet/adapters-opencode": "workspace:*",
     "@skillet/adapters-openclaw": "workspace:*",
+    "@skillet/adapters-opencode": "workspace:*",
     "@skillet/adapters-windsurf": "workspace:*",
     "@skillet/core": "workspace:*",
     "@skillet/mcp": "workspace:*",
@@ -45,11 +45,11 @@
     "postpublish": "node scripts/publish-restore.mjs"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "esbuild": "^0.25.0",
-    "fflate": "^0.8.2",
-    "tsx": "^4.19.0",
-    "typescript": "^5.5.0"
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.25.12",
+    "fflate": "^0.8.3",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
   },
   "engines": {
     "node": ">=22.0.0"
