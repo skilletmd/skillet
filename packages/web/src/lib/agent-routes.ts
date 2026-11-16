@@ -84,6 +84,8 @@ export const KNOWN_TOP_LEVEL_SEGMENTS: ReadonlySet<string> = new Set([
   'moderation',
   'news',
   'notifications',
+  // The packs preview: premade sets of job slots.
+  'packs',
   'privacy',
   'search',
   'settings',
@@ -246,6 +248,13 @@ export function classifyRoute(pathname: string): RouteVerdict {
   // here for the same PPR reason as /news topics.
   if (first === 'arena') {
     if (segments.length === 1) return { kind: 'known' }
+    // /arena/slots previews a kit as job slots; /arena/slots/before is today's
+    // kit page with the same kit, for a side-by-side.
+    if (second === 'slots') {
+      if (segments.length === 2) return { kind: 'known' }
+      if (segments.length === 3 && third === 'before') return { kind: 'known' }
+      return { kind: 'unknown' }
+    }
     if (!ARENA_ROUND_SLUGS.has(second!)) return { kind: 'unknown' }
     if (segments.length === 2) return { kind: 'known' }
     if (segments.length === 3 && third === 'vote') return { kind: 'known' }

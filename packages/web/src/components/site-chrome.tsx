@@ -6,7 +6,9 @@ import { SiteNav } from '@/components/site-nav'
 
 // Routes that own their full chrome (custom nav + footer) and must not render
 // the shared SiteNav/SiteFooter.
-const BARE_PREFIXES: string[] = []
+// Routes that draw their own page, with no site header or footer. /packs is the
+// packs preview, a fresh surface of its own.
+const BARE_PREFIXES: string[] = ['/packs']
 
 // `footer` is rendered on the server and passed in as a slot: SiteFooter pulls in
 // the async GithubStarBadge (a server component), which can't live in this client

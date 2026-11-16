@@ -1,0 +1,76 @@
+/* The kit map's moving parts: a job landing in its slot, its square lighting
+   up in the strip, and the bar that rises once there is something to add.
+   Transform and opacity only, each beat under 300ms; a fill staggers them
+   through --d so the map lights up in reading order. Layered so Tailwind's
+   utilities still win. */
+
+@layer components {
+  .land {
+    animation: land 280ms var(--ease-out) backwards;
+    animation-delay: var(--d, 0ms);
+  }
+
+  .cellOn {
+    animation: cellOn 260ms var(--ease-out) backwards;
+    animation-delay: var(--d, 0ms);
+  }
+
+  .barIn {
+    animation: barIn 240ms var(--ease-out) backwards;
+  }
+
+  /* A section's name is a button stretched over the card, so the focus ring
+     goes round the whole card. */
+  .section {
+    transition: scale 160ms var(--ease-out);
+  }
+
+  .section:has(button:focus-visible) {
+    outline: 2px solid var(--p-ink);
+    outline-offset: 3px;
+  }
+
+  .section:has(button:active) {
+    scale: 0.98;
+  }
+
+  @keyframes land {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+  }
+
+  @keyframes cellOn {
+    from {
+      opacity: 0;
+      transform: scale(0.5);
+    }
+  }
+
+  @keyframes barIn {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .land,
+    .cellOn,
+    .barIn {
+      animation: fadeIn 200ms ease backwards;
+      animation-delay: 0ms;
+    }
+
+    .section:has(button:active) {
+      scale: 1;
+    }
+  }
+}
