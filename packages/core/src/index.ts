@@ -57,6 +57,31 @@ export {
   type DiscoveryReport,
   type ImportDiscoveredResult,
 } from "./commands/discover.js";
+// The kit map's read-only scan (plan U3): every skill on the computer, sorted
+// by who owns its folder, with nothing written and nothing sent.
+export {
+  scanMap,
+  type MapScanOptions,
+  type MapScanResult,
+  type MapScanEntry,
+  type MapScanLocation,
+  type MapScannedFolder,
+  type MapFlags,
+  type MapBackupBlock,
+  type MapMergeBlock,
+} from "./map/scan.js";
+export {
+  MAP_SOURCE_RULES,
+  type MapSource,
+  type MapRemove,
+  type MapSourceRule,
+  type MapOwner,
+  type MapPluginOwner,
+  type MapOrganizationOwner,
+  type MapAppOwner,
+  type MapUnreadable,
+  type MapUnreadableReason,
+} from "./map/folder-rules.js";
 export * from "./commands/sync.js";
 // Curated customized-skills surface: only what the CLI/desktop actually
 // consume. Internals (moveDir, ledgerStamp, backupSkillVersion, drift
