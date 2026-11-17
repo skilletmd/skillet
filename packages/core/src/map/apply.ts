@@ -22,7 +22,8 @@
  *      or own published skill changes no file: the result names what to turn
  *      off. Each one is acknowledged.
  *   5. Fill each pick through the normal kit add. Moves change assignments
- *      only. Merges stay waiting for the merge step; a replace too.
+ *      only. Merges stay waiting for the merge step (./merge-run.ts), which
+ *      runs once this one is done; a replace too.
  *   6. Save the map with the version read, re-reading on a conflict.
  *
  * Every step can run again: backups go by hash, the trash moves only folders
@@ -47,6 +48,7 @@ import {
   type KitMapDocument,
   type KitMapDraft,
   type KitMapEntry,
+  type KitMapMergeSource,
   type KitMapPendingChange,
   type KitMapSaveCounts,
   type KitMapSavedEntry,
@@ -66,7 +68,10 @@ export interface MapBackupBody {
   name: string;
   description: string;
   tools: string[];
-  origin: "scan";
+  /** `scan`: a skill of the person's own, as Save found it. `merge`: a merged skill this computer wrote (./merge-run.ts). */
+  origin: "scan" | "merge";
+  /** A merge's sources, one per original: named when public, counted when private. */
+  sources?: KitMapMergeSource[];
 }
 
 /** `final`: retrying won't help (a secret, a quota, a size cap); otherwise the next run tries again. */

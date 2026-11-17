@@ -45,6 +45,7 @@ import { registerConnectPairRoutes } from './routes/connect-pair.js'
 import { registerMapSessionRoutes } from './routes/map-sessions.js'
 import { registerBackupRoutes } from './routes/backups.js'
 import { registerKitMapRoutes } from './routes/kit-maps.js'
+import { registerMapMergeRoutes } from './routes/map-merges.js'
 import { registerMcpRoutes } from './routes/mcp.js'
 import { registerConnectedRepoRoutes } from './routes/connected-repos.js'
 import { registerHttpSecurity } from './http-security.js'
@@ -436,6 +437,7 @@ export async function buildServer(opts: ServerOptions = {}): Promise<{
   registerMapSessionRoutes(app, opts.usePrismaAuth && prisma ? prisma : undefined)
   registerBackupRoutes(app, blobStore, opts.usePrismaAuth && prisma ? prisma : undefined)
   registerKitMapRoutes(app, opts.usePrismaAuth && prisma ? prisma : undefined)
+  registerMapMergeRoutes(app, opts.usePrismaAuth && prisma ? prisma : undefined)
   // Personal MCP link (mint / fetch / regenerate) + the hosted MCP serving
   // endpoint hardcode `/api/v1/...`.
   registerMcpRoutes(app, db, blobStore, opts.usePrismaAuth && prisma ? prisma : undefined)

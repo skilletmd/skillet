@@ -954,6 +954,7 @@ model users {
   kit_maps                                                    kit_maps?
   kit_subscriptions                                           kit_subscriptions[]
   machine_pair_codes                                          machine_pair_codes[]
+  map_merges                                                  map_merges[]
   mcp_links                                                   mcp_links[]
   organization_invites                                        organization_invites[]
   organization_members_organization_members_invited_byTousers organization_members[]       @relation("organization_members_invited_byTousers")
@@ -1145,4 +1146,34 @@ model kit_map_changes {
 
   @@index([user_id, acknowledged_at], map: "idx_kit_map_changes_user_open")
   @@index([device_id, acknowledged_at], map: "idx_kit_map_changes_device_open")
+}
+
+/// The merges a computer writes for the kit map (KTD12, KTD13): one per merge
+/// change, keyed by that change's id, with its job and originals copied from
+/// it. The computer the change targets writes the merge with the person's own
+/// AI tool and reports here: writing, ready (with the brief and one blind round
+/// per original), failed with its reason, or out of date. The pick and the
+/// replace move it on, and no report overwrites a picked or applied merge. The
+/// merged skill itself is a private backup (origin merge) holding the sources
+/// it credits (KTD14). `device_id` has no foreign key, like kit_map_changes.
+model map_merges {
+  id          String  @id
+  user_id     String
+  device_id   String?
+  job         String
+  /// JSON array of the originals' content hashes.
+  keys_json   String  @db.Text
+  /// `writing`, `ready`, `failed`, `picked`, `applied` or `out-of-date`.
+  status      String
+  reason      String?
+  merged_hash String?
+  brief       String? @db.Text
+  /// JSON array of the blind rounds, `{ key, merged, original }` each.
+  rounds_json String? @db.LongText
+  /// The merge change's own creation time, so merges list in the order they were drafted.
+  created_at  Int
+  updated_at  Int
+  users       users   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, created_at], map: "idx_map_merges_user_created")
 }

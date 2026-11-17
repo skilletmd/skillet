@@ -1,7 +1,7 @@
 /**
  * The kit map's shapes: what a scan found, the fixes drafted on it, the saved
- * map, the changes that wait for a computer, and the messages between the
- * three windows that show it.
+ * map, the changes that wait for a computer, the merges a computer writes for
+ * the blind pick, and the messages between the three windows that show it.
  *
  * `skillet map` serves a page on the person's computer (the loopback page),
  * which frames the map from skillet.md (the frame), and Save opens a
@@ -448,6 +448,105 @@ export interface KitMapPendingUnknown extends KitMapPendingRecord {
 }
 
 export type KitMapPendingChange = KitMapPendingRemove | KitMapPendingMerge | KitMapPendingReplace | KitMapPendingUnknown;
+
+// ---------------------------------------------------------------------------
+// Merges
+// ---------------------------------------------------------------------------
+
+/**
+ * Where a drafted merge is. The computer that holds the merge change writes it
+ * with the person's own AI tool and stores it privately with its blind rounds;
+ * the person picks on skillet.md; a replace puts it in place.
+ * - `waiting`: saved, and waiting for the computer to write it.
+ * - `writing`: the computer is writing it.
+ * - `ready`: written, with one blind round per original: ready to pick.
+ * - `failed`: couldn't be written, and `reason` says why. Nothing was stored.
+ * - `picked`: the person picked it; waiting for the computer to put it in place.
+ * - `applied`: in place of its originals.
+ * - `out-of-date`: an original changed after the merge was drafted or written.
+ */
+export type KitMapMergeStatus = 'waiting' | 'writing' | 'ready' | 'failed' | 'picked' | 'applied' | 'out-of-date';
+
+export const KIT_MAP_MERGE_STATUSES: readonly KitMapMergeStatus[] = Object.freeze([
+  'waiting',
+  'writing',
+  'ready',
+  'failed',
+  'picked',
+  'applied',
+  'out-of-date',
+]);
+
+/** The most skills one merge is written from: each is one blind round. */
+export const KIT_MAP_MERGE_MAX_SOURCES = 12;
+/** The brief every round runs, a request as a person would type it. */
+export const KIT_MAP_MERGE_BRIEF_MAX = 1_000;
+/** One sample's text. */
+export const KIT_MAP_MERGE_SAMPLE_MAX = 64 * 1024;
+
+/** A source a merged skill credits: a public skill by its ref and name, or a private one, counted and never shown. */
+export type KitMapMergeSource = { key: string; ref: string; name: string } | { key: string; private: true };
+
+/** One blind round: the brief, written once by the merged skill (fresh for this round) and once by one original. */
+export interface KitMapMergeRound {
+  /** The original this round compares, by content hash. */
+  key: string;
+  /** What the merged skill wrote. */
+  merged: string;
+  /** What the original wrote. */
+  original: string;
+}
+
+/** A merge as the account keeps it. Like every kit map record, it never holds a path. */
+export interface KitMapMerge {
+  /** The merge change's id. */
+  id: string;
+  /** The computer that writes it, or null until a computer claims it. */
+  device: string | null;
+  job: JobId;
+  /** The originals, by the content hashes the merge was drafted on. */
+  keys: string[];
+  status: KitMapMergeStatus;
+  /** A short code: why it couldn't be written, or why it's out of date. */
+  reason?: string;
+  /** The merged skill's content hash, once written. Its private backup holds the skill. */
+  merged?: string;
+  /** The one brief every round ran. */
+  brief?: string;
+  /** One round per original. */
+  rounds?: KitMapMergeRound[];
+  /** Who the merged skill credits, one per original, from its backup. */
+  sources?: KitMapMergeSource[];
+  /** When it last changed, in epoch seconds. */
+  updatedAt: number;
+}
+
+/** What the computer writing a merge reports. A pick, and putting a merge in place, are never a computer's to report. */
+export type KitMapMergeReport =
+  | { status: 'writing' }
+  | { status: 'ready'; merged: string; brief: string; rounds: KitMapMergeRound[] }
+  | { status: 'failed'; reason: string }
+  | { status: 'out-of-date'; reason?: string };
+
+export interface KitMapMergeCredits {
+  /** The public sources, to name with their makers and links. */
+  linked: Array<{ key: string; ref: string; name: string }>;
+  privateCount: number;
+  /** "1 private skill", "2 private skills", or null when every source is public. */
+  privateLabel: string | null;
+}
+
+/** How a merged skill lists its sources (R23): the public ones by name, the private ones as a count. */
+export function kitMapMergeCredits(sources: readonly KitMapMergeSource[]): KitMapMergeCredits {
+  const linked: KitMapMergeCredits['linked'] = [];
+  let privateCount = 0;
+  for (const source of sources) {
+    if ('private' in source) privateCount++;
+    else linked.push(source);
+  }
+  const privateLabel = privateCount === 0 ? null : `${privateCount} private skill${privateCount === 1 ? '' : 's'}`;
+  return { linked, privateCount, privateLabel };
+}
 
 // ---------------------------------------------------------------------------
 // Bridge messages
@@ -920,6 +1019,140 @@ export function parseKitMapPendingChange(value: unknown): KitMapPendingChange | 
     };
     return attempt(() => readPendingBody(rec, record)) ?? { ...record, kind: 'unknown', rawKind: kind };
   });
+}
+
+/** Free text a model wrote: not blank, within `max`, and no control character but tab and line breaks. */
+function writtenText(value: unknown, max: number): string {
+  if (typeof value !== 'string' || value.length > max || value.trim() === '') invalid();
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if ((code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) || code === 0x7f) invalid();
+  }
+  return value;
+}
+
+function mergeKeys(value: unknown): string[] {
+  const keys = distinctHashes(value, 2);
+  if (keys.length > KIT_MAP_MERGE_MAX_SOURCES) invalid();
+  return keys;
+}
+
+/** Exactly one item per original, naming each original once. */
+function onePerKey<T extends { key: string }>(items: readonly T[], keys: readonly string[]): T[] {
+  if (items.length !== keys.length) invalid();
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (!keys.includes(item.key) || seen.has(item.key)) invalid();
+    seen.add(item.key);
+  }
+  return [...items];
+}
+
+function readRounds(value: unknown, keys: readonly string[]): KitMapMergeRound[] {
+  const rounds = list(value, KIT_MAP_MERGE_MAX_SOURCES).map((item) => {
+    const rec = fields(item, ['key', 'merged', 'original']);
+    return {
+      key: matching(rec.key, HASH_RE),
+      merged: writtenText(rec.merged, KIT_MAP_MERGE_SAMPLE_MAX),
+      original: writtenText(rec.original, KIT_MAP_MERGE_SAMPLE_MAX),
+    };
+  });
+  return onePerKey(rounds, keys);
+}
+
+function readMergeSource(value: unknown): KitMapMergeSource {
+  if (isObject(value) && value.private === true) {
+    return { key: matching(fields(value, ['key', 'private']).key, HASH_RE), private: true };
+  }
+  const rec = fields(value, ['key', 'ref', 'name']);
+  return { key: matching(rec.key, HASH_RE), ref: wireRef(rec.ref), name: displayName(rec.name) };
+}
+
+function mergedHash(value: unknown, keys: readonly string[]): string {
+  const merged = matching(value, HASH_RE);
+  if (keys.includes(merged)) invalid();
+  return merged;
+}
+
+/** Statuses a written merge is in, and the ones it can be in once it's out of date. */
+const WRITTEN: ReadonlySet<KitMapMergeStatus> = new Set<KitMapMergeStatus>(['ready', 'picked', 'applied']);
+
+function readMerge(value: unknown): KitMapMerge {
+  const rec = fields(value, ['id', 'device', 'job', 'keys', 'status', 'reason', 'merged', 'brief', 'rounds', 'sources', 'updatedAt']);
+  const keys = mergeKeys(rec.keys);
+  const status = oneOf(rec.status, KIT_MAP_MERGE_STATUSES);
+  const merge: KitMapMerge = {
+    id: matching(rec.id, ID_RE),
+    device: rec.device === null ? null : matching(rec.device, ID_RE),
+    job: jobId(rec.job),
+    keys,
+    status,
+    updatedAt: count(rec.updatedAt),
+  };
+  // Why it failed, or why it's out of date; a failure always says.
+  if (status === 'failed' || status === 'out-of-date') {
+    if (rec.reason !== undefined || status === 'failed') merge.reason = matching(rec.reason, CODE_RE);
+  } else if (rec.reason !== undefined) invalid();
+  // A merged skill exists once written, and may outlive its originals' change.
+  if (WRITTEN.has(status) || (status === 'out-of-date' && rec.merged !== undefined)) {
+    merge.merged = mergedHash(rec.merged, keys);
+  } else if (rec.merged !== undefined) invalid();
+  const hasRounds = rec.rounds !== undefined || rec.brief !== undefined;
+  if (hasRounds) {
+    if (merge.merged === undefined) invalid();
+    merge.brief = writtenText(rec.brief, KIT_MAP_MERGE_BRIEF_MAX);
+    merge.rounds = readRounds(rec.rounds, keys);
+  }
+  if (rec.sources !== undefined) {
+    if (merge.merged === undefined) invalid();
+    merge.sources = onePerKey(list(rec.sources, KIT_MAP_MERGE_MAX_SOURCES).map(readMergeSource), keys);
+  }
+  return merge;
+}
+
+/**
+ * A merge record, or null when it is malformed or holds a field it shouldn't.
+ * A merged skill comes only with a written merge (or one out of date since),
+ * its rounds and sources only beside it, and both name each original once.
+ */
+export function parseKitMapMerge(value: unknown): KitMapMerge | null {
+  return attempt(() => readMerge(value));
+}
+
+function readMergeReport(value: unknown, keys: readonly string[]): KitMapMergeReport {
+  switch (isObject(value) ? value.status : undefined) {
+    case 'writing':
+      fields(value, ['status']);
+      return { status: 'writing' };
+    case 'ready': {
+      const rec = fields(value, ['status', 'merged', 'brief', 'rounds']);
+      return {
+        status: 'ready',
+        merged: mergedHash(rec.merged, keys),
+        brief: writtenText(rec.brief, KIT_MAP_MERGE_BRIEF_MAX),
+        rounds: readRounds(rec.rounds, keys),
+      };
+    }
+    case 'failed': {
+      const rec = fields(value, ['status', 'reason']);
+      return { status: 'failed', reason: matching(rec.reason, CODE_RE) };
+    }
+    case 'out-of-date': {
+      const rec = fields(value, ['status', 'reason']);
+      return rec.reason === undefined ? { status: 'out-of-date' } : { status: 'out-of-date', reason: matching(rec.reason, CODE_RE) };
+    }
+    default:
+      return invalid();
+  }
+}
+
+/**
+ * What the computer writing a merge reports, checked against the merge
+ * change's own keys (the originals come from the change, never the report), or
+ * null. `ready` carries one round per original.
+ */
+export function parseKitMapMergeReport(value: unknown, keys: readonly string[]): KitMapMergeReport | null {
+  return attempt(() => readMergeReport(value, keys));
 }
 
 function readCounts(value: unknown): KitMapSaveCounts {

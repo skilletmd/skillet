@@ -12,12 +12,19 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  KIT_MAP_MERGE_BRIEF_MAX,
+  KIT_MAP_MERGE_MAX_SOURCES,
+  KIT_MAP_MERGE_SAMPLE_MAX,
+  KIT_MAP_MERGE_STATUSES,
   KIT_MAP_VERSION,
   backsUp,
   deriveKitMapChanges,
+  kitMapMergeCredits,
   kitMapMessageVersion,
   parseKitMapDocument,
   parseKitMapDrafts,
+  parseKitMapMerge,
+  parseKitMapMergeReport,
   parseKitMapMessage,
   parseKitMapPendingChange,
   parseKitMapScan,
@@ -25,6 +32,8 @@ import {
   type KitMapDocument,
   type KitMapDraft,
   type KitMapEntry,
+  type KitMapMerge,
+  type KitMapMergeSource,
   type KitMapMessage,
   type KitMapScan,
 } from '../src/kit-map.js';
@@ -541,6 +550,127 @@ describe('pending changes', () => {
     assert.equal(parseKitMapPendingChange({ ...base, version: '1' }), null);
     assert.equal(parseKitMapPendingChange({ ...base, kind: 3 }), null);
     assert.equal(parseKitMapPendingChange('remove'), null);
+  });
+});
+
+describe('merges', () => {
+  const MERGED = hash(50);
+  const rounds = [
+    { key: A, merged: 'Merged take on the brief.', original: "House Style's take." },
+    { key: B, merged: 'Another merged take, written fresh.', original: "Better Writing's take." },
+  ];
+  const written: KitMapMerge = {
+    id: 'pc-2',
+    device: 'dev-1',
+    job: 'writing.editing',
+    keys: [A, B],
+    status: 'ready',
+    merged: MERGED,
+    brief: 'Tighten this launch email so a stranger reads it in ten seconds.',
+    rounds,
+    sources: [
+      { key: A, ref: '@every/house-style', name: 'House Style' },
+      { key: B, private: true },
+    ],
+    updatedAt: 1_790_000_000,
+  };
+
+  it('pass at every status, through JSON, and list their statuses in order', () => {
+    assert.deepEqual(KIT_MAP_MERGE_STATUSES, ['waiting', 'writing', 'ready', 'failed', 'picked', 'applied', 'out-of-date']);
+    const records: KitMapMerge[] = [
+      { id: 'pc-1', device: null, job: 'writing.editing', keys: [A, B], status: 'waiting', updatedAt: 1 },
+      { id: 'pc-1', device: 'dev-1', job: 'writing.editing', keys: [A, B], status: 'writing', updatedAt: 2 },
+      { id: 'pc-1', device: 'dev-1', job: 'writing.editing', keys: [A, B], status: 'failed', reason: 'no-ai-tool', updatedAt: 3 },
+      written,
+      { ...written, status: 'picked' },
+      { ...written, status: 'applied', brief: undefined, rounds: undefined, sources: undefined },
+      { id: 'pc-1', device: 'dev-1', job: 'writing.editing', keys: [A, B], status: 'out-of-date', reason: 'sources-changed', updatedAt: 4 },
+      { ...written, status: 'out-of-date', reason: 'sources-changed' },
+    ];
+    for (const record of records) {
+      assert.deepEqual(parseKitMapMerge(roundTrip(record)), roundTrip(record), record.status);
+    }
+  });
+
+  it('hold a merged skill only once written, and their rounds only beside it, one per original', () => {
+    const base = { id: 'pc-1', device: 'dev-1', job: 'writing.editing', keys: [A, B], updatedAt: 1 };
+    assert.equal(parseKitMapMerge({ ...base, status: 'ready' }), null, 'ready names the merged skill');
+    assert.equal(parseKitMapMerge({ ...base, status: 'writing', merged: MERGED }), null, 'nothing is written while writing');
+    assert.equal(parseKitMapMerge({ ...base, status: 'waiting', rounds, brief: 'x' }), null, 'no rounds before a merged skill');
+    assert.equal(parseKitMapMerge({ ...written, brief: undefined }), null, 'rounds come with their brief');
+    assert.equal(parseKitMapMerge({ ...written, rounds: rounds.slice(0, 1) }), null, 'one round per original');
+    assert.equal(parseKitMapMerge({ ...written, rounds: [rounds[0], rounds[0]] }), null, 'each original once');
+    assert.equal(parseKitMapMerge({ ...written, rounds: [rounds[0], { ...rounds[1], key: C }] }), null, 'only its own originals');
+    assert.equal(parseKitMapMerge({ ...written, merged: A }), null, 'the merged skill is not one of its originals');
+    assert.equal(parseKitMapMerge({ ...written, rounds: [{ ...rounds[0], merged: '   ' }, rounds[1]] }), null, 'a blank sample');
+    const long = 'x'.repeat(KIT_MAP_MERGE_SAMPLE_MAX + 1);
+    assert.equal(parseKitMapMerge({ ...written, rounds: [{ ...rounds[0], original: long }, rounds[1]] }), null, 'a sample past the cap');
+    assert.equal(parseKitMapMerge({ ...written, brief: 'b'.repeat(KIT_MAP_MERGE_BRIEF_MAX + 1) }), null, 'a brief past the cap');
+    assert.equal(parseKitMapMerge({ ...written, brief: 'one\u0007two' }), null, 'a control character in the brief');
+    assert.ok(parseKitMapMerge({ ...written, rounds: [{ ...rounds[0], merged: 'Line one.\n\n\tLine two.' }, rounds[1]] }), 'lines and tabs are text');
+  });
+
+  it('carry a reason only when one fits, and refuse anything else', () => {
+    const base = { id: 'pc-1', device: 'dev-1', job: 'writing.editing', keys: [A, B], updatedAt: 1 };
+    assert.equal(parseKitMapMerge({ ...base, status: 'failed' }), null, 'a failure says why');
+    assert.equal(parseKitMapMerge({ ...base, status: 'failed', reason: 'No AI tool' }), null, 'a reason is a short code');
+    assert.equal(parseKitMapMerge({ ...written, reason: 'no-ai-tool' }), null, 'a ready merge has no reason');
+    assert.equal(parseKitMapMerge({ ...base, status: 'merging' }), null, 'an unknown status');
+    assert.equal(parseKitMapMerge({ ...base, status: 'waiting', keys: [A] }), null, 'a merge of one');
+    assert.equal(parseKitMapMerge({ ...base, status: 'waiting', job: 'writing.nope' }), null, 'an unknown job');
+    const many = Array.from({ length: KIT_MAP_MERGE_MAX_SOURCES + 1 }, (_, i) => hash(200 + i));
+    assert.equal(parseKitMapMerge({ ...base, status: 'waiting', keys: many }), null, 'past the cap on sources');
+    assert.equal(parseKitMapMerge({ ...base, status: 'waiting', path: '/Users/test-machine/.claude/skills/x' }), null, 'a path');
+    assert.equal(parseKitMapMerge({ ...base, status: 'waiting', updatedAt: -1 }), null, 'a time');
+  });
+
+  it('credit each original once: a public one by ref and name, a private one by hash alone', () => {
+    const bad: unknown[] = [
+      [{ key: A, ref: '@every/house-style', name: 'House Style' }],
+      [{ key: A, private: true }, { key: A, private: true }],
+      [{ key: A, ref: 'every/house-style', name: 'House Style' }, { key: B, private: true }],
+      [{ key: A, ref: '@every/house-style', name: 'House Style', page: 'https://skillet.md/every/house-style' }, { key: B, private: true }],
+      [{ key: A, private: true, name: 'Hidden' }, { key: B, private: true }],
+      [{ key: C, private: true }, { key: B, private: true }],
+    ];
+    for (const sources of bad) {
+      assert.equal(parseKitMapMerge({ ...written, sources }), null, JSON.stringify(sources));
+    }
+  });
+
+  it('AE5: name the public sources and count the private ones', () => {
+    const sources: KitMapMergeSource[] = [
+      { key: A, ref: '@every/house-style', name: 'House Style' },
+      { key: B, ref: '@maker-one/tidy-notes', name: 'tidy-notes' },
+      { key: C, private: true },
+    ];
+    const credits = kitMapMergeCredits(sources);
+    assert.deepEqual(credits.linked, [sources[0], sources[1]]);
+    assert.equal(credits.privateCount, 1);
+    assert.equal(credits.privateLabel, '1 private skill');
+    assert.equal(kitMapMergeCredits([{ key: A, private: true }, { key: B, private: true }]).privateLabel, '2 private skills');
+    assert.equal(kitMapMergeCredits([sources[0]!]).privateLabel, null);
+  });
+
+  it("take a computer's report: writing, ready with one round per original, failed with why, or out of date", () => {
+    const keys = [A, B];
+    assert.deepEqual(parseKitMapMergeReport({ status: 'writing' }, keys), { status: 'writing' });
+    const ready = { status: 'ready', merged: MERGED, brief: written.brief, rounds };
+    assert.deepEqual(parseKitMapMergeReport(roundTrip(ready), keys), ready);
+    assert.deepEqual(parseKitMapMergeReport({ status: 'failed', reason: 'tool-call' }, keys), { status: 'failed', reason: 'tool-call' });
+    assert.deepEqual(parseKitMapMergeReport({ status: 'out-of-date' }, keys), { status: 'out-of-date' });
+    assert.deepEqual(parseKitMapMergeReport({ status: 'out-of-date', reason: 'sources-changed' }, keys), {
+      status: 'out-of-date',
+      reason: 'sources-changed',
+    });
+
+    assert.equal(parseKitMapMergeReport({ status: 'failed' }, keys), null, 'a failure says why');
+    assert.equal(parseKitMapMergeReport({ status: 'picked' }, keys), null, 'a pick is the person’s, never a computer’s');
+    assert.equal(parseKitMapMergeReport({ status: 'applied' }, keys), null, 'so is putting it in place, through a replace');
+    assert.equal(parseKitMapMergeReport({ ...ready, rounds: rounds.slice(1) }, keys), null, 'one round per original');
+    assert.equal(parseKitMapMergeReport({ ...ready, merged: B }, keys), null, 'an original is not the merge');
+    assert.equal(parseKitMapMergeReport({ ...ready, keys }, keys), null, 'the originals come from the change, not the report');
+    assert.equal(parseKitMapMergeReport({ status: 'writing', merged: MERGED }, keys), null, 'nothing extra while writing');
   });
 });
 

@@ -17,8 +17,15 @@
  * ends the run with a failure, and the next `skillet map` (or the app's
  * `skillet map --apply`) finishes what the account still holds.
  *
- * The registry only ever sees hashes, names and jobs: no path leaves this
- * computer, and the proof never goes to the registry.
+ * Once Save is done, still under the lock, core's runMapMerges writes the
+ * merges waiting for this computer with the person's own AI tool (U14, KTD12),
+ * and the CLI says so first, because they take minutes. A merge that can't be
+ * written waits with its reason; one the CLI exits before writing is written
+ * by the app's `skillet map --apply` or the next Save.
+ *
+ * The registry only ever sees hashes, names and jobs, plus a merge's own text
+ * and samples: no path leaves this computer, and the proof never goes to the
+ * registry.
  */
 import { createHash, randomBytes } from "node:crypto";
 import { Writable } from "node:stream";
@@ -29,11 +36,13 @@ import {
   add,
   authConnectFreshPair,
   defaultMachineLabel,
+  findMergeWriter,
   loadSessionToken,
   materializeSkills,
   readDeviceFile,
   readState,
   runMapApply,
+  runMapMerges,
   SignatureError,
   type Adapter,
   type MapApplyClient,
@@ -42,18 +51,26 @@ import {
   type MapBackupPut,
   type MapFillResult,
   type MapKitRemoval,
+  type MapMergeClient,
+  type MapMergeOutcome,
+  type MapMergeRunResult,
   type MapNotBackedUp,
   type MapScanResult,
+  type MergeWriter,
 } from "@skillet/core";
+import { jobById } from "@skillet/protocol/jobs";
 import {
   parseKitMapDocument,
+  parseKitMapMerge,
   parseKitMapPendingChange,
   type KitMapDocument,
   type KitMapDraft,
   type KitMapEntry,
+  type KitMapMerge,
   type KitMapPendingChange,
   type KitMapSaveCounts,
 } from "@skillet/protocol/kit-map";
+import { tryToSkillId } from "@skillet/protocol/skill-id";
 import { ADDITIONAL_ADAPTERS, BASELINE_GLOBAL_ADAPTERS } from "../cli-context.js";
 import { fail, ok } from "../cli-colors.js";
 import type { MapFrameLink, MapSaveHandler } from "./loopback-server.js";
@@ -286,10 +303,56 @@ interface ClientDeps {
   fill: (ref: string) => Promise<MapFillResult>;
 }
 
+/** The source-maker lookup takes this many hashes a call. */
+const LOOKUP_BATCH = 200;
+const NAME_MAX = 200;
+
+/** A ref in its canonical `@owner/slug` form, as a backup's sources must carry it. */
+function canonicalRef(value: unknown): string | null {
+  if (typeof value !== "string" || !value.startsWith("@")) return null;
+  const id = tryToSkillId(value);
+  return id !== null && `@${id.replace(":", "/")}` === value ? value : null;
+}
+
+/** A name a source is credited by: one line, never blank. */
+function creditName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const name = safeText(value, NAME_MAX);
+  return name === "" ? null : name;
+}
+
 /** Core's view of the registry, as this computer's device. */
-function applyClient({ wire, token, fill }: ClientDeps): MapApplyClient {
+function applyClient({ wire, token, fill }: ClientDeps): MapApplyClient & MapMergeClient {
   const device = new Registry(wire, token);
   return {
+    async listMerges() {
+      const answer = await device.send("GET", "/map-merges");
+      if (answer.status !== 200 || !isRecord(answer.body) || !Array.isArray(answer.body.merges)) {
+        throw unexpected("merges", answer);
+      }
+      return (answer.body.merges as unknown[]).map((item) => parseKitMapMerge(item)).filter((m): m is KitMapMerge => m !== null);
+    },
+    async reportMerge(id, report) {
+      const answer = await device.send("PUT", `/map-merges/${encodeURIComponent(id)}`, report);
+      if (answer.status !== 200) throw unexpected("report a merge", answer);
+    },
+    async lookupSources(keys) {
+      const found = new Map<string, { ref: string; name: string }>();
+      for (let i = 0; i < keys.length; i += LOOKUP_BATCH) {
+        const asked = keys.slice(i, i + LOOKUP_BATCH);
+        const answer = await device.send("POST", "/backups/sources", { keys: asked });
+        if (answer.status !== 200 || !isRecord(answer.body) || !Array.isArray(answer.body.sources)) {
+          throw unexpected("source lookup", answer);
+        }
+        for (const row of answer.body.sources as unknown[]) {
+          if (!isRecord(row) || typeof row.key !== "string" || !asked.includes(row.key)) continue;
+          const ref = canonicalRef(row.ref);
+          const name = creditName(row.name);
+          if (ref !== null && name !== null) found.set(row.key, { ref, name });
+        }
+      }
+      return found;
+    },
     async listChanges() {
       const answer = await device.send("GET", "/kit-map/changes");
       if (answer.status !== 200) throw unexpected("waiting changes", answer);
@@ -407,13 +470,64 @@ function leftText(left: KitMapSaveCounts): string {
     left.backups > 0 ? `back up ${plural(left.backups, "skill")}` : null,
     left.removals > 0 ? `remove ${plural(left.removals, "skill")}` : null,
     left.fills > 0 ? `add ${plural(left.fills, "pick")}` : null,
-    left.merges > 0 ? `start ${plural(left.merges, "merge")}` : null,
+    left.merges > 0 ? `write ${plural(left.merges, "merge")}` : null,
   ].filter((part): part is string => part !== null);
   return parts.join(", ");
 }
 
+/** Why a merge waits, given the AI tool's name (or "the AI tool" when none was found). */
+const MERGE_WAITS: Readonly<Record<string, (tool: string) => string>> = {
+  "no-ai-tool": () => "this machine has no Claude Code or Codex to write it with",
+  "tool-call": (tool) => `${tool} tried to use a tool, so Skillet stopped it`,
+  timeout: (tool) => `${tool} took too long`,
+  "too-large": (tool) => `${tool}'s answer was too long`,
+  "writer-failed": (tool) => `${tool} stopped with an error`,
+  "bad-output": (tool) => `${tool} didn't answer with a skill`,
+  "too-old": (tool) => `${tool} needs an update to write merges`,
+  "registry-unreachable": () => "Skillet couldn't be reached",
+  unreadable: () => "Skillet couldn't read one of its skills",
+  "backup-quota": () => "your account holds as many backups as it can",
+  "backup-secret": () => "the merged skill looks like it holds a secret",
+  "not-backed-up": () => "Skillet couldn't back it up",
+};
+
+/** Why a merge can't be written as it was drafted. */
+const MERGE_DROPS: Readonly<Record<string, string>> = {
+  "sources-changed": "one of its skills changed after you drafted it. Draft it again in the map",
+  "not-mergeable": "one of its skills can't be merged",
+  "too-many-sources": "a merge takes at most 12 skills",
+  "sources-too-large": "its skills are too long to merge",
+};
+
+/** One merge's outcome, for the terminal. Never a path. */
+export function mergeLine(outcome: MapMergeOutcome, writer: string | null): string {
+  const tool = writer ?? "the AI tool";
+  const merge = `the ${jobById(outcome.job as string)?.name ?? "drafted"} merge`;
+  if (outcome.result === "written") {
+    const sources = (outcome.linked ?? 0) + (outcome.private ?? 0);
+    return ok(`Wrote ${merge}. Your ${plural(sources, "skill")} stay until it wins a blind pick on skillet.md.`);
+  }
+  if (outcome.result === "dropped") {
+    return `Dropped ${merge}: ${MERGE_DROPS[outcome.reason ?? ""] ?? "it can't be written as drafted"}.`;
+  }
+  if (outcome.reason === "stopped") return `Stopped writing ${merge}. It waits for the next Save.`;
+  const why = MERGE_WAITS[outcome.reason ?? ""]?.(tool) ?? "Skillet couldn't write it";
+  return fail(`Couldn't write ${merge}: ${why}. It waits for the next Save.`);
+}
+
+/** What the merge step did, one line per merge. */
+export function mergeLines(run: MapMergeRunResult): string[] {
+  return run.outcomes.map((outcome) => mergeLine(outcome, run.writer));
+}
+
+const writingLine = ({ merges, writer }: { merges: number; writer: string }): string =>
+  `Writing ${plural(merges, "merge")} with ${writer}. This can take a few minutes.`;
+
+/** What Save (or `--apply`) did, merges included once they ran. */
+export type MapSaveResult = MapApplyResult & { merges?: MapMergeRunResult };
+
 /** What Save did, for the terminal. Never a path. */
-export function saveSummary(result: MapApplyResult): string[] {
+export function saveSummary(result: MapSaveResult): string[] {
   const lines: string[] = [];
   const { counts } = result;
   if (counts.backups > 0) lines.push(`Backed up ${plural(counts.backups, "skill")} privately.`);
@@ -422,7 +536,9 @@ export function saveSummary(result: MapApplyResult): string[] {
     lines.push(`Removed ${plural(counts.removals, "skill")}.${restore}`);
   }
   if (counts.fills > 0) lines.push(`Added ${plural(counts.fills, "pick")}.`);
-  if (counts.merges > 0) lines.push(`${plural(counts.merges, "merge")} waiting to be written.`);
+  // A Save that's done says its merges as it writes them; one that stopped leaves them waiting.
+  if (result.merges) lines.push(...mergeLines(result.merges));
+  else if (counts.merges > 0 && result.result !== "applied") lines.push(`${plural(counts.merges, "merge")} waiting to be written.`);
   for (const kept of result.kept) {
     switch (kept.kind) {
       case "plugin":
@@ -526,7 +642,12 @@ export interface MapSaveFlowOptions {
   finishGraceMs?: number;
   /** Add a pick. Defaults to the normal kit add with this computer's device token. */
   fill?: (ref: string, token: string) => Promise<MapFillResult>;
+  /** Finds the AI tool that writes merges. Defaults to this computer's Claude Code, then Codex. */
+  mergeWriter?: () => Promise<MergeWriter | null>;
 }
+
+/** This computer's own AI tool, found on PATH and in the usual install folders. */
+const thisMachinesWriter = (): Promise<MergeWriter | null> => findMergeWriter();
 
 export interface MapSaveFlow {
   handler: MapSaveHandler;
@@ -708,13 +829,13 @@ export function createMapSaveFlow(opts: MapSaveFlowOptions): MapSaveFlow {
     }
 
     let result: MapApplyResult;
+    const wire = wireFor(link);
+    const client = applyClient({
+      wire,
+      token: connection.token,
+      fill: (ref) => (opts.fill ?? ((r, t) => kitAddFill(r, wire.registryUrl, t)))(ref, connection.token),
+    });
     try {
-      const wire = wireFor(link);
-      const client = applyClient({
-        wire,
-        token: connection.token,
-        fill: (ref) => (opts.fill ?? ((r, t) => kitAddFill(r, wire.registryUrl, t)))(ref, connection.token),
-      });
       result = await runMapApply({
         mode: "save",
         scan: await opts.rescan(),
@@ -728,21 +849,46 @@ export function createMapSaveFlow(opts: MapSaveFlowOptions): MapSaveFlow {
       });
     } catch {
       result = { ...emptyResult(), result: "failed", reason: "error" };
-    } finally {
-      await lock.release();
     }
     if (result.changed) changed = true;
     for (const line of saveSummary(result)) print(line);
     if (result.result !== "applied") {
+      await lock.release();
       const left = leftText(result.left);
       print(fail(`Save stopped partway.${left ? ` Left to do: ${left}.` : ""}`));
       await stoppedPartway(link, connection, result);
       return;
     }
-    await report(link, connection, result);
-    print(ok(connection.handle ? `Saved your map to @${connection.handle}.` : "Saved your map."));
-    link.status("done");
+    try {
+      await report(link, connection, result);
+      print(ok(connection.handle ? `Saved your map to @${connection.handle}.` : "Saved your map."));
+      link.status("done");
+      // Save is done; the merges it recorded, and any older ones, take minutes, so they come after.
+      await writeMerges(client, link, result.counts.merges > 0);
+    } finally {
+      await lock.release();
+    }
     await finish(link);
+  };
+
+  /** The merge step, under Save's lock, saying each merge as it lands (U14). */
+  const writeMerges = async (client: MapMergeClient, link: MapFrameLink, drafted: boolean): Promise<void> => {
+    let run: MapMergeRunResult;
+    try {
+      run = await runMapMerges({
+        scan: opts.rescan,
+        client,
+        writer: opts.mergeWriter ?? thisMachinesWriter,
+        onStart: (info) => print(writingLine(info)),
+        onOutcome: (outcome, writer) => print(mergeLine(outcome, writer)),
+        signal: link.signal,
+      });
+    } catch {
+      if (drafted) print(fail("Couldn't write the merges. They wait for the next Save."));
+      return;
+    }
+    if (run.changed) changed = true;
+    if (run.reason !== undefined && drafted) print(fail("Couldn't write the merges. They wait for the next Save."));
   };
 
   /**
@@ -788,14 +934,19 @@ export interface MapApplyOnlyOptions {
   fetchImpl?: typeof fetch;
   paceMs?: number;
   lockWaitMs?: number;
+  /** Finds the AI tool that writes waiting merges. Defaults to this computer's Claude Code, then Codex. */
+  mergeWriter?: () => Promise<MergeWriter | null>;
 }
 
-export type MapApplyOnlyResult = MapApplyResult | { result: "not-connected" } | { result: "locked" };
+export type MapApplyOnlyResult = MapSaveResult | { result: "not-connected" } | { result: "locked" };
 
 /**
  * Make this computer's waiting changes, with no frame and no new drafts: what
  * the app's sync runs, and what finishes a Save that stopped partway. Only a
- * connected computer has waiting changes.
+ * connected computer has waiting changes. Once they're made, the merges
+ * waiting for this computer are written, and the result counts them: `counts`
+ * the ones written, `left` the ones still waiting. A merge that waits doesn't
+ * fail the run, since the next one tries again.
  */
 export async function runMapApplyOnly(opts: MapApplyOnlyOptions): Promise<MapApplyOnlyResult> {
   const device = await readDeviceFile();
@@ -823,7 +974,25 @@ export async function runMapApplyOnly(opts: MapApplyOnlyOptions): Promise<MapApp
     } catch {
       return { ...emptyResult(), result: "failed", reason: "scan-failed" };
     }
-    return await runMapApply({ mode: "apply", scan, wire: opts.wire, client });
+    const applied = await runMapApply({ mode: "apply", scan, wire: opts.wire, client });
+    if (applied.result !== "applied") return applied;
+    // Removes and picks change what's on this computer; otherwise the scan still holds.
+    const moved = applied.counts.removals > 0 || applied.counts.fills > 0;
+    const merges = await runMapMerges({
+      scan: moved ? opts.rescan : scan,
+      client,
+      writer: opts.mergeWriter ?? thisMachinesWriter,
+      // Nobody pressed Save here, so a merge that just failed waits a day.
+      unattended: true,
+      ...(opts.print ? { onStart: (info: { merges: number; writer: string }) => opts.print!(writingLine(info)) } : {}),
+    });
+    return {
+      ...applied,
+      counts: { ...applied.counts, merges: merges.written },
+      left: { ...applied.left, merges: merges.waiting },
+      changed: applied.changed || merges.changed,
+      merges,
+    };
   } finally {
     await lock.release();
   }

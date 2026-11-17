@@ -118,6 +118,38 @@ export {
   type MapRefusedFill,
   type MapUnremoved,
 } from "./map/apply.js";
+// The merge step (plan U14): drafted merges written by the person's own AI
+// tool with no tools, stored privately with their blind rounds, and the record
+// of what this computer wrote.
+export {
+  runMapMerges,
+  isMergeableEntry,
+  mapMergeSources,
+  readMapMergeRecord,
+  readMapMergeRecords,
+  mapMergeRecordsDir,
+  MAP_MERGE_LIMITS,
+  type MapMergeClient,
+  type MapMergeLimits,
+  type MapMergeOutcome,
+  type MapMergeRecord,
+  type MapMergeRunOptions,
+  type MapMergeRunResult,
+} from "./map/merge-run.js";
+export {
+  MergeWriterError,
+  createToolMergeWriter,
+  findMergeTool,
+  findMergeWriter,
+  mergeToolSearchDirs,
+  type MergeSourceSkill,
+  type MergeTool,
+  type MergeToolId,
+  type MergeToolSearch,
+  type MergeWriter,
+  type MergeWriterCall,
+  type MergeWriterFailure,
+} from "./map/merge-writer.js";
 export {
   trashMapFolders,
   listMapTrash,

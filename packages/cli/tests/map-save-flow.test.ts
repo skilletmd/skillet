@@ -16,6 +16,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test, { after } from "node:test";
 import type { KitMapDraft, KitMapScan } from "@skillet/protocol/kit-map";
+import type { MergeWriter } from "@skillet/core";
 
 const ROOT = mkdtempSync(join(tmpdir(), "skillet-map-save-"));
 const HOME = join(ROOT, "home");
@@ -43,8 +44,8 @@ process.env["XDG_CONFIG_HOME"] = join(HOME, ".config");
 process.env["XDG_DATA_HOME"] = join(HOME, ".local", "share");
 
 const { readMap, startMap, scanThisMachine, wireEntries } = await import("../src/commands/map-cmd.js");
-const { createMapSaveFlow, runMapApplyOnly } = await import("../src/map/save-flow.js");
-const { acquireMapSaveLock } = await import("@skillet/core");
+const { createMapSaveFlow, runMapApplyOnly, saveSummary } = await import("../src/map/save-flow.js");
+const { acquireMapSaveLock, findMergeWriter, readMapMergeRecord } = await import("@skillet/core");
 const { MAP_TOKEN_HEADER } = await import("../src/map/shell-page.js");
 
 after(async () => {
@@ -154,6 +155,10 @@ class FakeRegistry {
   changes = new Map<string, Change>();
   backups = new Map<string, Map<string, unknown>>();
   docs = new Map<string, { version: number; entries: unknown[]; assignments: Record<string, unknown> }>();
+  /** Merge records by change id, as PUT /map-merges/:id leaves them. */
+  merges = new Map<string, Record<string, unknown>>();
+  /** Public skill versions by content hash, as the source-maker lookup finds them. */
+  published = new Map<string, { ref: string; name: string }>();
   /** Per PUT /backups attempt: an override reply, or null to store it. */
   backupReply: (hash: string, attempt: number) => Reply | null = () => null;
   failAck = false;
@@ -337,6 +342,39 @@ class FakeRegistry {
         assignments: body.assignments as Record<string, unknown>,
       });
       return { status: 200, body: { version: current + 1 } };
+    }
+    if (method === "GET" && p === "/map-merges") {
+      const mine = [...this.changes.values()].filter((c) => c.user === user && c.device === device.id && c.kind === "merge");
+      const merges = mine.map(
+        (c) => this.merges.get(c.id) ?? { id: c.id, device: c.device, job: c.body.job, keys: c.body.keys, status: "waiting", updatedAt: 1 },
+      );
+      return { status: 200, body: { merges } };
+    }
+    if (method === "PUT" && (m = /^\/map-merges\/([^/]+)$/.exec(p))) {
+      const change = this.changes.get(decodeURIComponent(m[1]!));
+      if (!change || change.device !== device.id || change.kind !== "merge") return { status: 404, body: { error: "merge_not_found" } };
+      const record: Record<string, unknown> = {
+        id: change.id,
+        device: change.device,
+        job: change.body.job,
+        keys: change.body.keys,
+        status: body.status,
+        updatedAt: 2,
+        ...(typeof body.reason === "string" ? { reason: body.reason } : {}),
+        ...(typeof body.merged === "string" ? { merged: body.merged } : {}),
+      };
+      this.merges.set(change.id, { ...record, ...(body.rounds ? { brief: body.brief, rounds: body.rounds } : {}) });
+      return { status: 200, body: { merge: record } };
+    }
+    if (method === "POST" && p === "/backups/sources") {
+      const keys = Array.isArray(body.keys) ? (body.keys as string[]) : [];
+      const sources = keys.map((key) => {
+        const hit = this.published.get(key);
+        if (!hit) return { key, private: true };
+        const [owner, slug] = hit.ref.slice(1).split("/");
+        return { key, ref: hit.ref, maker: owner, name: hit.name, page: `${WEB}/${owner}/${slug}` };
+      });
+      return { status: 200, body: { sources } };
     }
     if (method === "GET" && (m = /^\/skills\/([^/]+)\/([^/]+)\/manifest$/.exec(p))) {
       return { status: 404, body: { error: "skill_not_found", message: "No such public skill." } };
@@ -829,6 +867,183 @@ test("--apply on a computer that isn't connected does nothing and says so", { ti
     const result = await runMapApplyOnly({ registryUrl: registry.url, rescan: scanThisMachine, wire: wireEntries, paceMs: 5 });
     assert.equal(result.result, "not-connected");
     assert.deepEqual(registry.hits, []);
+  } finally {
+    await registry.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Merges (U14, KTD12): written by the person's own AI tool once Save is done
+// ---------------------------------------------------------------------------
+
+/** A merge writer in process. No test here reaches a real AI tool. */
+function fakeWriter(): MergeWriter & { calls: string[] } {
+  const calls: string[] = [];
+  let n = 0;
+  const nameIn = (skill: string) => /^name:\s*(.+)$/m.exec(skill)?.[1]?.trim() ?? "unnamed";
+  return {
+    name: "Test Writer",
+    calls,
+    async merge({ job, sources }) {
+      calls.push("merge");
+      return `---\nname: editing-merged\ndescription: One ${job.name} skill from ${sources.length}.\n---\n\n# ${job.name}\n\nEdit plainly.\n`;
+    },
+    async brief() {
+      calls.push("brief");
+      return "Tighten this note for a stranger: the meeting moved to Friday.";
+    },
+    async sample({ skill, brief }) {
+      calls.push("sample");
+      return `Sample ${++n} by ${nameIn(skill)} for: ${brief}`;
+    },
+  };
+}
+
+function mergeReports(registry: FakeRegistry): Array<Record<string, unknown>> {
+  return registry.calls("PUT", "/api/v1/map-merges/").map((hit) => hit.body as Record<string, unknown>);
+}
+
+test("after Save, the CLI says it is writing merges with the person's AI tool, and stores them for the blind pick", { timeout: 60_000 }, async () => {
+  await resetHome();
+  await writeSkill(join(CLAUDE, "plain-prose"), "plain-prose", "Edit prose so it reads plainly.");
+  await writeSkill(join(CLAUDE, "copy-editor"), "copy-editor", "Copy edit prose before it ships.");
+  await connectAs("skillet_d_valid");
+  const registry = await new FakeRegistry().start();
+  const writer = fakeWriter();
+  const opened = await openMap(registry, { mergeWriter: async () => writer });
+  const before = readFileSync(join(CLAUDE, "plain-prose", "SKILL.md"), "utf8");
+  try {
+    const prose = keyOf(opened.scan, "plain-prose");
+    const copy = keyOf(opened.scan, "copy-editor");
+    const drafts: KitMapDraft[] = [
+      { kind: "move", key: prose, job: "writing.editing" },
+      { kind: "move", key: copy, job: "writing.editing" },
+      { kind: "merge", job: "writing.editing", keys: [prose, copy] },
+    ];
+    await post(opened.frame, { type: "save", v: 1, drafts });
+    await waitFor(opened.frame, isStatus("confirm"));
+    await post(opened.frame, { type: "confirm", v: 1 });
+    await waitFor(opened.frame, isStatus("done"));
+    await opened.flow.settled();
+
+    const lines = opened.printed.join("\n");
+    const saved = opened.printed.findIndex((line) => /Saved your map to @test-user/.test(line));
+    const writing = opened.printed.indexOf("Writing 1 merge with Test Writer. This can take a few minutes.");
+    assert.ok(saved !== -1 && writing > saved, `Save is done before the merges start:\n${lines}`);
+    assert.ok(
+      opened.printed.some((line) => line.endsWith("Wrote the Editing merge. Your 2 skills stay until it wins a blind pick on skillet.md.")),
+      lines,
+    );
+
+    const merge = [...registry.changes.values()].find((c) => c.kind === "merge");
+    assert.ok(merge, "Save recorded the merge first");
+    assert.equal(merge.outcome, "written");
+    assert.deepEqual(mergeReports(registry).map((r) => r.status), ["writing", "ready"]);
+    const ready = mergeReports(registry)[1]!;
+    const rounds = ready.rounds as Array<{ key: string; merged: string; original: string }>;
+    assert.deepEqual(rounds.map((r) => r.key), [prose, copy], "one blind round per original");
+    assert.equal(writer.calls.filter((c) => c === "sample").length, 4, "2N samples for N originals");
+    const backup = registry.backups.get("user-b")?.get(String(ready.merged)) as Record<string, unknown> | undefined;
+    assert.equal(backup?.origin, "merge", "the merged skill is backed up privately as a merge");
+    assert.deepEqual(backup?.sources, [
+      { key: prose, private: true },
+      { key: copy, private: true },
+    ]);
+    assert.equal((await readMapMergeRecord(merge.id))?.merged, ready.merged, "this machine records the bundle it wrote");
+    assert.equal(readFileSync(join(CLAUDE, "plain-prose", "SKILL.md"), "utf8"), before, "the originals stay until a blind pick");
+    assert.ok(existsSync(join(CLAUDE, "copy-editor", "SKILL.md")));
+    assert.equal(await opened.run.done, "finished");
+  } finally {
+    await opened.run.stop("interrupted");
+    await registry.close();
+  }
+});
+
+test("a merge recorded while the CLI had exited is written on the next --apply, the app's sync", { timeout: 60_000 }, async () => {
+  await resetHome();
+  await writeSkill(join(CLAUDE, "plain-prose"), "plain-prose", "Edit prose so it reads plainly.");
+  await writeSkill(join(CLAUDE, "every--house-style"), "house-style", "Write in the house style.");
+  await connectAs("skillet_d_valid");
+  const scan = await scanThisMachine();
+  const prose = scan.entries.find((e) => e.name === "plain-prose")!.key;
+  const house = scan.entries.find((e) => e.name === "house-style")!.key;
+  const registry = await new FakeRegistry().start();
+  registry.published.set(house, { ref: "@every/house-style", name: "house-style" });
+  // Save recorded the merge, then the CLI exited before it wrote it.
+  registry.changes.set("merge-1", {
+    id: "merge-1",
+    user: "user-b",
+    device: "dev-valid",
+    kind: "merge",
+    version: 1,
+    body: { job: "writing.editing", keys: [prose, house] },
+  });
+  const writer = fakeWriter();
+  const printed: string[] = [];
+  try {
+    const result = await runMapApplyOnly({
+      registryUrl: registry.url,
+      rescan: scanThisMachine,
+      wire: wireEntries,
+      print: (line) => printed.push(line),
+      paceMs: 5,
+      mergeWriter: async () => writer,
+    });
+    assert.equal(result.result, "applied");
+    if (result.result !== "applied") return;
+    assert.equal(result.counts.merges, 1, "the app's JSON counts the merge written");
+    assert.equal(result.left.merges, 0);
+    assert.equal(registry.changes.get("merge-1")?.outcome, "written");
+    assert.deepEqual(mergeReports(registry).map((r) => r.status), ["writing", "ready"]);
+    const merged = String(mergeReports(registry)[1]!.merged);
+    const backup = registry.backups.get("user-b")?.get(merged) as Record<string, unknown> | undefined;
+    assert.deepEqual(backup?.sources, [
+      { key: prose, private: true },
+      { key: house, ref: "@every/house-style", name: "house-style" },
+    ]);
+    assert.deepEqual(printed, ["Writing 1 merge with Test Writer. This can take a few minutes."]);
+    assert.ok(
+      saveSummary(result).some((line) => line.endsWith("Wrote the Editing merge. Your 2 skills stay until it wins a blind pick on skillet.md.")),
+      saveSummary(result).join("\n"),
+    );
+    assert.ok(existsSync(join(CLAUDE, "plain-prose", "SKILL.md")));
+  } finally {
+    await registry.close();
+  }
+});
+
+test("with no supported AI tool, --apply leaves the merge waiting and says why", { timeout: 60_000 }, async () => {
+  await resetHome();
+  await writeSkill(join(CLAUDE, "plain-prose"), "plain-prose", "Edit prose so it reads plainly.");
+  await writeSkill(join(CLAUDE, "copy-editor"), "copy-editor", "Copy edit prose before it ships.");
+  await connectAs("skillet_d_valid");
+  const scan = await scanThisMachine();
+  const keys = ["plain-prose", "copy-editor"].map((name) => scan.entries.find((e) => e.name === name)!.key);
+  const registry = await new FakeRegistry().start();
+  registry.changes.set("merge-1", { id: "merge-1", user: "user-b", device: "dev-valid", kind: "merge", version: 1, body: { job: "writing.editing", keys } });
+  // The sidecar's bare PATH, this fixture home, and no system folders: there is no AI tool to find.
+  const empty = join(ROOT, "empty-bin");
+  await mkdir(empty, { recursive: true });
+  try {
+    const result = await runMapApplyOnly({
+      registryUrl: registry.url,
+      rescan: scanThisMachine,
+      wire: wireEntries,
+      paceMs: 5,
+      mergeWriter: () => findMergeWriter({ path: empty, home: HOME, systemDirs: [] }),
+    });
+    assert.equal(result.result, "applied", "a merge that waits is not a failed sync");
+    if (result.result !== "applied") return;
+    assert.equal(result.left.merges, 1, "the merge waits");
+    assert.equal(registry.changes.get("merge-1")?.outcome, undefined);
+    assert.deepEqual(mergeReports(registry), [{ status: "failed", reason: "no-ai-tool" }]);
+    assert.equal(registry.calls("PUT", "/api/v1/backups/").length, 0, "nothing is stored");
+    assert.ok(
+      saveSummary(result).some((line) =>
+        line.endsWith("Couldn't write the Editing merge: this machine has no Claude Code or Codex to write it with. It waits for the next Save."),
+      ),
+      saveSummary(result).join("\n"),
+    );
   } finally {
     await registry.close();
   }
