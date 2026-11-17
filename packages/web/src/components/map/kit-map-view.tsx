@@ -381,6 +381,10 @@ export interface KitMapViewProps {
   onConfirm?: () => void
   /** The `?demo` map: says once that these skills are a sample. */
   sample?: boolean
+  /** The line under the strip in place of where the scan looked: a dropped folder's map says what it didn't check. */
+  lede?: ReactNode
+  /** Why Save can't run on this map yet. The bar says it, beside a Save that's off. */
+  saveOff?: string
 }
 
 export function KitMapView({
@@ -392,6 +396,8 @@ export function KitMapView({
   onReopen,
   onConfirm = () => {},
   sample = false,
+  lede,
+  saveOff,
 }: KitMapViewProps) {
   const [openId, setOpenId] = useState<OpenId | null>(null)
   const [moving, setMoving] = useState<KitMapEntry | null>(null)
@@ -572,7 +578,7 @@ export function KitMapView({
 
         <p className="mt-4 text-sm text-pretty text-[var(--p-ink-2)]">
           {sample && 'Sample skills, not yours. '}
-          {lookedText(scan)}
+          {lede ?? lookedText(scan)}
           {spots.length > 0 && (
             <>
               {' '}
@@ -616,6 +622,7 @@ export function KitMapView({
       {(scan.entries.length > 0 || drafts.length > 0 || save.phase !== 'idle') && (
         <SaveBar
           save={save}
+          saveOff={saveOff}
           counts={map.changes.counts}
           changes={drafts.length}
           onSave={onSave}
@@ -1098,6 +1105,7 @@ function doneText({ backups, removals, fills, merges }: KitMapSaveCounts): strin
 /** The bar Save lives in, and every state the frame shows around it. */
 function SaveBar({
   save,
+  saveOff,
   counts,
   changes,
   onSave,
@@ -1107,6 +1115,7 @@ function SaveBar({
   onOutcome,
 }: {
   save: SaveState
+  saveOff?: string
   counts: KitMapSaveCounts
   changes: number
   onSave: () => void
@@ -1149,8 +1158,14 @@ function SaveBar({
   let secondary: ReactNode = null
   switch (save.phase) {
     case 'idle':
-      message = 'Nothing leaves this computer until you save.'
-      action = button('Save', onSave)
+      message = saveOff ?? 'Nothing leaves this computer until you save.'
+      action = saveOff ? (
+        <button type="button" className={primary} disabled>
+          Save
+        </button>
+      ) : (
+        button('Save', onSave)
+      )
       break
     case 'opened':
       action = button('Finish in the other tab', onReopen)
