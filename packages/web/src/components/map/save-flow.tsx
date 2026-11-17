@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Check } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
+import type { DropSaveResult } from '@/lib/map-drop-store'
 import { loginHref } from '@/lib/urls'
 import { KIT_MAP_VERSION, parseKitMapMessage, type KitMapFlag, type KitMapSaveCounts } from '@skillet/protocol/kit-map'
 import s from '@/components/packs/packs.module.css'
 
 /**
- * Save, on skillet.md (kit map onboarding, KTD6). Two places draw it:
+ * Save, on skillet.md (kit map onboarding, KTD6). Three places draw it:
  *
  * - The save tab (/map/save), for a computer that isn't connected yet. Save in
  *   the framed map opens it inside the click, then points it at the session the
@@ -21,6 +22,9 @@ import s from '@/components/packs/packs.module.css'
  *   session followed to done.
  * - The framed map on a connected computer, which confirms in place: the
  *   confirm button and Done below are the same components.
+ * - The map a dropped folder built on /packs/home, which saves from the browser
+ *   itself (lib/map-drop-store.ts, U12): the same confirm, its own count line,
+ *   and Done with the removes and merges that wait for the app.
  *
  * Nothing here names a skill before Save: the confirm's line is counts only.
  */
@@ -52,11 +56,14 @@ const sessionApi = (session: string, leaf: 'binding' | 'bind' | 'approve') => `/
 // The wire between the save tab and its routes
 // ---------------------------------------------------------------------------
 
-/** A skill Save didn't back up, by name, and why. Never a path. */
+/** A skill Save didn't back up, by name, and why. Never a path on the computer. */
 export interface NotBackedUp {
   name: string
   reason: string
+  /** The file to clean: its name, or its path inside the skill when this browser read it. */
   file?: string
+  /** The line a secret starts on, when the registry said. */
+  line?: number
 }
 
 /** How Save went on the computer, as the terminal reported it. */
@@ -117,6 +124,42 @@ export function saveSummary({ backups, removals, fills, merges }: KitMapSaveCoun
   return parts.length > 0 ? parts.join(' ') : 'Saves your map.'
 }
 
+/** Removes and merges left for the app, as a phrase: "2 removals and 1 merge". */
+function waitingText({ removals, merges }: { removals: number; merges: number }): string {
+  return andList(present([removals > 0 ? plural(removals, 'removal') : null, merges > 0 ? plural(merges, 'merge') : null]))
+}
+
+/**
+ * What Save does from a dropped folder, in one line of counts: it backs up and
+ * adds picks now, and leaves removes and merges for the app, because the
+ * browser can't change files on the computer.
+ */
+export function dropSaveSummary({ backups, removals, fills, merges }: KitMapSaveCounts): string {
+  const later = waitingText({ removals, merges })
+  const parts = present([
+    backups > 0 ? `Backs up ${plural(backups, 'skill')} privately.` : null,
+    fills > 0 ? `Adds ${plural(fills, 'pick')}.` : null,
+    later ? `Leaves ${later} for the app.` : null,
+  ])
+  return parts.length > 0 ? parts.join(' ') : 'Saves your map.'
+}
+
+/** A dropped folder's Save, in the bar: done, or done partway with what's left. */
+export function dropDoneLine(result: DropSaveResult): string {
+  if (result.result === 'partial') {
+    const left = leftText({ backups: result.unsent.length, removals: 0, fills: result.unadded, merges: 0 })
+    return left ? `Saved partway. Left to do: ${left}.` : "Saved partway. Your map didn't save."
+  }
+  const waiting = result.waiting.removals + result.waiting.merges
+  const skipped = result.notBackedUp.length
+  return present([
+    'Saved.',
+    result.counts.backups > 0 ? `Backed up ${plural(result.counts.backups, 'skill')}.` : null,
+    waiting > 0 ? `${plural(waiting, 'change')} ${waiting === 1 ? 'waits' : 'wait'} for the app.` : null,
+    skipped > 0 ? `${plural(skipped, 'skill')} ${skipped === 1 ? "isn't" : "aren't"} backed up.` : null,
+  ]).join(' ')
+}
+
 /** What's left after Save stopped partway, as a phrase. */
 export function leftText({ backups, removals, fills, merges }: KitMapSaveCounts): string {
   return andList(
@@ -130,17 +173,37 @@ export function leftText({ backups, removals, fills, merges }: KitMapSaveCounts)
 }
 
 /** Why a skill can't be backed up or merged, as one clause. */
-export function flagReason(flag: KitMapFlag): string {
+export function flagReason(flag: KitMapFlag & { line?: number }): string {
   switch (flag.reason) {
-    case 'secret':
-      return flag.file ? `${flag.file} looks like it holds a secret` : 'a file in it looks like it holds a secret'
+    case 'secret': {
+      const at = flag.line ? ` on line ${flag.line}` : ''
+      return flag.file ? `${flag.file} looks like it holds a secret${at}` : 'a file in it looks like it holds a secret'
+    }
     case 'links-outside':
       return 'it links to files outside its folder'
     case 'extra-files':
       return 'it has files besides SKILL.md'
+    case 'over-25-mb':
+    case 'too-large':
+      return "it's over 25 MB"
+    case 'instructions-over-1-mb':
+      return 'its SKILL.md is over 1 MB'
+    case 'git-folder':
+      return 'it holds a .git folder'
+    case 'quota':
+      return 'your account holds as many backups as it can'
+    case 'unreadable':
+      return "this browser couldn't read it again"
+    case 'refused':
+      return "Skillet couldn't store it"
     default:
       return flag.file ? `Skillet flagged ${flag.file}` : 'Skillet flagged a file in it'
   }
+}
+
+/** Why Skillet wouldn't add a pick, as one clause. */
+function pickReason(reason: string): string {
+  return reason === 'not-public' ? "it isn't public on Skillet" : 'Skillet refused it'
 }
 
 // ---------------------------------------------------------------------------
@@ -233,18 +296,23 @@ export function ConfirmButton({
  * skill that didn't back up and why, how to restore, and the app in one button.
  * The save tab draws it from the terminal's report; the framed map, on a
  * connected computer, from its own drafts. `newTab` keeps the frame's map open.
+ * A dropped folder's map passes `dropped`: its removes and merges wait for the
+ * app, and Try again sends what didn't go through.
  */
 export function SaveDone({
   counts,
   notBackedUp,
   newTab = false,
+  dropped,
 }: {
   counts: KitMapSaveCounts | null
   notBackedUp: readonly NotBackedUp[]
   newTab?: boolean
+  dropped?: Pick<DropSaveResult, 'waiting' | 'unsent' | 'notAdded' | 'mapSaved'>
 }) {
   const away = newTab ? ({ target: '_blank', rel: 'noreferrer' } as const) : {}
   const { backups, removals, fills, merges } = counts ?? { backups: 0, removals: 0, fills: 0, merges: 0 }
+  const waiting = dropped ? dropped.waiting.removals + dropped.waiting.merges : 0
   const rows: ReactNode[] = present([
     backups > 0 ? `Backed up ${plural(backups, 'skill')} privately.` : null,
     removals > 0 ? (
@@ -255,7 +323,11 @@ export function SaveDone({
     ) : null,
     fills > 0 ? `Added ${plural(fills, 'pick')}.` : null,
     merges > 0 ? `Writing ${plural(merges, 'merge')} for you to pick from.` : null,
+    waiting > 0 ? `${waitingText(dropped!.waiting)} ${waiting === 1 ? 'waits' : 'wait'} for the app.` : null,
     ...notBackedUp.map((skipped) => `${skipped.name} isn't backed up: ${flagReason(skipped)}.`),
+    ...(dropped?.unsent ?? []).map((name) => `${name} didn't back up. Try again.`),
+    ...(dropped?.notAdded ?? []).map((pick) => `${pick.name} wasn't added: ${pickReason(pick.reason)}.`),
+    dropped && !dropped.mapSaved ? "Your map didn't save. Try again." : null,
   ])
   return (
     <>
@@ -266,7 +338,11 @@ export function SaveDone({
           </li>
         ))}
       </ul>
-      <p className="mt-6 text-base text-pretty text-[var(--p-ink-2)]">The app keeps your map current as you add skills.</p>
+      <p className="mt-6 text-base text-pretty text-[var(--p-ink-2)]">
+        {waiting > 0
+          ? 'The app makes the waiting changes on the computer these skills came from.'
+          : 'The app keeps your map current as you add skills.'}
+      </p>
       <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <a href="/download" className={cn(s.pill, s.pillPrimary, 'w-full sm:w-auto')} {...away}>
           Get the app

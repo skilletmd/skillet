@@ -533,9 +533,9 @@ describe('/packs/home', () => {
     expect(screen.getByText(/Didn't check other AI tools, plugins or usage\./)).toBeInTheDocument()
     expect(screen.queryByText('unused')).toBeNull()
     expect(screen.queryByText(/No runs in 30 days/)).toBeNull()
-    // Nothing leaves the browser: Save waits for a later step.
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
-    expect(screen.getByText(/Your files stay in this browser\./)).toBeInTheDocument()
+    // Nothing leaves the browser until Save, which runs from here (U12, tests/map-drop-save.test.tsx).
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(screen.getByText('Nothing leaves this computer until you save.')).toBeInTheDocument()
   })
 
   it('takes a folder dropped anywhere on the page', async () => {

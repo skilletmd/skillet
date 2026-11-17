@@ -1,18 +1,31 @@
 'use client'
 
 import Link from 'next/link'
-import { Fragment, useCallback, useEffect, useId, useRef, useState, type ChangeEvent } from 'react'
+import { useSession } from 'next-auth/react'
+import { Fragment, Suspense, lazy, useCallback, useEffect, useId, useRef, useState, type ChangeEvent } from 'react'
 import { folderFromDrop, folderFromFiles, readSkillsFolder, type FolderDir, type FolderRead } from '@/components/map/folder-drop'
-import { KitMapView, type SaveState } from '@/components/map/kit-map-view'
-import { CommandBox, MAP_COMMAND } from '@/components/map/save-flow'
+import { KitMapView, type SaveBarParts, type SaveState } from '@/components/map/kit-map-view'
+import { CommandBox, MAP_COMMAND, SaveDone, dropDoneLine, dropSaveSummary } from '@/components/map/save-flow'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar } from '@/components/ui/avatar'
 import { Check } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
+import {
+  forgetDrop,
+  keepDrop,
+  readDropAccount,
+  recordReads,
+  restoreDrop,
+  saveDroppedMap,
+  sweepDrop,
+  type DropBundles,
+  type DropSaveResult,
+} from '@/lib/map-drop-store'
 import { CATALOG_SIZE, HOME_PICKS, STACKS, type HomeSkill } from '@/lib/packs/home-picks'
 import { SECTION_HUES, TAYLOR_KIT, TAYLOR_TOOLS, type MapSkill } from '@/lib/packs/kit-map'
+import { loginHref } from '@/lib/urls'
 import { JOB_SECTIONS, TOOLS_SECTION, type JobId, type JobSection } from '@skillet/protocol/jobs'
-import type { KitMapDraft } from '@skillet/protocol/kit-map'
+import { backsUp, deriveKitMapChanges, type KitMapDraft, type KitMapEntry } from '@skillet/protocol/kit-map'
 import { CountUp, Coverage, JobChip, SectionCard, SkillLine, landDelay, secVars, type Hue } from './kit-parts'
 import i from './ideas/ideas.module.css'
 import k from './kit.module.css'
@@ -26,7 +39,11 @@ import { Tray } from './tray'
  *
  * The hero offers the line that opens your own map (`skillet map`). Without
  * Node, a skills folder dropped or chosen here builds the same map in this tab
- * (folder-drop.ts): nothing is uploaded, and Start over comes back here.
+ * (folder-drop.ts): nothing is uploaded until Save, and Start over comes back
+ * here. Save on that map runs in this tab (map-drop-store.ts): a signed-out
+ * Save keeps the map in this browser through sign-in and comes back to
+ * `?drop=kept`, then backs up, adds picks, and leaves removes and merges for
+ * the app (U12).
  */
 
 /** A job's protocol id, such as `writing.editing`. The maps below are keyed by it. */
@@ -70,19 +87,80 @@ const MAKERS = (() => {
 const runsText = (n: number) => (n === 0 ? 'never ran' : n === 1 ? '1 run' : `${n} runs`)
 const skillsText = (n: number) => `${n} ${n === 1 ? 'skill' : 'skills'}`
 
-type FolderMap = Extract<FolderRead, { kind: 'map' }>
+/** A dropped folder's map, and the bytes each of its skills was keyed from, for Save. */
+type FolderMap = Extract<FolderRead, { kind: 'map' }> & { bundles: DropBundles }
 
-export function HomeKit() {
-  const [folder, setFolder] = useState<FolderMap | null>(null)
+/** A map on screen: read from a folder, brought back after sign-in, or a `?demo` state. */
+interface Opened {
+  map: FolderMap
+  drafts: KitMapDraft[]
+  /** Back from sign-in: Save picks up where it left off. */
+  resume: boolean
+  /** A `?demo` state, drawn and never run. */
+  demo?: { run: DropRun; outcome: boolean }
+}
+
+/** Where a signed-out Save comes back to, its map kept in this browser. */
+const KEPT_PARAM = 'drop'
+const KEPT_PATH = `/packs/home?${KEPT_PARAM}=kept`
+const LOST_LINE = "Couldn't bring your map back. Drop your folder again to save it."
+
+const goTo = (href: string) => window.location.assign(href)
+
+/** Takes `?drop=kept` off the address, so a reload looks for nothing. */
+function dropKeptParam() {
+  const url = new URL(window.location.href)
+  if (!url.searchParams.has(KEPT_PARAM)) return
+  url.searchParams.delete(KEPT_PARAM)
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+}
+
+export function HomeKit({ navigate = goTo }: { navigate?: (href: string) => void } = {}) {
+  const [opened, setOpened] = useState<Opened | null>(null)
+  const [lost, setLost] = useState(false)
   const [said, setSaid] = useState('')
 
+  // Back from sign-in, the kept map comes back; any other visit clears one past 24 hours.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (process.env.NODE_ENV !== 'production') {
+      const demo = demoOpened(params.get('demo'))
+      if (demo) {
+        setOpened(demo)
+        return
+      }
+    }
+    if (params.get(KEPT_PARAM) !== 'kept') {
+      void sweepDrop()
+      return
+    }
+    let live = true
+    void restoreDrop().then((kept) => {
+      if (!live) return
+      if (!kept) {
+        dropKeptParam()
+        setLost(true)
+        setSaid(LOST_LINE)
+        return
+      }
+      setOpened({ map: { kind: 'map', scan: kept.scan, missed: kept.missed, bundles: kept.bundles }, drafts: kept.drafts, resume: true })
+      setSaid(`Brought back ${skillsText(kept.scan.entries.length)} from your folder.`)
+    })
+    return () => {
+      live = false
+    }
+  }, [])
+
   const showFolder = useCallback((map: FolderMap) => {
-    setFolder(map)
+    setOpened({ map, drafts: [], resume: false })
+    setLost(false)
     setSaid(`Read ${skillsText(map.scan.entries.length)} from your folder.`)
   }, [])
   const startOver = () => {
-    setFolder(null)
+    setOpened(null)
     setSaid('')
+    dropKeptParam()
+    void forgetDrop()
     window.scrollTo(0, 0)
   }
 
@@ -95,7 +173,11 @@ export function HomeKit() {
         </Link>
         <ThemeToggle />
       </header>
-      {folder ? <FolderKit map={folder} onStartOver={startOver} /> : <Preview onFolder={showFolder} />}
+      {opened ? (
+        <FolderKit opened={opened} navigate={navigate} onStartOver={startOver} />
+      ) : (
+        <Preview onFolder={showFolder} note={lost ? LOST_LINE : undefined} />
+      )}
       <p className="sr-only" role="status">
         {said}
       </p>
@@ -103,7 +185,7 @@ export function HomeKit() {
   )
 }
 
-function Preview({ onFolder }: { onFolder: (map: FolderMap) => void }) {
+function Preview({ onFolder, note }: { onFolder: (map: FolderMap) => void; note?: string }) {
   const [taken, setTaken] = useState<Record<string, HomeSkill>>({})
   const [choice, setChoice] = useState<Record<string, number>>({})
   const [mine, setMine] = useState(false)
@@ -308,7 +390,7 @@ function Preview({ onFolder }: { onFolder: (map: FolderMap) => void }) {
         <div className="mt-6 grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">{FRAME.map((sec) => card(sec))}</div>
         <div className="mt-3 sm:mt-4">{card(TOOLS, true)}</div>
 
-        <FolderDrop onFolder={onFolder} />
+        <FolderDrop onFolder={onFolder} note={note} />
       </main>
 
       {toAdd.length > 0 && <AddBar n={toAdd.length} onOpen={() => setAdding(true)} />}
@@ -371,9 +453,10 @@ const mayCarryFiles = (data: DataTransfer | null) => {
 /**
  * The fallback to the line: a skills folder dropped here, or anywhere on the
  * page, or picked with Choose folder. The folder is read in this tab
- * (folder-drop.ts), and its map replaces the preview.
+ * (folder-drop.ts), and its map replaces the preview. The read is recorded, so
+ * Save backs up the bytes each skill was keyed from. `note` is said until then.
  */
-function FolderDrop({ onFolder }: { onFolder: (map: FolderMap) => void }) {
+function FolderDrop({ onFolder, note }: { onFolder: (map: FolderMap) => void; note?: string }) {
   const [state, setState] = useState<DropState>('idle')
   const [over, setOver] = useState(false)
   const run = useRef(0)
@@ -390,16 +473,20 @@ function FolderDrop({ onFolder }: { onFolder: (map: FolderMap) => void }) {
         return
       }
       setState('reading')
+      const recorder = recordReads(root)
       let timer = 0
       const late = new Promise<FolderRead>((resolve) => {
         timer = window.setTimeout(() => resolve({ kind: 'error' }), READ_TIMEOUT_MS)
       })
-      const result = await Promise.race([readSkillsFolder(root).catch((): FolderRead => ({ kind: 'error' })), late])
+      const result = await Promise.race([readSkillsFolder(recorder.root).catch((): FolderRead => ({ kind: 'error' })), late])
       window.clearTimeout(timer)
       // A newer drop or choice owns the zone now.
       if (id !== run.current) return
-      if (result.kind === 'map') onFolder(result)
-      else setState(result.kind)
+      if (result.kind !== 'map') return setState(result.kind)
+      // Only what Save backs up stays in memory.
+      const keys = result.scan.entries.filter(backsUp).map((entry) => entry.key)
+      const bundles = await recorder.bundles(keys).catch((): DropBundles => new Map())
+      if (id === run.current) onFolder({ ...result, bundles })
     },
     [onFolder],
   )
@@ -464,7 +551,7 @@ function FolderDrop({ onFolder }: { onFolder: (map: FolderMap) => void }) {
         </button>
         <input ref={input} type="file" multiple hidden onChange={choose} />
         <p role="status" className="mt-2 min-h-5 text-sm font-medium text-pretty text-[var(--p-ink)]">
-          {DROP_LINE[state]}
+          {state === 'idle' && note ? note : DROP_LINE[state]}
         </p>
         <p className="mt-2 text-sm text-pretty">
           On a Mac, open <code className="font-mono">~/.claude</code> in Finder (Cmd+Shift+G) and drag{' '}
@@ -480,13 +567,172 @@ function FolderDrop({ onFolder }: { onFolder: (map: FolderMap) => void }) {
 
 const IDLE: SaveState = { phase: 'idle' }
 
+/** Where a dropped map's Save is. */
+type DropRun =
+  | { phase: 'idle' }
+  /** Asking the registry whose session this is. */
+  | { phase: 'checking' }
+  /** Kept in this browser, on the way to sign in. */
+  | { phase: 'signing-in' }
+  /** Signed out, and this browser can't keep the map through sign-in. */
+  | { phase: 'sign-in-first' }
+  /** Signed in with no username yet. */
+  | { phase: 'username' }
+  | { phase: 'confirm'; handle: string; sent: boolean }
+  | { phase: 'saving'; step: 'saving' | 'applying' }
+  | { phase: 'saved'; handle: string; result: DropSaveResult }
+  /** `started`: it stopped after saving began. */
+  | { phase: 'failed'; reason: 'signed-out' | 'unreachable'; started: boolean }
+
+const ChooseUsername = lazy(() => import('@/components/choose-username').then((m) => ({ default: m.ChooseUsername })))
+const PICK_NAMES: ReadonlyMap<string, string> = new Map(
+  Object.values(HOME_PICKS).flatMap((list) => list.map((pick) => [`@${pick.handle}/${pick.slug}`, pick.name] as const)),
+)
+const pickName = (ref: string) => PICK_NAMES.get(ref) ?? ref
+
+/** The bar for a run: the phase the view locks drafts by, and the words for this Save. */
+function barOf(
+  run: DropRun,
+  drafts: readonly KitMapDraft[],
+  map: FolderMap,
+  on: { outcome: () => void; retry: () => void },
+): { save: SaveState; parts?: SaveBarParts } {
+  switch (run.phase) {
+    case 'idle':
+      return { save: IDLE }
+    case 'checking':
+    case 'username':
+      return { save: { phase: 'checking' } }
+    case 'signing-in':
+      return { save: { phase: 'checking' }, parts: { action: { kind: 'pending', label: 'Taking you to sign in…' } } }
+    case 'sign-in-first':
+      return {
+        save: IDLE,
+        parts: {
+          message: "Sign in first, then drop your folder again. This browser can't hold your map while you sign in.",
+          action: { kind: 'link', label: 'Sign in', href: loginHref('/packs/home') },
+        },
+      }
+    case 'confirm':
+      return {
+        save: { phase: 'confirm', handle: run.handle, sent: run.sent },
+        parts: { message: dropSaveSummary(deriveKitMapChanges(drafts, map.scan.entries).counts) },
+      }
+    case 'saving':
+      return {
+        save: { phase: 'progress', state: run.step },
+        parts: run.step === 'applying' ? { action: { kind: 'pending', label: 'Saving your map…' } } : undefined,
+      }
+    case 'saved': {
+      const parts: SaveBarParts = { message: dropDoneLine(run.result), secondary: { label: 'What changed', onClick: on.outcome } }
+      if (run.result.result === 'partial') parts.action = { kind: 'button', label: 'Try again', onClick: on.retry }
+      return { save: { phase: 'done' }, parts }
+    }
+    case 'failed':
+      return {
+        save: { phase: 'failed', started: run.started },
+        parts: {
+          message:
+            run.reason === 'signed-out'
+              ? "You're signed out. Try again to sign in and finish."
+              : "Couldn't reach Skillet. Nothing was saved.",
+        },
+      }
+  }
+}
+
 /**
  * The map a folder built: the same view the line opens, with a header line that
- * says what a folder can't tell (R15, AE6). Fixes stay drafts in this tab, and
- * Save from a folder isn't wired yet, so nothing leaves the browser.
+ * says what a folder can't tell (R15, AE6). Fixes stay drafts in this tab until
+ * Save, which runs here (KTD15): it checks the account, keeps the map through
+ * sign-in when it has to, asks for a username when the account has none, then
+ * confirms the account by name and saves (map-drop-store.ts). Done says what
+ * waits for the app and offers it (R20, R26).
  */
-function FolderKit({ map, onStartOver }: { map: FolderMap; onStartOver: () => void }) {
-  const [drafts, setDrafts] = useState<KitMapDraft[]>([])
+function FolderKit({
+  opened,
+  navigate,
+  onStartOver,
+}: {
+  opened: Opened
+  navigate: (href: string) => void
+  onStartOver: () => void
+}) {
+  const { map, demo } = opened
+  const [drafts, setDrafts] = useState<KitMapDraft[]>(opened.drafts)
+  const [run, setRun] = useState<DropRun>(demo?.run ?? (opened.resume ? { phase: 'checking' } : { phase: 'idle' }))
+  const [outcome, setOutcome] = useState(demo?.outcome ?? false)
+  const saving = useRef(false)
+  // The username step claims a handle and refreshes the session; the confirm follows from it.
+  const sessionHandle = useSession().data?.handle ?? null
+  const shown: DropRun = run.phase === 'username' && sessionHandle ? { phase: 'confirm', handle: sessionHandle, sent: false } : run
+
+  const save = useCallback(
+    async (handle: string, current: readonly KitMapDraft[]) => {
+      if (saving.current) return
+      saving.current = true
+      setRun({ phase: 'confirm', handle, sent: true })
+      const result = await saveDroppedMap({
+        entries: map.scan.entries,
+        drafts: current,
+        bundles: map.bundles,
+        handle,
+        pickName,
+        onStep: (step) => setRun({ phase: 'saving', step }),
+      })
+      saving.current = false
+      if (result.result === 'failed') {
+        setRun({ phase: 'failed', reason: result.reason ?? 'unreachable', started: result.reason === 'signed-out' })
+        return
+      }
+      setRun({ phase: 'saved', handle, result })
+      if (result.result === 'applied') {
+        dropKeptParam()
+        await forgetDrop()
+      }
+    },
+    [map],
+  )
+
+  /**
+   * Save pressed: whose session is this? Signed out, the map is kept and the
+   * person signs in, unless `back` from doing just that. `again` is the account
+   * that already confirmed, so Try again goes straight to saving.
+   */
+  const check = useCallback(
+    async (current: readonly KitMapDraft[], { back = false, again }: { back?: boolean; again?: string } = {}) => {
+      setRun({ phase: 'checking' })
+      const account = await readDropAccount()
+      if (account.kind === 'unreachable') return setRun({ phase: 'failed', reason: 'unreachable', started: false })
+      if (account.kind === 'signed-out') {
+        // Back from sign-in and still signed out: wait for Save, never go round again.
+        if (back) return setRun({ phase: 'idle' })
+        const kept = await keepDrop({ scan: map.scan, missed: map.missed, drafts: [...current], bundles: map.bundles })
+        if (!kept) return setRun({ phase: 'sign-in-first' })
+        setRun({ phase: 'signing-in' })
+        return navigate(loginHref(KEPT_PATH))
+      }
+      if (!account.handle) return setRun({ phase: 'username' })
+      if (account.handle === again) return save(again, current)
+      setRun({ phase: 'confirm', handle: account.handle, sent: false })
+    },
+    [map, navigate, save],
+  )
+
+  // Back from sign-in: Save carries on from the account check.
+  const resumed = useRef(false)
+  useEffect(() => {
+    if (!opened.resume || demo || resumed.current) return
+    resumed.current = true
+    void check(opened.drafts, { back: true })
+  }, [opened, demo, check])
+
+  const { save: saveState, parts } = barOf(shown, drafts, map, {
+    outcome: () => setOutcome(true),
+    retry: () => {
+      if (!demo && run.phase === 'saved') void check(drafts, { again: run.handle })
+    },
+  })
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -504,29 +750,133 @@ function FolderKit({ map, onStartOver }: { map: FolderMap; onStartOver: () => vo
   }, [])
 
   return (
-    <KitMapView
-      scan={map.scan}
-      drafts={drafts}
-      onDraftsChange={setDrafts}
-      save={IDLE}
-      onSave={() => {}}
-      onReopen={() => {}}
-      saveOff="Save from a folder isn't ready yet. Your files stay in this browser."
-      lede={
-        <>
-          Read from your folder. Didn&apos;t check other AI tools, plugins or usage.
-          {map.missed > 0 && ` Couldn't read ${map.missed} ${map.missed === 1 ? 'folder' : 'folders'} in it.`}{' '}
-          <button
-            type="button"
-            className="rounded-sm font-medium text-[var(--p-ink)] underline decoration-[var(--p-line)] underline-offset-4 hover:decoration-[var(--p-ink-2)] focus-visible:outline-2 focus-visible:outline-[var(--p-ink)]"
-            onClick={onStartOver}
-          >
-            Start over
-          </button>
-        </>
-      }
-    />
+    <>
+      <KitMapView
+        scan={map.scan}
+        drafts={drafts}
+        onDraftsChange={setDrafts}
+        save={saveState}
+        bar={parts}
+        onSave={() => {
+          if (!demo) void check(drafts)
+        }}
+        onReopen={() => {}}
+        onConfirm={() => {
+          if (!demo && shown.phase === 'confirm') void save(shown.handle, drafts)
+        }}
+        lede={
+          <>
+            Read from your folder. Didn&apos;t check other AI tools, plugins or usage.
+            {map.missed > 0 && ` Couldn't read ${map.missed} ${map.missed === 1 ? 'folder' : 'folders'} in it.`}{' '}
+            <button
+              type="button"
+              className="rounded-sm font-medium text-[var(--p-ink)] underline decoration-[var(--p-line)] underline-offset-4 hover:decoration-[var(--p-ink-2)] focus-visible:outline-2 focus-visible:outline-[var(--p-ink)]"
+              onClick={onStartOver}
+            >
+              Start over
+            </button>
+          </>
+        }
+      />
+
+      <Tray open={shown.phase === 'username'} onOpenChange={(open) => !open && setRun({ phase: 'idle' })} title="Save your map">
+        <Suspense fallback={null}>
+          <ChooseUsername />
+        </Suspense>
+      </Tray>
+
+      {run.phase === 'saved' && (
+        <Tray open={outcome} onOpenChange={setOutcome} title={run.result.result === 'partial' ? 'Saved partway' : 'Saved'}>
+          <SaveDone counts={run.result.counts} notBackedUp={run.result.notBackedUp} dropped={run.result} newTab />
+        </Tray>
+      )}
+    </>
   )
+}
+
+// ---------------------------------------------------------------------------
+// ?demo=<state>: a dropped map's Save states, with made-up skills (dev only)
+// ---------------------------------------------------------------------------
+
+const DEMO_SKILLS: [string, JobId | null][] = [
+  ['Plain Prose', 'writing.editing'],
+  ['Copy Editor', 'writing.editing'],
+  ['Thread Writer', 'writing.short-posts'],
+  ['Readme Writer', 'writing.docs'],
+  ['Code Review', 'development.code-review'],
+  ['PR Writer', 'development.pull-requests'],
+  ['Deploy Notes', 'development.platforms'],
+  ['Deep Research', 'research.web-research'],
+  ['Meeting Notes', 'business.meetings'],
+  ['Morning Brief', null],
+]
+
+const DEMO_RESULT: DropSaveResult = {
+  result: 'applied',
+  counts: { backups: 9, removals: 0, fills: 1, merges: 0 },
+  waiting: { removals: 1, merges: 1 },
+  notBackedUp: [],
+  unsent: [],
+  notAdded: [],
+  unadded: 0,
+  mapSaved: true,
+}
+
+/** The `?demo` states, each a run drawn over the same made-up map. */
+const DEMO_RUNS: Record<string, { run: DropRun; outcome?: boolean }> = {
+  map: { run: { phase: 'idle' } },
+  'signing-in': { run: { phase: 'signing-in' } },
+  'sign-in-first': { run: { phase: 'sign-in-first' } },
+  username: { run: { phase: 'username' } },
+  confirm: { run: { phase: 'confirm', handle: 'sample', sent: false } },
+  'backing-up': { run: { phase: 'saving', step: 'saving' } },
+  done: { run: { phase: 'saved', handle: 'sample', result: DEMO_RESULT } },
+  'done-detail': { run: { phase: 'saved', handle: 'sample', result: DEMO_RESULT }, outcome: true },
+  secret: {
+    run: {
+      phase: 'saved',
+      handle: 'sample',
+      result: {
+        ...DEMO_RESULT,
+        counts: { ...DEMO_RESULT.counts, backups: 8 },
+        notBackedUp: [{ name: 'Deploy Notes', reason: 'secret', file: 'config.json', line: 3 }],
+      },
+    },
+    outcome: true,
+  },
+  partial: {
+    run: {
+      phase: 'saved',
+      handle: 'sample',
+      result: { ...DEMO_RESULT, result: 'partial', counts: { ...DEMO_RESULT.counts, backups: 8 }, unsent: ['Code Review'] },
+    },
+  },
+  failed: { run: { phase: 'failed', reason: 'unreachable', started: false } },
+}
+
+function demoOpened(state: string | null): Opened | null {
+  const demo = state ? DEMO_RUNS[state] : undefined
+  if (!demo) return null
+  const entries: KitMapEntry[] = DEMO_SKILLS.map(([name, job], n) => ({
+    key: `sha256:${(n + 1).toString(16).padStart(64, '0')}`,
+    name,
+    description: '',
+    source: 'local',
+    tools: [],
+    job,
+    usage: { state: 'unknown', reason: 'no-history' },
+  }))
+  const key = (name: string) => entries.find((entry) => entry.name === name)!.key
+  return {
+    map: { kind: 'map', scan: { entries, looked: [], unchecked: [] }, missed: 0, bundles: new Map() },
+    drafts: [
+      { kind: 'merge', job: 'writing.editing', keys: [key('Plain Prose'), key('Copy Editor')] },
+      { kind: 'remove', key: key('Morning Brief') },
+      { kind: 'fill', job: 'sales.prospecting', ref: '@openclaudia/icp-builder' },
+    ],
+    resume: false,
+    demo: { run: demo.run, outcome: demo.outcome ?? false },
+  }
 }
 
 function SectionSheet({

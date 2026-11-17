@@ -171,6 +171,23 @@ export function saveReducer(state: SaveState, event: SaveEvent): SaveState {
   }
 }
 
+/** One of the bar's buttons, drawn the way the bar draws its own. `pending` shows a step and does nothing. */
+export type SaveBarAction =
+  | { kind: 'button'; label: string; onClick: () => void }
+  | { kind: 'link'; label: string; href: string }
+  | { kind: 'pending'; label: string }
+
+/**
+ * For a Save the page runs itself (a dropped folder's): what the bar says and
+ * offers in place of Save's own for the phase. A part left out keeps the
+ * phase's own, and a secondary button takes the place of the changes count.
+ */
+export interface SaveBarParts {
+  message?: ReactNode
+  action?: SaveBarAction
+  secondary?: { label: string; onClick: () => void }
+}
+
 /** Drafts stay open to change only before Save, after it failed or timed out, and on the demo. */
 export function draftsLocked(save: SaveState): boolean {
   return !(save.phase === 'idle' || save.phase === 'failed' || save.phase === 'expired' || save.phase === 'sample')
@@ -383,8 +400,8 @@ export interface KitMapViewProps {
   sample?: boolean
   /** The line under the strip in place of where the scan looked: a dropped folder's map says what it didn't check. */
   lede?: ReactNode
-  /** Why Save can't run on this map yet. The bar says it, beside a Save that's off. */
-  saveOff?: string
+  /** The bar's words for a Save the page runs itself (a dropped folder's), in place of the computer's. */
+  bar?: SaveBarParts
 }
 
 export function KitMapView({
@@ -397,7 +414,7 @@ export function KitMapView({
   onConfirm = () => {},
   sample = false,
   lede,
-  saveOff,
+  bar,
 }: KitMapViewProps) {
   const [openId, setOpenId] = useState<OpenId | null>(null)
   const [moving, setMoving] = useState<KitMapEntry | null>(null)
@@ -622,7 +639,7 @@ export function KitMapView({
       {(scan.entries.length > 0 || drafts.length > 0 || save.phase !== 'idle') && (
         <SaveBar
           save={save}
-          saveOff={saveOff}
+          parts={bar}
           counts={map.changes.counts}
           changes={drafts.length}
           onSave={onSave}
@@ -1105,7 +1122,7 @@ function doneText({ backups, removals, fills, merges }: KitMapSaveCounts): strin
 /** The bar Save lives in, and every state the frame shows around it. */
 function SaveBar({
   save,
-  saveOff,
+  parts,
   counts,
   changes,
   onSave,
@@ -1115,7 +1132,7 @@ function SaveBar({
   onOutcome,
 }: {
   save: SaveState
-  saveOff?: string
+  parts?: SaveBarParts
   counts: KitMapSaveCounts
   changes: number
   onSave: () => void
@@ -1158,14 +1175,8 @@ function SaveBar({
   let secondary: ReactNode = null
   switch (save.phase) {
     case 'idle':
-      message = saveOff ?? 'Nothing leaves this computer until you save.'
-      action = saveOff ? (
-        <button type="button" className={primary} disabled>
-          Save
-        </button>
-      ) : (
-        button('Save', onSave)
-      )
+      message = 'Nothing leaves this computer until you save.'
+      action = button('Save', onSave)
       break
     case 'opened':
       action = button('Finish in the other tab', onReopen)
@@ -1217,6 +1228,29 @@ function SaveBar({
       message = <>This is a sample. Run {command} to save yours.</>
       action = copyButton
       break
+  }
+  if (parts?.message !== undefined) message = parts.message
+  if (parts?.action) {
+    const own = parts.action
+    action =
+      own.kind === 'button' ? (
+        button(own.label, own.onClick)
+      ) : own.kind === 'link' ? (
+        <a href={own.href} className={primary}>
+          {own.label}
+        </a>
+      ) : (
+        pending(own.label)
+      )
+  }
+  if (parts?.secondary) {
+    const { label, onClick } = parts.secondary
+    review = false
+    secondary = (
+      <button type="button" className={cn(s.pill, s.pillSecondary, 'min-w-0')} onClick={onClick}>
+        {label}
+      </button>
+    )
   }
 
   return (
