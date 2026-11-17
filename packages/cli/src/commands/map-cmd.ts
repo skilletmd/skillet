@@ -591,14 +591,20 @@ export async function startMap(opts: StartMapOptions = {}): Promise<MapRun> {
   return { url: server.url, origin: server.origin, token: server.token, done, save, stop: (reason) => stop(reason) };
 }
 
-/** `skillet map --apply` (see the module comment). Exits non-zero unless everything waiting is done. */
+/**
+ * `skillet map --apply` (see the module comment). Exits non-zero unless
+ * everything waiting is done. `--json` is how the app's sync tick runs it
+ * (U13): a live Save lock answers `locked` at once, so the app skips that
+ * tick and tries again instead of waiting the Save out (KTD10). A person at
+ * the terminal waits for the Save.
+ */
 async function applyCommand(json: boolean): Promise<void> {
   const print = (line: string) => console.log(line);
   const result = await runMapApplyOnly({
     registryUrl: REGISTRY_DEFAULT,
     rescan: scanThisMachine,
     wire: wireEntries,
-    ...(json ? {} : { print }),
+    ...(json ? { lockWaitMs: 0 } : { print }),
   });
   if (result.result === "not-connected") failAuthRequired({ json });
   if (result.result === "locked") {
@@ -620,6 +626,8 @@ async function applyCommand(json: boolean): Promise<void> {
       unremoved: result.unremoved,
       refused: result.refused,
       trash_run: result.trashRun,
+      // Whether this computer or the account changed: the app rescans its map when it did.
+      changed: result.changed,
     };
     process.stdout.write(JSON.stringify({ ok: done, data }, null, 2) + "\n");
   } else {

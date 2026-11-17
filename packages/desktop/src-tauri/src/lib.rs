@@ -685,6 +685,161 @@ fn pending_updates() -> Result<String, String> {
     run_skillet(&["pending", "--json", "--background"])
 }
 
+// ── Kit map (U13) ───────────────────────────────────────────────────────────
+// The app takes over from `npx skilletmd map` through the same CLI: it opens
+// the same map, applies the changes the account holds for this computer on
+// every sync tick, and rescans when a skill folder changed. The map payload
+// never holds a path; the only paths here are the watch list's own.
+
+/// Start `skillet` and leave it running: no window, no captured output, never
+/// waited on. Same environment as `run_skillet` (desktop TCC context, run from
+/// the Skillet home). A thread reaps the child when it exits, so a tray that
+/// runs for weeks never collects zombies.
+fn spawn_skillet_detached(args: &[&str]) -> Result<(), String> {
+    let (exe, mut argv) = skillet_command().ok_or("skillet CLI not found")?;
+    argv.extend(args.iter().map(|s| s.to_string()));
+    let mut child = hidden_command(exe)
+        .args(argv)
+        .env("SKILLET_TCC_CONTEXT", "desktop")
+        .current_dir(skillet_home())
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    std::thread::spawn(move || {
+        let _ = child.wait();
+    });
+    Ok(())
+}
+
+/// The map as this computer's scan sees it (`skillet map --json`): every skill
+/// with its job, and no path. The map watch rescans with it when a skill
+/// folder changed. Off the UI thread: a scan reads every skill.
+#[tauri::command]
+async fn map_scan() -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let (stdout, stderr) = run_skillet_capture(&["map", "--json"]);
+        if stdout.trim().is_empty() {
+            Err(if stderr.trim().is_empty() {
+                "map scan failed".to_string()
+            } else {
+                stderr
+            })
+        } else {
+            Ok(stdout)
+        }
+    })
+    .await
+    .map_err(|e| format!("map scan task failed: {e}"))?
+}
+
+/// The first step of every sync tick (KTD10): make the changes the account
+/// holds for this computer (`skillet map --apply --json`). A live Save lock
+/// answers `locked` at once and the webview skips the whole tick. Stdout comes
+/// back on every exit code, since locked, partial and not-connected are all
+/// JSON the webview reads.
+#[tauri::command]
+async fn map_apply() -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let (stdout, stderr) = run_skillet_capture(&["map", "--apply", "--json"]);
+        if stdout.trim().is_empty() {
+            Err(if stderr.trim().is_empty() {
+                "map apply failed".to_string()
+            } else {
+                stderr
+            })
+        } else {
+            Ok(stdout)
+        }
+    })
+    .await
+    .map_err(|e| format!("map apply task failed: {e}"))?
+}
+
+/// "Open my map" (onboarding and the tray): start `skillet map`, which serves
+/// the map on this computer, opens it in the browser and closes itself after
+/// 30 idle minutes. Its Save connects an unconnected computer (KTD6, KTD11).
+#[tauri::command]
+fn open_map() -> Result<(), String> {
+    spawn_skillet_detached(&["map"])
+}
+
+/// How many paths one `map_watch_stamps` call takes. The watch list is about a
+/// dozen, so anything far past it is not the app asking.
+const MAP_WATCH_MAX_PATHS: usize = 64;
+
+/// The roots a watched path may sit under: home, the Skillet dir and any
+/// `SKILLET_SKILL_ROOTS` entry, the roots `open_folder` allows. Compared by
+/// component and never canonicalized: a stat needs no more.
+fn map_watch_roots() -> Vec<PathBuf> {
+    let mut roots: Vec<PathBuf> = Vec::new();
+    if let Some(home) = home_dir() {
+        roots.push(home);
+    }
+    roots.push(PathBuf::from(skillet_home()));
+    if let Ok(extra) = std::env::var("SKILLET_SKILL_ROOTS") {
+        for part in extra
+            .split(|c| c == ':' || c == ';')
+            .filter(|s| !s.is_empty())
+        {
+            roots.push(PathBuf::from(part));
+        }
+    }
+    roots
+}
+
+/// A watched path from the webview, or None. `~/` is expanded against `home`;
+/// the result must be absolute, free of `..` and under one of `roots`.
+fn resolve_watch_path(raw: &str, home: Option<&Path>, roots: &[PathBuf]) -> Option<PathBuf> {
+    let path = match raw.strip_prefix("~/") {
+        Some(rest) => home?.join(rest),
+        None => PathBuf::from(raw),
+    };
+    if !path.is_absolute() {
+        return None;
+    }
+    if path
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return None;
+    }
+    if !roots.iter().any(|root| path.starts_with(root)) {
+        return None;
+    }
+    Some(path)
+}
+
+/// One path's stamp for the map watch: its modification time and size, or None
+/// when it's missing. Metadata only, never a listing or a read of what's in
+/// it, so it can't bring up a macOS folder prompt (see
+/// path_in_tcc_protected_folder). A linked folder stamps its target.
+fn watch_stamp(path: &Path) -> Option<String> {
+    let meta = fs::metadata(path).ok()?;
+    let since = meta.modified().ok()?.duration_since(UNIX_EPOCH).ok()?;
+    Some(format!(
+        "{}.{:09}:{}",
+        since.as_secs(),
+        since.subsec_nanos(),
+        meta.len()
+    ))
+}
+
+/// Stamps for the map watch, one per path in order: None when a path is
+/// missing or outside the allowed roots. The webview compares them with the
+/// last check and rescans only when one changed (KTD11).
+#[tauri::command]
+fn map_watch_stamps(paths: Vec<String>) -> Vec<Option<String>> {
+    let home = home_dir();
+    let roots = map_watch_roots();
+    paths
+        .iter()
+        .take(MAP_WATCH_MAX_PATHS)
+        .map(|raw| resolve_watch_path(raw, home.as_deref(), &roots).and_then(|p| watch_stamp(&p)))
+        .collect()
+}
+
 // ── Insertion ────────────────────────────────────────────────────────────────
 // Clipboard + synthesized paste — the same model as the Swift app, needing the
 // same Accessibility grant. Cross-platform: Cmd+V on macOS, Ctrl+V elsewhere.
@@ -1628,7 +1783,11 @@ pub fn run() {
             accessibility_asked,
             open_folder_access_settings,
             reset_folder_access,
-            finish_onboarding
+            finish_onboarding,
+            map_scan,
+            map_apply,
+            open_map,
+            map_watch_stamps
         ])
         .setup(|app| {
             // Pin the real app version before anything can shell out to the
@@ -1778,6 +1937,82 @@ mod folder_access_tests {
         // Shell metacharacters are not special to Command, but they must not
         // resolve to a service either.
         assert_eq!(tccutil_service_for("/tmp/Documents; rm -rf /"), None);
+    }
+}
+
+#[cfg(test)]
+mod map_watch_tests {
+    use super::{resolve_watch_path, watch_stamp, MAP_WATCH_MAX_PATHS};
+    use std::path::PathBuf;
+
+    fn scratch(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("skillet-map-watch-{}-{name}", std::process::id()))
+    }
+
+    // The paths come from the webview. Only a home-relative or rooted path
+    // under the allowed roots may reach a stat, and never one that climbs out.
+    #[test]
+    fn watch_paths_expand_home_and_stay_inside_the_roots() {
+        let home = scratch("home");
+        let skillet = home.join(".skillet");
+        let roots = vec![home.clone(), skillet.clone()];
+        assert_eq!(
+            resolve_watch_path("~/.claude/skills", Some(&home), &roots),
+            Some(home.join(".claude/skills"))
+        );
+        let rooted = home.join(".agents").join("skills");
+        assert_eq!(
+            resolve_watch_path(&rooted.to_string_lossy(), Some(&home), &roots),
+            Some(rooted.clone())
+        );
+        assert_eq!(
+            resolve_watch_path(".claude/skills", Some(&home), &roots),
+            None,
+            "a relative path resolves against nothing the app knows"
+        );
+        assert_eq!(
+            resolve_watch_path("~/../elsewhere/.claude/skills", Some(&home), &roots),
+            None,
+            "a path that climbs out of home is refused before any stat"
+        );
+        let outside = scratch("outside").join("skills");
+        assert_eq!(
+            resolve_watch_path(&outside.to_string_lossy(), Some(&home), &roots),
+            None,
+            "a path outside every allowed root is refused"
+        );
+        assert_eq!(
+            resolve_watch_path("~/.claude/skills", None, &roots),
+            None,
+            "no home, no tilde expansion"
+        );
+        assert!(MAP_WATCH_MAX_PATHS >= 32, "room for the whole watch list");
+    }
+
+    // The light check (KTD11): a skills folder that isn't there has no stamp,
+    // and a skill folder landing in one changes it, without reading anything.
+    #[test]
+    fn watch_stamp_is_none_when_missing_and_moves_when_a_skill_lands() {
+        let root = scratch("stamp");
+        let _ = std::fs::remove_dir_all(&root);
+        let skills = root.join("skills");
+        assert_eq!(watch_stamp(&skills), None, "a missing folder has no stamp");
+
+        std::fs::create_dir_all(&skills).expect("mkdir skills");
+        let first = watch_stamp(&skills).expect("a folder has a stamp");
+        assert_eq!(watch_stamp(&skills), Some(first.clone()), "nothing changed, same stamp");
+
+        // Past any filesystem's timestamp granularity, then a skill lands.
+        std::thread::sleep(std::time::Duration::from_millis(1100));
+        std::fs::create_dir_all(skills.join("plain-prose")).expect("mkdir skill");
+        let second = watch_stamp(&skills).expect("still a folder");
+        assert_ne!(first, second, "a new skill folder moves the folder's stamp");
+
+        let file = root.join("installed_plugins.json");
+        std::fs::write(&file, b"{}").expect("write list");
+        assert!(watch_stamp(&file).is_some(), "a plugin list file has a stamp too");
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 }
 

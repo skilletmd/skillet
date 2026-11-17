@@ -14,6 +14,22 @@ import { parseCliJson } from './cli-json'
 import { extractPairCode, pairCodeInputError } from './pair-code'
 import { normalizeDeviceLabel } from './device-label'
 import { escapeHtml } from './escape-html'
+import {
+  MAP_WATCH_INTERVAL_MS,
+  createMapWatch,
+  mapLines,
+  mapWatchPaths,
+  runSyncTick,
+  withAdded,
+  type MapAddedSkill,
+} from './map-watch'
+import {
+  createOnboardingFlow,
+  welcomeActionsHtml,
+  welcomeAgents,
+  welcomeAgentsHtml,
+  type OnboardingStep,
+} from './onboarding-flow'
 import { vocabularyEntry } from '@skillet/protocol/scan-vocabulary'
 import {
   clearPersistedDeviceSyncSeq,
@@ -338,6 +354,8 @@ function getAdapters(opts: { background?: boolean } = {}): Promise<Adapter[]> {
   if (adaptersInFlight) return adaptersInFlight
   adaptersInFlight = getAdaptersUncached(opts.background !== false).finally(() => {
     adaptersInFlight = null
+    // A sync writes into the skill folders: the map catches up once it's done.
+    void mapWatchCheck()
   })
   return adaptersInFlight
 }
@@ -369,8 +387,28 @@ async function getDetectedAgents(): Promise<Adapter[]> {
     return []
   }
 }
+// Every sync tick, from any window, comes through here, so the map's step
+// does too (U13, KTD10): `skillet map --apply --json` first makes the changes
+// the account holds for this computer. While a Save holds the lock, the whole
+// tick is skipped, last-known state stands, and the tray tries again shortly.
 async function getAdaptersUncached(background: boolean): Promise<Adapter[]> {
   if (!(await usingCli())) return MOCK_ADAPTERS
+  const tick = await runSyncTick({
+    applyMap: () => invoke<string>('map_apply'),
+    sync: () => syncAdapters(background),
+    retryLater: (ms) => scheduleSaveLockRetry(ms),
+    mapChanged: () => {
+      void mapWatchCheck({ force: true })
+    },
+  })
+  if (tick.kind === 'locked') {
+    traySaveLocked = true
+    return trayAdapters ?? []
+  }
+  traySaveLocked = false
+  return tick.value
+}
+async function syncAdapters(background: boolean): Promise<Adapter[]> {
   // A quarantined/approval-gated update fails the sync but is NOT a connectivity
   // problem — the CLI prints progress text then a `{"ok":false,"error":"…approval…"}`
   // blob, so plain JSON.parse of the whole stdout throws. Classify it as review, not offline.
@@ -867,6 +905,18 @@ let trayKit: KitStatus | null = null
 let traySyncKits: SyncKitGroupJson[] | null = null
 let deviceSyncStream: DeviceSyncStreamController | null = null
 let deviceSyncStreamStarting = false
+// The kit map (U13). A Save held this computer's lock on the last tick, so
+// that tick was skipped and a retry is due (KTD10).
+let traySaveLocked = false
+let saveLockRetryTimer: number | null = null
+// Skills the light check found, newest first, pinned to Latest until one of
+// their rows opens the map. The watch's last scan lives in map-watch.ts.
+let trayMapAdded: readonly MapAddedSkill[] = []
+const mapWatch = createMapWatch({
+  paths: () => mapWatchPaths(trayDetectedAgents ?? []),
+  stamps: (paths) => invoke<(string | null)[]>('map_watch_stamps', { paths }),
+  scan: () => invoke<string>('map_scan'),
+})
 type TrayView = 'home' | 'signin' | 'settings' | 'kit' | 'backup' | 'agents' | 'folders'
 let trayView: TrayView = 'home'
 // Silent auto-update: an update that's been downloaded in the background and is
@@ -1348,14 +1398,17 @@ async function renderTray() {
   if (trayKit === null) trayKit = await getKitStatus()
   if (trayAdapters === null) {
     trayAdapters = await getAdapters()
-    traySyncedAt = Date.now()
     // This cold-cache fetch was a real `sync --json` attempt (the launch sync).
     // Stamp it like runSync does, or the daily auto-sync throttle can't see it
-    // and fires a redundant sync right after every app launch.
-    try {
-      localStorage.setItem('lastAutoSync', String(traySyncedAt))
-    } catch {
-      /* private mode */
+    // and fires a redundant sync right after every app launch. A tick a Save's
+    // lock skipped is not a sync: its retry is already due.
+    if (!traySaveLocked) {
+      traySyncedAt = Date.now()
+      try {
+        localStorage.setItem('lastAutoSync', String(traySyncedAt))
+      } catch {
+        /* private mode */
+      }
     }
   }
   // Local agent detection — loaded separately so it succeeds even when the sync
@@ -1791,6 +1844,7 @@ function paintTray(skills: Skill[], granted: boolean) {
   const footer =
     (parked ? renderParkedNote(parked) : '') +
     (traySyncIssues.length > 0 ? renderSyncIssuesNote() : '')
+  const mapRows = trayMapAdded.length > 0 ? renderMapRows() : ''
 
   // When there's no feed (not synced), fill the body with a centered state instead
   // of a blank void — the status bar carries the headline, this carries the action.
@@ -1812,9 +1866,9 @@ function paintTray(skills: Skill[], granted: boolean) {
   // followed content is all first-install-gated. The approval-block emptyState
   // already carries its own review button, so don't double it there.
   const listOrEmpty = skillRows
-    ? `<div class="lib-list">${updateCta}${statsCard}${skillRows}</div>`
-    : (updateCta || statsCard) && !trayApprovalBlocked
-      ? `<div class="lib-list">${updateCta}${statsCard}</div>${emptyState}`
+    ? `<div class="lib-list">${updateCta}${mapRows}${statsCard}${skillRows}</div>`
+    : (updateCta || mapRows || statsCard) && !trayApprovalBlocked
+      ? `<div class="lib-list">${updateCta}${mapRows}${statsCard}</div>${emptyState}`
       : emptyState
 
   app.innerHTML = panelWithRail(
@@ -1888,7 +1942,32 @@ function paintTray(skills: Skill[], granted: boolean) {
   document.getElementById('retrysyncissue')?.addEventListener('click', () => {
     void runSync().then(() => paintTray(lastSkills, lastGranted))
   })
+  // A new-skill row opens the map, where a doubled job merges; opened, the
+  // rows have done their job.
+  document.querySelectorAll<HTMLElement>('[data-map-open]').forEach((el) => {
+    el.onclick = () => {
+      openMapFromTray()
+      trayMapAdded = []
+      paintTray(skills, granted)
+    }
+  })
   fitTrayWindow()
+}
+
+// New skills the light check found (R30, F5): one pinned row each, naming
+// its job and how many skills that job holds now, the same shape as the
+// pending-updates row above them.
+function renderMapRows(): string {
+  return mapLines(trayMapAdded)
+    .map(
+      (line) => `<button type="button" class="lib-row" data-map-open>
+        <span class="cover lib-cover">${ICON.skills}</span>
+        <span class="lib-name-col"><span class="lib-name lib-kit-name">${escapeHtml(line.title)}</span><span class="lib-sub">${escapeHtml(line.detail)}</span></span>
+        <span class="spacer"></span>
+        <span class="ico lib-chev lib-ext">${ICON.arrowUpRight}</span>
+      </button>`,
+    )
+    .join('')
 }
 
 // Needs-access notice (U3/R7): one row, visible for as long as any agent
@@ -1946,6 +2025,16 @@ async function runSync(opts: { background?: boolean } = {}): Promise<void> {
   syncJustSucceeded = false
   await renderTray() // spinner
   trayAdapters = await getAdapters({ background })
+  if (traySaveLocked) {
+    // A Save is changing this computer: the whole tick waits for it (KTD10).
+    // No stamp, so the daily throttle still counts it as due; the retry the
+    // tick asked for runs it once the lock clears.
+    traySyncing = false
+    syncPending = false
+    syncPendingUserInitiated = false
+    await renderTray()
+    return
+  }
   // Re-scan detected agents too. A sync is exactly when folder access can
   // CHANGE (a user-initiated one probes the root and records the grant; a
   // denial suspends the marker), and the Permissions rows read this. Without
@@ -2097,6 +2186,39 @@ async function refreshPending(): Promise<void> {
   if (await trayUnpaired()) return // gate showing — nothing account-scoped to poll
   applyPending(await getPending())
   await renderTray()
+}
+
+// The light check (U13, KTD11): stat the skill folders, rescan with
+// `skillet map --json` only when one moved, and pin a line per new skill to
+// Latest. Unforced checks wait while a sync is writing into those folders;
+// the one after it catches up. Local only: works before the computer is
+// connected too, though only the connected tray shows the lines.
+async function mapWatchCheck(opts: { force?: boolean } = {}): Promise<void> {
+  if (view !== 'tray') return
+  if (!(await usingCli())) return
+  if (adaptersInFlight && !opts.force) return
+  const result = await mapWatch.check(opts)
+  if (!result.rescanned) return
+  const next = withAdded(trayMapAdded, result.added)
+  if (next === trayMapAdded) return
+  trayMapAdded = next
+  if (trayView === 'home') paintTray(lastSkills, lastGranted)
+}
+
+// A Save held this computer's lock, so the tick was skipped (KTD10). One
+// retry at a time; the first tick after the lock clears makes the changes.
+function scheduleSaveLockRetry(ms: number): void {
+  if (view !== 'tray' || saveLockRetryTimer !== null) return
+  saveLockRetryTimer = window.setTimeout(() => {
+    saveLockRetryTimer = null
+    void runSync()
+  }, ms)
+}
+
+// "Open my map": the same `skillet map` the pasted line runs (R28). It opens
+// in the browser, which takes focus, so the panel closes on its own.
+function openMapFromTray(): void {
+  void invoke('open_map').catch(() => undefined)
 }
 
 function stopDeviceSyncStream(): void {
@@ -2517,6 +2639,16 @@ function paintKitBrowser(skills: Skill[], kit: KitStatus | null) {
   const groupBlocks = auth.showAccountKitGroups
     ? renderLibraryHtml(skills, { sort: 'kit', includeLocal: true, view: libView, localViewer: true })
     : `<div class="empty-row">Sign in to pull kits from your account.</div>`
+  // The kit map (R28): the same `skillet map` the pasted line runs, pinned
+  // first like the other one-tap rows.
+  const mapRow = auth.showAccountKitGroups
+    ? `<button type="button" class="lib-row" id="openmap">
+        <span class="cover lib-cover">${ICON.skills}</span>
+        <span class="lib-name-col"><span class="lib-name lib-kit-name">Open my map</span><span class="lib-sub">${escapeHtml(`Every skill on ${deviceNoun()}, by job`)}</span></span>
+        <span class="spacer"></span>
+        <span class="ico lib-chev lib-ext">${ICON.arrowUpRight}</span>
+      </button>`
+    : ''
 
   // Counts move INTO the tabs (Kits N / Skills N), so the subtitle line is gone.
   // "Not synced" lives as the pinned CTA row at the top of the list, not here.
@@ -2537,9 +2669,10 @@ function paintKitBrowser(skills: Skill[], kit: KitStatus | null) {
             : `<span class="view-head-sub">Sign in to pull kits from your account</span>`
         }
       </div>
-      <div class="lib-list kit-browser">${groupBlocks}</div>`,
+      <div class="lib-list kit-browser">${mapRow}${groupBlocks}</div>`,
   )
   wireRail()
+  document.getElementById('openmap')?.addEventListener('click', () => openMapFromTray())
   wireLibrary(() => paintKitBrowser(skills, kit))
   document.querySelectorAll<HTMLElement>('.lib-toggle-btn[data-view]').forEach((el) => {
     el.onclick = () => {
@@ -3009,6 +3142,7 @@ if (view === 'tray') {
       if (Date.now() - lastPointerDown > 250) {
         void renderTray()
         void maybeSyncOnTrayOpen()
+        void mapWatchCheck()
       }
     }, 40)
   })
@@ -3055,18 +3189,29 @@ if (view === 'tray') {
   setInterval(() => void maybeAutoSync(), 60 * 60 * 1000)
   // Cheap account-pending refresh so a web/desktop approval shows up promptly.
   setInterval(() => void refreshPending(), PENDING_POLL_MS)
+  // The map's light check between tray opens (U13). Its first run, the
+  // baseline, follows the launch sync (see getAdapters).
+  setInterval(() => void mapWatchCheck(), MAP_WATCH_INTERVAL_MS)
   // Silent auto-update: check on launch, then every 6 hours.
   void maybeCheckForUpdate()
   setInterval(() => void maybeCheckForUpdate(), 6 * 60 * 60 * 1000)
 }
 
 // ── Onboarding (first run) ─────────────────────────────────────────────────────
+// The app and the CLI share ~/.skillet (KTD11), so onboarding asks `auth
+// status` before it shows a step: a computer the pasted line already connected
+// starts at sync (R27). One nobody connected leads with "Open my map", whose
+// Save connects it; the pair code stays as the fallback. The decisions live in
+// onboarding-flow.ts; this paints them.
 async function renderOnboarding() {
-  let step: 'welcome' | 'link' | 'sync' | 'permission' = 'welcome'
+  let step: OnboardingStep = 'start'
   let connecting = false
   let linkMsg = ''
+  let mapMsg = ''
   let shakeCode = false // one-shot: bad code shakes the boxes instead of lecturing
   let connectedHandle: string | null = null
+  // Connected before onboarding opened: there is no connect step to count.
+  let startedConnected = false
   // paint() rebuilds innerHTML, which would wipe a half-typed code — carry it over.
   let codeDraft = ''
   let detecting = false
@@ -3080,15 +3225,78 @@ async function renderOnboarding() {
   let rowsAnimated = false
   // The welcome proves the promise instead of stating it: local detection of
   // the agents already on this machine, before any account exists.
-  let welcomeAgents: Adapter[] | null = null
+  let welcomeFound: Adapter[] | null = null
   // Step-enter motion fires only on actual step changes — an error repaint
   // must not replay the slide (Apple: motion carries meaning, not decoration).
   let lastPaintedStep: string | null = null
   let obShortcut = 'Alt+Shift+KeyS'
+  let lockWaits = 0
+
+  const flow = createOnboardingFlow({
+    authStatus: () => invoke<string>('auth_status'),
+    openMap: () => invoke('open_map'),
+    onStep: (next) => {
+      step = next
+      paint()
+    },
+    onConnected: (auth, how) => {
+      if (how === 'already') startedConnected = true
+      // The tray is a separate webview with its own cached auth state —
+      // without this it keeps showing the signed-out gate after the map's Save.
+      else void emit('skillet:paired')
+      beginSync(auth.handle)
+    },
+  })
+
+  // A lock-raced or failed sync returns NO adapters at all; a real answer
+  // always carries the adapter list (counts may be zero). Only the latter may
+  // claim an outcome — retry briefly on the former so the fresh-account
+  // conversion can never fire from a race. The map's own Save may still hold
+  // this computer's lock right after it connected: then the sync waits for it.
+  const settleSync = async (attempt = 0): Promise<void> => {
+    const synced = await getAdapters()
+    if (step !== 'sync') return
+    if (synced.length > 0) {
+      const byName = new Map(synced.map((a) => [a.name, a]))
+      found = found.map((f) => (byName.has(f.name) ? { ...byName.get(f.name)!, label: f.label } : f))
+      syncedTotal = Math.max(0, ...synced.map((a) => a.count ?? 0), 0)
+      paint()
+      return
+    }
+    if (traySaveLocked && lockWaits < 100) {
+      lockWaits++
+      setTimeout(() => void settleSync(attempt), 3000)
+      return
+    }
+    if (attempt < 4) setTimeout(() => void settleSync(attempt + 1), 1500)
+  }
+
+  // Every way in (already connected, the map's Save, a pair code) lands here.
+  // FOUND list = pure local detection: a lock race or transient sync failure
+  // must never render "nothing detected" seconds after the welcome proved
+  // detection. The full sync merges counts when it lands.
+  const beginSync = (handle: string | null): void => {
+    connectedHandle = handle
+    detecting = true
+    flow.go('sync')
+    void getDetectedAgents().then((agents) => {
+      found = agents
+      detecting = false
+      paint()
+      void settleSync()
+    })
+  }
+
+  const openMap = (): void => {
+    void flow.openMap().then((opened) => {
+      mapMsg = opened.ok ? '' : (opened.error ?? '')
+      paint()
+    })
+  }
 
   void getDetectedAgents()
     .then((a) => {
-      welcomeAgents = a
+      welcomeFound = a
       if (step === 'welcome') paint()
     })
     .catch(() => {})
@@ -3106,80 +3314,67 @@ async function renderOnboarding() {
   })
 
   async function paint() {
+    if (step === 'start') {
+      // The moment before `auth status` answers: nothing to show yet.
+      app.innerHTML = `<div class="panel onboarding" data-tauri-drag-region><button class="ob-close" id="ob-close" aria-label="Close">×</button></div>`
+      document
+        .getElementById('ob-close')
+        ?.addEventListener('click', () => void getCurrentWindow().close())
+      return
+    }
     const granted = step === 'permission' ? await axGranted() : false
     // The prompt is one-per-app. Once spent, "Allow access" would be a lie —
     // pressing it can only open System Settings from then on.
     const asked = step === 'permission' ? await axAsked() : false
     const noun = deviceNoun() // platform noun: Mac/PC/device, from platform-copy
     const Noun = noun.charAt(0).toUpperCase() + noun.slice(1)
-    const dotSteps = needsPerm
-      ? ['welcome', 'link', 'sync', 'permission']
-      : ['welcome', 'link', 'sync']
-    const dots = `<div class="dots">${dotSteps
-      .map((s) => `<span class="${step === s ? 'on' : ''}"></span>`)
-      .join('')}</div>`
+    // The map and the pair code are two ways through one step.
+    const dotSteps = startedConnected ? ['sync'] : ['welcome', 'connect', 'sync']
+    if (needsPerm) dotSteps.push('permission')
+    const dotOn = (s: string) => s === step || (s === 'connect' && (step === 'link' || step === 'map'))
+    // One step has nothing to count.
+    const dots =
+      dotSteps.length > 1
+        ? `<div class="dots">${dotSteps.map((s) => `<span class="${dotOn(s) ? 'on' : ''}"></span>`).join('')}</div>`
+        : ''
     // One header per moment: welcome carries the promise; every later step
     // carries only its own job. Never a task list before a reason.
     const header =
       step === 'welcome'
-        ? `<div class="ob-head" data-tauri-drag-region>${brandMark('ob-logo ob-brand')}<div class="ob-title">Skills worth running.</div><div class="ob-sub">Connect ${noun} and skills you add on Skillet land in your agents, instantly.</div></div>`
-        : step === 'link'
-          ? `<div class="ob-head" data-tauri-drag-region>${brandMark('ob-logo ob-brand ob-logo-sm')}<div class="ob-title">Connect ${noun}</div></div>`
-          : step === 'sync'
-            ? `<div class="ob-head" data-tauri-drag-region>${brandMark('ob-logo ob-brand ob-logo-sm')}<div class="ob-title">Connected${connectedHandle ? ` to @${escapeHtml(connectedHandle)}` : ''} <span class="ob-ok">✓</span></div><div class="ob-sub">${
-              syncedTotal === null
-                ? `Syncing your skills to ${noun}.`
-                : syncedTotal > 0
-                  ? `${syncedTotal} skill${syncedTotal === 1 ? '' : 's'} just landed in your agents.`
-                  : 'Your agents are ready for their first skill.'
-            }</div></div>`
-            : `<div class="ob-head" data-tauri-drag-region>${brandMark('ob-logo ob-brand ob-logo-sm')}<div class="ob-title">One more thing</div></div>`
+        ? `<div class="ob-head" data-tauri-drag-region>${brandMark('ob-logo ob-brand')}<div class="ob-title">Skills worth running.</div><div class="ob-sub">${escapeHtml(`See every skill on ${noun}, sorted by job.`)}</div></div>`
+        : step === 'map'
+          ? `<div class="ob-head" data-tauri-drag-region>${brandMark('ob-logo ob-brand ob-logo-sm')}<div class="ob-title">Your map is open</div><div class="ob-sub">${escapeHtml(`Save it in your browser to connect ${noun}.`)}</div></div>`
+          : step === 'link'
+            ? `<div class="ob-head" data-tauri-drag-region>${brandMark('ob-logo ob-brand ob-logo-sm')}<div class="ob-title">Connect ${noun}</div></div>`
+            : step === 'sync'
+              ? `<div class="ob-head" data-tauri-drag-region>${brandMark('ob-logo ob-brand ob-logo-sm')}<div class="ob-title">Connected${connectedHandle ? ` to @${escapeHtml(connectedHandle)}` : ''} <span class="ob-ok">✓</span></div><div class="ob-sub">${
+                syncedTotal === null
+                  ? `Syncing your skills to ${noun}.`
+                  : syncedTotal > 0
+                    ? `${syncedTotal} skill${syncedTotal === 1 ? '' : 's'} just landed in your agents.`
+                    : 'Your agents are ready for their first skill.'
+              }</div></div>`
+              : `<div class="ob-head" data-tauri-drag-region>${brandMark('ob-logo ob-brand ob-logo-sm')}<div class="ob-title">One more thing</div></div>`
     let body = ''
 
     if (step === 'welcome') {
-      // Detected agents lead as personal proof; a "+ more" chip absorbs any
-      // detection miss (under a FOUND caption an omission reads as failure)
-      // and carries the breadth pitch. Falls back to the flagship three.
-      const detected = (welcomeAgents ?? [])
-        // "Universal" is the shared dir, not an agent a person knows; the CLI
-        // labels the codex row "Codex" when ~/.codex proves it's installed.
-        .filter((a) => (a.label ?? pretty(a.name)) !== 'Universal')
-        .map((a) => ({ name: a.name, label: a.label ?? pretty(a.name) }))
-      // Always a 2×2: three agent pills (detected first, flagship fill) plus
-      // a ghost "+ more" in the fourth slot — deterministic layout, no orphan
-      // wrap, and honest under a works-with (not found-on) caption.
-      const FLAGSHIP = [
-        { name: 'claude-code', label: 'Claude Code' },
-        { name: 'cursor', label: 'Cursor' },
-        { name: 'codex', label: 'Codex' },
-        { name: 'windsurf', label: 'Devin Desktop' },
-      ]
-      const shown = [...detected]
-      for (const f of FLAGSHIP) {
-        if (shown.length >= 3) break
-        if (!shown.some((a) => a.label === f.label)) shown.push(f)
-      }
-      const chips =
-        shown
-          .slice(0, 3)
-          .map(
-            (a) => `<span class="ob-agent">${agentLogoSvg(a.name) ?? ''}${escapeHtml(a.label)}</span>`,
-          )
-          .join('') + `<span class="ob-agent ob-agent-more">+ more</span>`
-      // No caption: the sub ends "…into your agents", and this row IS those
-      // agents — proximity does the mapping (a label here would be the mapping
-      // failing). Bare lockups, not pills: containers on non-interactive
-      // content read as controls and steal weight from Get started.
-      body = `<div class="ob-agents">${chips}</div>
-        <button class="ob-cta" id="ob-start">Get started</button>
-        <div class="ob-fine">Connecting never uploads your local skills.</div>`
+      // Only the tools this computer has (R29): no stock list, no "+ more".
+      // Until detection answers the row stays empty, so a slow scan never
+      // flashes "no tools". Bare lockups, not pills: containers on
+      // non-interactive content read as controls and steal weight from the CTA.
+      const row =
+        welcomeFound === null ? '' : welcomeAgentsHtml(welcomeAgents(welcomeFound, pretty), agentLogoSvg, noun)
+      body = `${row}${welcomeActionsHtml(noun, { message: mapMsg })}`
+    } else if (step === 'map') {
+      body = welcomeActionsHtml(noun, { reopen: true, message: mapMsg })
     } else if (step === 'link') {
       body = `<div class="ob-note">Get your pair code at <button class="ob-link" id="ob-web">skillet.md/settings ↗</button></div>
         ${pairCodeBoxesHtml('ob-code-boxes')}
         <div class="ob-msg" id="ob-msg">${escapeHtml(linkMsg)}</div>
         <button class="ob-cta" id="ob-connect" disabled>${connecting ? 'Connecting…' : `Connect ${Noun}`}</button>
         <div class="ob-privacy">Connecting never uploads your local skills.</div>
-        <div class="ob-fine">No account? Getting a code creates one.</div>`
+        <div class="ob-fine">No account? Getting a code creates one.</div>
+        <button class="ob-skip" id="ob-open-map">Open my map instead</button>`
     } else if (step === 'sync') {
       const detected = found.filter((a) => a.status !== 'skipped-not-detected')
       const rows = detecting
@@ -3197,10 +3392,10 @@ async function renderOnboarding() {
               })
               .join('')
           : `<div class="ob-row"><span class="todo">○</span> No agents detected yet</div>`
-      // This step is only reachable after a successful connect (there is no
-      // skip path — pairing is the front door), so the copy assumes linked.
-      // Two payoffs: skills landed (counts, staggered arrival) or a fresh
-      // account (convert straight to finding the first skill).
+      // This step is only reachable once this computer is connected (by the
+      // CLI before onboarding, the map's Save, or a pair code), so the copy
+      // assumes linked. Two payoffs: skills landed (counts, staggered arrival)
+      // or a fresh account (convert straight to finding the first skill).
       const freshAccount = syncedTotal === 0 && !detecting
       if (!detecting && detected.length > 0) rowsAnimated = true
       body = `<div class="ob-card"><div class="ob-cap">${escapeHtml(`FOUND ON ${deviceNoun().replace(/^this /, 'THIS ').toUpperCase()}`)}</div>${rows}</div>
@@ -3239,9 +3434,11 @@ async function renderOnboarding() {
       void getCurrentWindow().startDragging()
     })
 
-    document.getElementById('ob-start')?.addEventListener('click', () => {
-      step = 'link'
-      paint()
+    // "Open my map" runs the same `skillet map` the pasted line does (R28).
+    document.getElementById('ob-open-map')?.addEventListener('click', openMap)
+    document.getElementById('ob-pair')?.addEventListener('click', () => {
+      mapMsg = ''
+      flow.usePairCode()
     })
     // /settings redirects through sign-in when logged out, so this one link
     // covers both "sign in" and "copy your pair code".
@@ -3287,35 +3484,10 @@ async function renderOnboarding() {
         if (res.ok) {
           connecting = false
           linkMsg = ''
-          connectedHandle = res.handle ?? null
           // The tray is a separate webview with its own cached auth state —
           // without this it keeps showing the signed-out gate after pairing.
           void emit('skillet:paired')
-          detecting = true
-          step = 'sync'
-          // FOUND list = pure local detection: a lock race or transient sync
-          // failure must never render "nothing detected" seconds after the
-          // welcome proved detection. The full sync merges counts when it lands.
-          found = await getDetectedAgents()
-          detecting = false
-          paint()
-          // A lock-raced or failed sync returns NO adapters at all; a real
-          // answer always carries the adapter list (counts may be zero). Only
-          // the latter may claim an outcome — retry briefly on the former so
-          // the fresh-account conversion can never fire from a race.
-          const settleSync = async (attempt = 0): Promise<void> => {
-            const synced = await getAdapters()
-            if (step !== 'sync') return
-            if (synced.length > 0) {
-              const byName = new Map(synced.map((a) => [a.name, a]))
-              found = found.map((f) => (byName.has(f.name) ? { ...byName.get(f.name)!, label: f.label } : f))
-              syncedTotal = Math.max(0, ...synced.map((a) => a.count ?? 0), 0)
-              paint()
-              return
-            }
-            if (attempt < 4) setTimeout(() => void settleSync(attempt + 1), 1500)
-          }
-          void settleSync()
+          beginSync(res.handle ?? null)
         } else {
           connecting = false
           linkMsg = res.error ?? 'That code didn’t work. Grab a fresh one and try again.'
@@ -3332,16 +3504,11 @@ async function renderOnboarding() {
     document.getElementById('ob-browse')?.addEventListener('click', () => {
       void invoke('open_web', { path: '/browse' })
       if (!needsPerm) invoke('finish_onboarding')
-      else {
-        step = 'permission'
-        paint()
-      }
+      else flow.go('permission')
     })
     document.getElementById('cta')?.addEventListener('click', () => {
-      if (needsPerm) {
-        step = 'permission'
-        paint()
-      } else invoke('finish_onboarding')
+      if (needsPerm) flow.go('permission')
+      else invoke('finish_onboarding')
     })
     document
       .getElementById('allow')
@@ -3353,6 +3520,7 @@ async function renderOnboarding() {
     if (step === 'permission') paint()
   }, 1200)
   paint()
+  void flow.start()
 }
 
 // ── Preview-only view switcher ──────────────────────────────────────────────────
