@@ -12,6 +12,7 @@ import { registerExportCommand } from "./export.js";
 import { registerImportCommand } from "./import-cmd.js";
 import { registerInitCommand } from "./init.js";
 import { registerListCommand } from "./list.js";
+import { registerMapCommand } from "./map-cmd.js";
 import { registerMcpCommand } from "./mcp.js";
 import { registerPendingCommands } from "./pending.js";
 import { registerRouteCommand } from "./route-cmd.js";
@@ -70,6 +71,9 @@ export function registerAllCommands(program: Command, options?: RegisterCommands
   // `skillet init` — install the /skillet router skill into detected agents with
   // no account/pairing (the Summon tier's front door). Anonymous, like search.
   registerInitCommand(program);
+  // `skillet map`: the kit map, from `npx -y skilletmd map`. No account and no
+  // pairing gate: the scan only reads, and nothing leaves before Save (KTD1).
+  registerMapCommand(program);
   registerStatusCommand(program);
   registerDoctorCommand(program);
   registerAuthCommands(program);

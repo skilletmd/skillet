@@ -6,6 +6,7 @@ Usage
 
 Getting started
   init                  Install the /skillet router skill into your agents. No account needed
+  map                   See every skill on this machine sorted into jobs. No account needed
   connect <code>        Link this machine with a pair code from skillet.md Settings
   web [path]            Open skillet.md in your browser (e.g. /settings)
 
@@ -333,6 +334,18 @@ Usage
 
 Options
   --print               Print the router skill instead of installing it (copy-paste fallback)
+  -h, --help            display help for command
+
+
+# map
+skillet map   See every skill on this machine sorted into jobs. No account needed
+
+Usage
+  skillet map [options]
+
+Options
+  --no-open             Print the map's address without opening a browser
+  --json                Emit the scan as machine-readable JSON and exit
   -h, --help            display help for command
 
 

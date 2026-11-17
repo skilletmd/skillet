@@ -57,6 +57,7 @@ The full device surface, generated from the CLI's own command registration. The 
 | `skillet list` | List skills grouped by kit |
 | `skillet search` | Search the public skill library |
 | `skillet init` | Install the /skillet router skill into your agents. No account needed |
+| `skillet map` | See every skill on this machine sorted into jobs. No account needed |
 | `skillet scan` | Check your kit for unsafe skills |
 | `skillet doctor` | Auth, sync state, pending updates, and paths |
 | `skillet auth logout` | Sign out of this machine |
