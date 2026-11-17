@@ -42,6 +42,9 @@ import { registerEmailLoginCodeRoutes } from './auth/email-login-code.js'
 import { registerAuthorKeyRoutes } from './routes/author-keys.js'
 import { registerSearchRoutes } from './routes/search.js'
 import { registerConnectPairRoutes } from './routes/connect-pair.js'
+import { registerMapSessionRoutes } from './routes/map-sessions.js'
+import { registerBackupRoutes } from './routes/backups.js'
+import { registerKitMapRoutes } from './routes/kit-maps.js'
 import { registerMcpRoutes } from './routes/mcp.js'
 import { registerConnectedRepoRoutes } from './routes/connected-repos.js'
 import { registerHttpSecurity } from './http-security.js'
@@ -428,6 +431,11 @@ export async function buildServer(opts: ServerOptions = {}): Promise<{
   registerDeviceAgentRoutes(app, db, opts.usePrismaAuth && prisma ? prisma : undefined)
   registerDeviceSyncStreamRoutes(app, db, opts.usePrismaAuth && prisma ? prisma : undefined)
   registerConnectPairRoutes(app, db, opts.usePrismaAuth && prisma ? prisma : undefined)
+  // Kit map onboarding: Save from an unconnected computer, private backups by
+  // hash, the saved map and its pending changes. All hardcode `/api/v1/...`.
+  registerMapSessionRoutes(app, opts.usePrismaAuth && prisma ? prisma : undefined)
+  registerBackupRoutes(app, blobStore, opts.usePrismaAuth && prisma ? prisma : undefined)
+  registerKitMapRoutes(app, opts.usePrismaAuth && prisma ? prisma : undefined)
   // Personal MCP link (mint / fetch / regenerate) + the hosted MCP serving
   // endpoint hardcode `/api/v1/...`.
   registerMcpRoutes(app, db, blobStore, opts.usePrismaAuth && prisma ? prisma : undefined)

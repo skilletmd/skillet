@@ -28,7 +28,7 @@ main [README](../README.md) and [packages/registry/README.md](../packages/regist
 - **Rate limits.** Per-client-IP classes (ambient / write / heavy); see
   `packages/registry/README.md`.
 
-_182 routes across 35 areas._
+_199 routes across 38 areas._
 
 ## Account
 
@@ -115,6 +115,16 @@ _182 routes across 35 areas._
 | GET | `/api/v1/me/availability` |
 | DELETE | `/api/v1/me/availability` |
 | POST | `/api/v1/sync/availability` |
+
+## Backups
+
+| Method | Path |
+| --- | --- |
+| GET | `/api/v1/backups` |
+| GET | `/api/v1/backups/:hash` |
+| PUT | `/api/v1/backups/:hash` |
+| DELETE | `/api/v1/backups/:hash` |
+| POST | `/api/v1/backups/sources` |
 
 ## Connect Pair
 
@@ -206,6 +216,17 @@ _182 routes across 35 areas._
 | GET | `/api/v1/profiles/:author/followers` |
 | GET | `/api/v1/profiles/:author/following` |
 
+## Kit Maps
+
+| Method | Path |
+| --- | --- |
+| GET | `/api/v1/kit-map` |
+| PUT | `/api/v1/kit-map` |
+| GET | `/api/v1/kit-map/changes` |
+| POST | `/api/v1/kit-map/changes` |
+| POST | `/api/v1/kit-map/changes/:id/ack` |
+| POST | `/api/v1/kit-map/changes/claim` |
+
 ## Kit Members
 
 | Method | Path |
@@ -243,6 +264,17 @@ _182 routes across 35 areas._
 | GET | `/api/v1/kits/:kitId/versions` |
 | GET | `/api/v1/kits/by-handle/:owner/:slug` |
 | POST | `/api/v1/me/library/skills` |
+
+## Map Sessions
+
+| Method | Path |
+| --- | --- |
+| POST | `/api/v1/map-sessions` |
+| GET | `/api/v1/map-sessions/:id` |
+| POST | `/api/v1/map-sessions/:id/approve` |
+| POST | `/api/v1/map-sessions/:id/bind` |
+| POST | `/api/v1/map-sessions/:id/poll` |
+| POST | `/api/v1/map-sessions/:id/result` |
 
 ## Mcp
 
