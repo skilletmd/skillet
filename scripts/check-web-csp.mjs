@@ -13,19 +13,25 @@ const expectedMode = process.env.WEB_CSP_MODE ?? 'enforce'
 
 const PATHS = ['/', '/feed/foryou']
 
+// The kit map embed is framed by the CLI's page on 127.0.0.1, so it sends no
+// X-Frame-Options and allows only loopback parents. Its privacy rules (no
+// connection, no image that isn't inline) are enforced in every mode, the
+// rollback switch included (packages/web/src/lib/security-headers.ts).
+const EMBED_PATH = '/map/embed'
+const EMBED_RULES = ['frame-ancestors http://127.0.0.1:* http://localhost:*', "connect-src 'none'", 'img-src data: blob:']
+
 async function main() {
   console.log(`Checking CSP at ${site} (expected mode: ${expectedMode})`)
 
   for (const path of PATHS) {
     await checkPath(path)
   }
+  await checkEmbed()
 
   console.log('Web CSP check passed.')
 }
 
-async function checkPath(path) {
-  console.log(`\n${path}`)
-
+async function get(path) {
   let res
   try {
     res = await fetch(`${site}${path}`, { redirect: 'follow' })
@@ -36,7 +42,13 @@ async function checkPath(path) {
   if (!res.ok && res.status !== 304) {
     throw new Error(`GET ${path} returned ${res.status}`)
   }
+  return res
+}
 
+async function checkPath(path) {
+  console.log(`\n${path}`)
+
+  const res = await get(path)
   const enforce = res.headers.get('content-security-policy')
   const reportOnly = res.headers.get('content-security-policy-report-only')
   const frameOptions = res.headers.get('x-frame-options')
@@ -71,6 +83,27 @@ async function checkPath(path) {
   } else {
     throw new Error(`unknown WEB_CSP_MODE: ${expectedMode}`)
   }
+}
+
+async function checkEmbed() {
+  console.log(`\n${EMBED_PATH}`)
+
+  const res = await get(EMBED_PATH)
+  const enforce = res.headers.get('content-security-policy')
+  if (!enforce) {
+    throw new Error('missing enforced Content-Security-Policy on the map embed')
+  }
+  const rules = enforce.split(/[;,]/).map((rule) => rule.trim().replace(/\s+/g, ' '))
+  for (const rule of EMBED_RULES) {
+    if (!rules.includes(rule)) {
+      throw new Error(`map embed CSP missing "${rule}"`)
+    }
+  }
+  const frameOptions = res.headers.get('x-frame-options')
+  if (frameOptions) {
+    throw new Error(`map embed must not send X-Frame-Options, got ${frameOptions}`)
+  }
+  console.log('  loopback framing and privacy rules enforced OK')
 }
 
 function assertCompanion(frameOptions) {
