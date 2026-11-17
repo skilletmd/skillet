@@ -508,6 +508,24 @@ describe('pending changes', () => {
     }
   });
 
+  it('ride in a connected scan for the map to list, and never in an unconnected one', () => {
+    const pending = [
+      { id: 'pc-3', kind: 'replace', device: 'dev-1', version: 2, merged: E, keys: [A, B] },
+      { id: 'pc-9', kind: 'rename', device: 'dev-1', version: 4, to: 'x' },
+    ];
+    const parsed = parseKitMapScan(roundTrip({ ...SCAN, connected: true, pending }));
+    assert.ok(parsed);
+    assert.deepEqual(parsed.pending, [
+      pending[0],
+      { id: 'pc-9', kind: 'unknown', rawKind: 'rename', device: 'dev-1', version: 4 },
+    ]);
+    assert.equal(parseKitMapScan({ ...SCAN, pending }), null, 'an unconnected computer has no waiting changes');
+    assert.equal(parseKitMapScan({ ...SCAN, connected: true, pending: [{ id: '', kind: 'remove' }] }), null, 'a malformed record');
+    const withPath = { ...pending[0], path: '/Users/test-machine/.claude/skills/x' };
+    const grown = parseKitMapScan({ ...SCAN, connected: true, pending: [withPath] });
+    assert.equal(grown?.pending?.[0]?.kind, 'unknown', 'a change holding more than it should is skipped, never applied in part');
+  });
+
   it('pass an unknown kind as unknown, so an older client can skip it', () => {
     const later = { id: 'pc-9', kind: 'rename', device: 'dev-1', version: 4, key: A, name: 'Writing' };
     assert.deepEqual(parseKitMapPendingChange(later), { id: 'pc-9', kind: 'unknown', rawKind: 'rename', device: 'dev-1', version: 4 });

@@ -196,6 +196,13 @@ export interface KitMapScan {
    * skips the map-session handshake and confirms the account in the frame.
    */
   connected?: boolean;
+  /**
+   * On a connected computer, the changes the account holds for this computer,
+   * such as a merge picked on skillet.md or removes from a dropped-folder Save.
+   * The map lists them and Save applies them with the new drafts. Like every
+   * pending change, they name skills by content hash, never by path.
+   */
+  pending?: KitMapPendingChange[];
 }
 
 /** Whether Save backs this skill up: the person's own folders, unless the scan found a reason not to. */
@@ -761,7 +768,7 @@ function uniqueKeys(entries: readonly { key: string }[]): Set<string> {
 }
 
 function readScan(value: unknown): KitMapScan {
-  const rec = fields(value, ['entries', 'looked', 'unchecked', 'connected']);
+  const rec = fields(value, ['entries', 'looked', 'unchecked', 'connected', 'pending']);
   if (rec.connected !== undefined && typeof rec.connected !== 'boolean') invalid();
   const entries = list(rec.entries, MAX_ENTRIES).map(readEntry);
   uniqueKeys(entries);
@@ -773,6 +780,11 @@ function readScan(value: unknown): KitMapScan {
   const unchecked = list(rec.unchecked, MAX_ENTRIES).map(readUnchecked);
   const scan: KitMapScan = { entries, looked, unchecked };
   if (rec.connected !== undefined) scan.connected = rec.connected as boolean;
+  if (rec.pending !== undefined) {
+    // Waiting changes come only to a connected computer.
+    if (scan.connected !== true) invalid();
+    scan.pending = list(rec.pending, MAX_DRAFTS).map((item) => parseKitMapPendingChange(item) ?? invalid());
+  }
   return scan;
 }
 
