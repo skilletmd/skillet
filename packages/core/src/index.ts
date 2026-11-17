@@ -82,6 +82,23 @@ export {
   type MapUnreadable,
   type MapUnreadableReason,
 } from "./map/folder-rules.js";
+// Usage marks for the map (plan U4): used, unused or unknown per entry, from
+// each tool's own records on this computer, never uploaded.
+export {
+  readMapUsage,
+  MAP_USAGE_WINDOW_DAYS,
+  CODEX_READ_BUDGET_MS,
+  CLAUDE_SKILL_USAGE_CAP,
+  type MapUsageOptions,
+  type MapUsageResult,
+  type MapUsageMark,
+  type MapUsageState,
+  type MapUsageReason,
+  type MapUsageGap,
+  type MapUsageGapReason,
+  type MapUsageHistory,
+  type MapUsageTool,
+} from "./map/usage.js";
 export * from "./commands/sync.js";
 // Curated customized-skills surface: only what the CLI/desktop actually
 // consume. Internals (moveDir, ledgerStamp, backupSkillVersion, drift
