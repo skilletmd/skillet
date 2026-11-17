@@ -1,15 +1,18 @@
 'use client'
 
 import { useEffect, useReducer, useRef, useState } from 'react'
-import { CommandBox, KitMapView, MAP_COMMAND, saveReducer, type SaveState } from '@/components/map/kit-map-view'
-import { openEmbedBridge, type EmbedBridge } from '@/components/map/embed-bridge'
+import { KitMapView, saveReducer, type SaveState } from '@/components/map/kit-map-view'
+import { answerSaveTab, openEmbedBridge, type EmbedBridge } from '@/components/map/embed-bridge'
+import { CommandBox, MAP_COMMAND, saveHref } from '@/components/map/save-flow'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { cn } from '@/lib/cn'
 import type { JobId } from '@skillet/protocol/jobs'
 import {
+  deriveKitMapChanges,
   parseKitMapDrafts,
   type KitMapDraft,
   type KitMapEntry,
+  type KitMapSaveCounts,
   type KitMapScan,
   type KitMapSessionMessage,
 } from '@skillet/protocol/kit-map'
@@ -22,11 +25,13 @@ import s from '@/components/packs/packs.module.css'
  * says where the map comes from; `?demo` draws a sample scan for visual checks.
  */
 
-/** The tab Save opens. U10's page signs in and approves there. */
+/** The tab Save opens on a computer that isn't connected: it signs in and approves there. */
 const SAVE_PATH = '/map/save'
 const SAVE_TAB = 'skillet-map-save'
 /** How long the frame waits for its scan before saying it didn't come. */
 const SCAN_WAIT_MS = 15_000
+/** How long a connected Save waits for the terminal to name the account, or to start after the confirm. */
+const ANSWER_WAIT_MS = 30_000
 
 type Mode = 'starting' | 'alone' | 'lost' | 'mismatch' | 'live' | 'demo'
 
@@ -37,8 +42,12 @@ export function MapEmbed() {
   const [save, dispatch] = useReducer(saveReducer, { phase: 'idle' } as SaveState)
   const bridge = useRef<EmbedBridge | null>(null)
   const tab = useRef<Window | null>(null)
-  // The map session Save opened. The save tab asks for its proof (U10).
+  // The map session Save opened, kept in memory. Its proof goes to the save tab
+  // only when that tab asks (answerSaveTab), never through a URL.
   const session = useRef<KitMapSessionMessage | null>(null)
+  // What the pressed Save will do, for the tab's confirm line: counts only.
+  const counts = useRef<KitMapSaveCounts | null>(null)
+  const confirmed = useRef(false)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -62,8 +71,18 @@ export function MapEmbed() {
       },
       session: (message) => {
         session.current = message
+        // Point the tab Save opened at the session. A tab the person closed is
+        // reopened from the bar instead.
+        const open = tab.current
+        if (open && !open.closed) {
+          try {
+            open.location.replace(saveHref(message.session))
+          } catch {
+            // Gone between the check and the call: "Finish in the other tab" reopens it.
+          }
+        }
       },
-      status: (message) => dispatch({ type: 'status', state: message.state }),
+      status: (message) => dispatch({ type: 'status', state: message.state, handle: message.handle }),
       mismatch: () => setMode((m) => (m === 'live' ? m : 'mismatch')),
     })
     bridge.current = opened
@@ -80,15 +99,44 @@ export function MapEmbed() {
     if (mode === 'live') bridge.current?.drafts(drafts)
   }, [drafts, mode])
 
+  // The save tab asks this frame, its opener, for the session's proof.
+  useEffect(() => {
+    if (mode !== 'live') return
+    return answerSaveTab(window, {
+      tab: () => tab.current,
+      answer: () =>
+        session.current && counts.current
+          ? { session: session.current.session, proof: session.current.proof, counts: counts.current }
+          : null,
+    })
+  }, [mode])
+
+  // A connected Save waits on the terminal twice: to name the account, then to
+  // start once confirmed. Neither wait hangs: it ends as "Save didn't start".
+  const waiting = save.phase === 'checking' || (save.phase === 'confirm' && save.sent)
+  useEffect(() => {
+    if (!waiting || mode !== 'live') return
+    const timer = window.setTimeout(() => dispatch({ type: 'status', state: 'failed' }), ANSWER_WAIT_MS)
+    return () => window.clearTimeout(timer)
+  }, [waiting, mode])
+
   const onSave = () => {
     if (mode === 'demo') {
       dispatch({ type: 'sample' })
       return
     }
+    session.current = null
+    confirmed.current = false
+    counts.current = scan ? deriveKitMapChanges(drafts, scan.entries).counts : null
+    // A connected computer saves to its own account after a confirm here: no tab.
+    if (scan?.connected) {
+      bridge.current?.save(drafts)
+      dispatch({ type: 'checking' })
+      return
+    }
     // Opened inside the click, or the browser blocks it. A fresh load each time:
     // a new Save starts a new session.
     tab.current = window.open(SAVE_PATH, SAVE_TAB)
-    session.current = null
     bridge.current?.save(drafts)
     dispatch({ type: 'pressed', opened: tab.current !== null })
   }
@@ -98,9 +146,21 @@ export function MapEmbed() {
     if (tab.current && !tab.current.closed) {
       tab.current.focus()
     } else {
-      tab.current = window.open(SAVE_PATH, SAVE_TAB)
+      tab.current = window.open(session.current ? saveHref(session.current.session) : SAVE_PATH, SAVE_TAB)
     }
     dispatch({ type: 'reopened', opened: tab.current !== null })
+  }
+
+  // Once per Save, however many times it's pressed.
+  const onConfirm = () => {
+    if (mode === 'demo') {
+      dispatch({ type: 'sample' })
+      return
+    }
+    if (confirmed.current || save.phase !== 'confirm') return
+    confirmed.current = true
+    bridge.current?.confirm()
+    dispatch({ type: 'confirmed' })
   }
 
   return (
@@ -121,6 +181,7 @@ export function MapEmbed() {
           save={save}
           onSave={onSave}
           onReopen={onReopen}
+          onConfirm={onConfirm}
           sample={mode === 'demo'}
         />
       ) : mode === 'starting' ? (
@@ -164,6 +225,10 @@ function demoSave(state: string | null) {
       return { type: 'pressed', opened: true } as const
     case 'blocked':
       return { type: 'pressed', opened: false } as const
+    case 'checking':
+      return { type: 'checking' } as const
+    case 'confirm':
+      return { type: 'status', state: 'confirm', handle: 'sample' } as const
     case 'saving':
     case 'applying':
     case 'done':

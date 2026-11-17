@@ -12,11 +12,12 @@ import {
   deriveKitMapChanges,
   isRemovableSource,
   type KitMapChanges,
+  type KitMapDocument,
   type KitMapDraft,
   type KitMapDraftState,
   type KitMapEntry,
-  type KitMapFlag,
   type KitMapSaveCounts,
+  type KitMapSavedEntry,
   type KitMapScan,
   type KitMapSource,
   type KitMapStatusState,
@@ -26,6 +27,18 @@ import i from '@/components/packs/ideas/ideas.module.css'
 import k from '@/components/packs/kit.module.css'
 import s from '@/components/packs/packs.module.css'
 import { Tray } from '@/components/packs/tray'
+import {
+  CommandBox,
+  ConfirmButton,
+  MAP_COMMAND,
+  SaveDone,
+  flagReason,
+  saveSummary,
+  useCopy,
+  type NotBackedUp,
+} from './save-flow'
+
+export { CommandBox, MAP_COMMAND }
 
 /**
  * The kit map drawn from a scan: every skill in the job it does or under "Not
@@ -39,9 +52,6 @@ import { Tray } from '@/components/packs/tray'
  * avatar URL loaded only for some jobs would tell an image host which jobs the
  * person lacks. Links to Skillet pages open only when tapped, in a new tab.
  */
-
-/** The line that opens the map, as the person pastes it. */
-export const MAP_COMMAND = 'npx -y skilletmd map'
 
 type Section = JobSection & Hue
 const frame = (sec: JobSection): Section => ({ ...sec, ...SECTION_HUES[sec.id] })
@@ -88,8 +98,9 @@ const rowPill = cn(s.pill, s.pillSecondary, 'h-11 min-w-[96px] shrink-0 px-4 tex
 /**
  * Where Save is, from the frame's side. The loopback page's `status` messages
  * drive it after the press: `waiting` and `signing-in` mean the person is in the
- * save tab, `saving` and `applying` are shown here (a connected computer saves
- * without that tab), and `ended` means the terminal stopped serving the map.
+ * save tab, `saving` and `applying` are shown here, and `ended` means the
+ * terminal stopped serving the map. A connected computer opens no tab: the
+ * terminal names its account (`confirm`), and the person confirms here.
  */
 export type SaveState =
   | { phase: 'idle' }
@@ -97,6 +108,10 @@ export type SaveState =
   | { phase: 'opened' }
   /** The browser blocked the save tab. */
   | { phase: 'blocked' }
+  /** A connected computer: Save was pressed, and the terminal is looking up its account. */
+  | { phase: 'checking' }
+  /** A connected computer: "Save to @handle". `sent` once the person confirmed. */
+  | { phase: 'confirm'; handle: string; sent: boolean }
   | { phase: 'progress'; state: 'saving' | 'applying' }
   | { phase: 'done' }
   /** `started`: it failed after saving began, so pressing Save again finishes the rest. */
@@ -111,7 +126,11 @@ export type SaveEvent =
   | { type: 'pressed'; opened: boolean }
   /** The save tab was reopened, or blocked again. */
   | { type: 'reopened'; opened: boolean }
-  | { type: 'status'; state: KitMapStatusState }
+  /** Save was pressed on a connected computer: no tab. */
+  | { type: 'checking' }
+  /** The person confirmed the account `confirm` named. */
+  | { type: 'confirmed' }
+  | { type: 'status'; state: KitMapStatusState; handle?: string }
   | { type: 'sample' }
 
 export function saveReducer(state: SaveState, event: SaveEvent): SaveState {
@@ -121,6 +140,10 @@ export function saveReducer(state: SaveState, event: SaveEvent): SaveState {
     case 'pressed':
     case 'reopened':
       return { phase: event.opened ? 'opened' : 'blocked' }
+    case 'checking':
+      return { phase: 'checking' }
+    case 'confirmed':
+      return state.phase === 'confirm' ? { ...state, sent: true } : state
     case 'sample':
       return { phase: 'sample' }
     case 'status':
@@ -140,9 +163,10 @@ export function saveReducer(state: SaveState, event: SaveEvent): SaveState {
         case 'ended':
           return { phase: 'ended' }
         case 'confirm':
-          // A connected computer's account confirm belongs to the save flow,
-          // which draws it from the status's handle; the bar doesn't move yet.
-          return state
+          // Only a connected Save asks, and one that already started saving
+          // never goes back to asking.
+          if (!event.handle || state.phase === 'progress' || state.phase === 'done') return state
+          return { phase: 'confirm', handle: event.handle, sent: false }
       }
   }
 }
@@ -217,10 +241,13 @@ function lay(entries: readonly KitMapEntry[], drafts: readonly KitMapDraft[]): L
 const toolText = (t: KitMapEntry['tools'][number]) =>
   t.copies > 1 ? `${runtimeLabel(t.tool)} loads ${t.copies} copies` : runtimeLabel(t.tool)
 
-function sourceText(entry: KitMapEntry): string {
+/** Where a skill came from. A saved entry has no tools, so a local one reads as the person's folder. */
+type Sourced = Pick<KitMapEntry, 'source' | 'skillet'> & { tools?: KitMapEntry['tools']; from?: { name: string } }
+
+function sourceText(entry: Sourced): string {
   switch (entry.source) {
     case 'local':
-      return entry.tools.length > 0 ? andList(entry.tools.map(toolText)) : 'Your folder'
+      return entry.tools && entry.tools.length > 0 ? andList(entry.tools.map(toolText)) : 'Your folder'
     case 'skillet-imported':
       return 'Imported to Skillet'
     case 'skillet-added':
@@ -236,29 +263,30 @@ function sourceText(entry: KitMapEntry): string {
   }
 }
 
-function why(flag: KitMapFlag): string {
-  switch (flag.reason) {
-    case 'secret':
-      return flag.file ? `${flag.file} looks like it holds a secret` : 'a file in it looks like it holds a secret'
-    case 'links-outside':
-      return 'it links to files outside its folder'
-    case 'extra-files':
-      return 'it has files besides SKILL.md'
-    default:
-      return flag.file ? `Skillet flagged ${flag.file}` : 'Skillet flagged a file in it'
-  }
-}
-
 /** The one line that says why a skill can't be backed up or merged. */
 function flagText(entry: KitMapEntry): string | null {
   const { noBackup, noMerge } = entry
   if (noBackup && noMerge && noBackup.reason === noMerge.reason && noBackup.file === noMerge.file) {
-    return `Not backed up or merged: ${why(noBackup)}.`
+    return `Not backed up or merged: ${flagReason(noBackup)}.`
   }
   const parts: string[] = []
-  if (noBackup) parts.push(`Not backed up: ${why(noBackup)}.`)
-  if (noMerge) parts.push(`Can't merge: ${why(noMerge)}.`)
+  if (noBackup) parts.push(`Not backed up: ${flagReason(noBackup)}.`)
+  if (noMerge) parts.push(`Can't merge: ${flagReason(noMerge)}.`)
   return parts.length > 0 ? parts.join(' ') : null
+}
+
+/**
+ * What Done lists as not backed up: the person's own skills the scan flagged,
+ * still on the map. The inverse of the protocol's `backsUp`, which the backup
+ * count uses too, so the two never disagree.
+ */
+function notBackedUp(entries: readonly KitMapEntry[], drafts: readonly KitMapDraft[]): NotBackedUp[] {
+  const removed = new Set(drafts.flatMap((d) => (d.kind === 'remove' ? [d.key] : [])))
+  return entries.flatMap((e) =>
+    e.source === 'local' && e.noBackup && !removed.has(e.key)
+      ? [{ name: e.name, reason: e.noBackup.reason, ...(e.noBackup.file ? { file: e.noBackup.file } : {}) }]
+      : [],
+  )
 }
 
 const UNCHECKED: Record<string, string> = {
@@ -349,15 +377,27 @@ export interface KitMapViewProps {
   onSave: () => void
   /** Brings the save tab back: "Finish in the other tab", or a retry after the browser blocked it. */
   onReopen: () => void
+  /** A connected computer: the person pressed "Save to @handle". */
+  onConfirm?: () => void
   /** The `?demo` map: says once that these skills are a sample. */
   sample?: boolean
 }
 
-export function KitMapView({ scan, drafts, onDraftsChange, save, onSave, onReopen, sample = false }: KitMapViewProps) {
+export function KitMapView({
+  scan,
+  drafts,
+  onDraftsChange,
+  save,
+  onSave,
+  onReopen,
+  onConfirm = () => {},
+  sample = false,
+}: KitMapViewProps) {
   const [openId, setOpenId] = useState<OpenId | null>(null)
   const [moving, setMoving] = useState<KitMapEntry | null>(null)
   const [reviewing, setReviewing] = useState(false)
   const [checking, setChecking] = useState(false)
+  const [outcome, setOutcome] = useState(false)
   const [choice, setChoice] = useState<Partial<Record<JobId, number>>>({})
   const [wave, setWave] = useState<Partial<Record<JobId, number>>>({})
   const [said, setSaid] = useState('')
@@ -580,9 +620,15 @@ export function KitMapView({ scan, drafts, onDraftsChange, save, onSave, onReope
           changes={drafts.length}
           onSave={onSave}
           onReopen={onReopen}
+          onConfirm={onConfirm}
           onReview={() => setReviewing(true)}
+          onOutcome={() => setOutcome(true)}
         />
       )}
+
+      <Tray open={outcome && save.phase === 'done'} onOpenChange={setOutcome} title="Saved">
+        <SaveDone counts={map.changes.counts} notBackedUp={notBackedUp(scan.entries, drafts)} newTab />
+      </Tray>
 
       {openId !== null && (
         <Tray
@@ -638,8 +684,11 @@ export function KitMapView({ scan, drafts, onDraftsChange, save, onSave, onReope
   )
 }
 
+/** A skill as a chip needs it: the saved map keeps no usage, so its chips carry no unused mark. */
+type Chipped = { key: string; name: string; usage?: KitMapEntry['usage'] }
+
 /** What a job's chip carries: a doubled-up count, a many-slot's count, or "unused" for its only skill. */
-function ChipMark({ many, held }: { many: boolean; held: KitMapEntry[] }) {
+function ChipMark({ many, held }: { many: boolean; held: readonly Chipped[] }) {
   if (many) return held.length > 0 ? <span className="text-[var(--p-ink-2)] tabular-nums">{held.length}</span> : null
   if (held.length > 1) {
     return (
@@ -649,15 +698,15 @@ function ChipMark({ many, held }: { many: boolean; held: KitMapEntry[] }) {
       </span>
     )
   }
-  return held[0]?.usage.state === 'unused' ? <span className="font-normal text-[var(--p-ink-2)]">unused</span> : null
+  return held[0]?.usage?.state === 'unused' ? <span className="font-normal text-[var(--p-ink-2)]">unused</span> : null
 }
 
 /** An unsorted skill on the map: JobChip's filled look, with a long name cut short (its sheet shows it whole). */
-function SkillChip({ entry }: { entry: KitMapEntry }) {
+function SkillChip({ entry }: { entry: Chipped }) {
   return (
     <li className="inline-flex h-8 max-w-full min-w-0 items-center gap-1.5 rounded-full border border-[var(--p-line)] bg-[var(--p-surface)] px-3 text-sm font-medium">
       <span className="truncate">{entry.name}</span>
-      {entry.usage.state === 'unused' && <span className="shrink-0 font-normal text-[var(--p-ink-2)]">unused</span>}
+      {entry.usage?.state === 'unused' && <span className="shrink-0 font-normal text-[var(--p-ink-2)]">unused</span>}
     </li>
   )
 }
@@ -1035,47 +1084,6 @@ function MovePicker({
   )
 }
 
-/** The command, ready to copy. */
-export function CommandBox({ command, className }: { command: string; className?: string }) {
-  const [copy, onCopy] = useCopy(command)
-  return (
-    <div className={className}>
-      <pre className="overflow-x-auto rounded-2xl border border-[var(--p-line)] bg-[var(--p-surface)] p-4 font-mono text-sm leading-[1.6] whitespace-pre">
-        {command}
-      </pre>
-      <button type="button" className={cn(s.pill, s.pillPrimary, 'mt-3 w-full sm:w-auto')} onClick={onCopy}>
-        {copy === 'copied' ? (
-          <>
-            <Check className="h-4 w-4" />
-            Copied
-          </>
-        ) : (
-          'Copy'
-        )}
-      </button>
-      {copy === 'failed' && (
-        <p role="alert" className="mt-2 text-sm">
-          Copy didn&apos;t work. Select the text above instead.
-        </p>
-      )}
-    </div>
-  )
-}
-
-function useCopy(text: string): ['idle' | 'copied' | 'failed', () => void] {
-  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
-  const onCopy = () => {
-    navigator.clipboard.writeText(text).then(
-      () => {
-        setState('copied')
-        window.setTimeout(() => setState('idle'), 1800)
-      },
-      () => setState('failed'),
-    )
-  }
-  return [state, onCopy]
-}
-
 /** The counts a Save made, in a line. */
 function doneText({ backups, removals, fills, merges }: KitMapSaveCounts): string {
   const rest = [
@@ -1094,14 +1102,19 @@ function SaveBar({
   changes,
   onSave,
   onReopen,
+  onConfirm,
   onReview,
+  onOutcome,
 }: {
   save: SaveState
   counts: KitMapSaveCounts
   changes: number
   onSave: () => void
   onReopen: () => void
+  onConfirm: () => void
   onReview: () => void
+  /** Opens Done in full: what Save did, and what it couldn't. */
+  onOutcome: () => void
 }) {
   const [copy, onCopy] = useCopy(MAP_COMMAND)
   const primary = cn(s.pill, s.pillPrimary, 'min-w-0 flex-1 sm:flex-none')
@@ -1124,9 +1137,16 @@ function SaveBar({
   )
   const command = <code className="font-mono">{MAP_COMMAND}</code>
 
+  const pending = (label: string) => (
+    <button type="button" className={cn(primary, 'cursor-default')} aria-disabled="true">
+      {label}
+    </button>
+  )
+
   let message: ReactNode = null
   let action: ReactNode
   let review = changes > 0
+  let secondary: ReactNode = null
   switch (save.phase) {
     case 'idle':
       message = 'Nothing leaves this computer until you save.'
@@ -1139,17 +1159,26 @@ function SaveBar({
       message = 'Your browser blocked the save tab.'
       action = button('Try again', onReopen)
       break
+    case 'checking':
+      action = pending('Checking your account…')
+      break
+    case 'confirm':
+      // The same counts the save tab's confirm shows, above the same button.
+      message = saveSummary(counts)
+      action = <ConfirmButton handle={save.handle} busy={save.sent} onConfirm={onConfirm} className={primary} />
+      break
     case 'progress':
       review = false
-      action = (
-        <button type="button" className={cn(primary, 'cursor-default')} aria-disabled="true">
-          {save.state === 'saving' ? 'Backing up…' : 'Making changes…'}
-        </button>
-      )
+      action = pending(save.state === 'saving' ? 'Backing up…' : 'Making changes…')
       break
     case 'done':
       review = false
       message = doneText(counts)
+      secondary = (
+        <button type="button" className={cn(s.pill, s.pillSecondary, 'min-w-0')} onClick={onOutcome}>
+          What changed
+        </button>
+      )
       action = (
         <a href="/download" target="_blank" rel="noreferrer" className={primary}>
           Get the app
@@ -1188,9 +1217,185 @@ function SaveBar({
               {plural(changes, 'change')}
             </button>
           )}
+          {secondary}
           {action}
         </div>
       </div>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// The saved map, on skillet.md/map
+// ---------------------------------------------------------------------------
+
+/**
+ * The map Save kept, read-only: every saved skill in its job or under "Not
+ * sorted". It holds no usage and offers no fixes. Both stay on the computer,
+ * and changing the map means running the line again. `null` is an account with
+ * no saved map yet, and 'error' a map that couldn't be read.
+ */
+export function SavedMap({ doc }: { doc: KitMapDocument | null | 'error' }) {
+  return (
+    <div className={cn(s.tokens, 'text-[var(--p-ink)]')}>
+      {doc === null || doc === 'error' ? <SavedMapMissing error={doc === 'error'} /> : <SavedMapView doc={doc} />}
+    </div>
+  )
+}
+
+function SavedMapMissing({ error }: { error: boolean }) {
+  return (
+    <main className="mx-auto max-w-[560px] px-4 pt-10 pb-16 sm:pt-16">
+      <h1 className="text-4xl leading-[1.05] font-bold tracking-[-0.045em] text-balance">
+        {error ? "Couldn't load your map" : 'No saved map yet'}
+      </h1>
+      <p className="mt-3 text-base text-pretty text-[var(--p-ink-2)]">
+        {error ? 'Refresh to try again.' : 'Paste this in a terminal to sort your skills into jobs. Nothing leaves your computer until you save.'}
+      </p>
+      {!error && <CommandBox command={MAP_COMMAND} className="mt-6" />}
+    </main>
+  )
+}
+
+function SavedMapView({ doc }: { doc: KitMapDocument }) {
+  const [openId, setOpenId] = useState<OpenId | null>(null)
+  const held = useMemo(() => {
+    const out = new Map<JobId | null, KitMapSavedEntry[]>()
+    for (const entry of doc.entries) push(out, doc.assignments[entry.key] ?? null, entry)
+    return out
+  }, [doc])
+  const heldIn = (id: JobId | null) => held.get(id) ?? []
+  const count = (sec: Section) => sec.jobs.filter((j) => heldIn(j.id).length > 0).length
+  const filled = SECTIONS.reduce((n, sec) => n + count(sec), 0)
+  const loose = heldIn(null)
+  const openSec = openId === NOT_SORTED ? null : (ALL.find((sec) => sec.id === openId) ?? null)
+
+  const card = (sec: Section, wide = false) => (
+    <SectionCard
+      key={sec.id}
+      sec={sec}
+      label={wide ? plural(sec.jobs.reduce((n, j) => n + heldIn(j.id).length, 0), 'skill') : `${count(sec)} of ${sec.jobs.length}`}
+      onOpen={() => setOpenId(sec.id)}
+    >
+      {sec.jobs.map((j) => (
+        <JobChip
+          key={j.id}
+          job={j.name}
+          filled={heldIn(j.id).length > 0}
+          className="pl-3"
+          extra={<ChipMark many={j.many} held={heldIn(j.id)} />}
+        />
+      ))}
+    </SectionCard>
+  )
+
+  return (
+    <main className="mx-auto max-w-[1120px] px-4 pt-4 pb-16 sm:px-8 sm:pt-8">
+      <h1 className="text-4xl leading-[1.05] font-bold tracking-[-0.045em] text-balance sm:text-5xl">
+        {doc.entries.length === 0 ? 'Your kit map' : `${plural(doc.entries.length, 'skill')}, sorted by job`}
+      </h1>
+      <p className="mt-2 text-base font-medium">
+        Your kit: {filled} of {TOTAL} jobs
+      </p>
+      <Coverage
+        className="mt-6"
+        label={`Your kit: ${filled} of ${TOTAL} jobs filled`}
+        groups={SECTIONS.map((sec) => ({
+          id: sec.id,
+          color: sec.color,
+          cells: sec.jobs.map((j) => ({ key: j.id, filled: heldIn(j.id).length > 0 })),
+        }))}
+      />
+      <p className="mt-4 text-sm text-pretty text-[var(--p-ink-2)]">
+        To change your map, run <code className="font-mono text-[var(--p-ink)]">{MAP_COMMAND}</code> again.
+      </p>
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">{SECTIONS.map((sec) => card(sec))}</div>
+      <div className="mt-3 sm:mt-4">{card(TOOLS, true)}</div>
+      {loose.length > 0 && (
+        <div className="mt-3 sm:mt-4">
+          <SectionCard sec={LOOSE} label={plural(loose.length, 'skill')} onOpen={() => setOpenId(NOT_SORTED)}>
+            {loose.slice(0, LOOSE_CHIPS).map((entry) => (
+              <SkillChip key={entry.key} entry={entry} />
+            ))}
+            {loose.length > LOOSE_CHIPS && (
+              <li className="inline-flex h-8 items-center px-1 text-sm text-[var(--p-ink-2)]">{loose.length - LOOSE_CHIPS} more</li>
+            )}
+          </SectionCard>
+        </div>
+      )}
+
+      {openId !== null && (
+        <Tray
+          open
+          onOpenChange={(o) => !o && setOpenId(null)}
+          title={openSec?.name ?? LOOSE.name}
+          style={openSec ? secVars(openSec) : undefined}
+        >
+          {openSec ? (
+            <ul className="divide-y divide-[var(--p-line)]">
+              {openSec.jobs.map((j) => (
+                <SavedJobRow key={j.id} job={j} held={heldIn(j.id)} />
+              ))}
+            </ul>
+          ) : (
+            <ul>
+              {loose.map((entry) => (
+                <SavedRow key={entry.key} entry={entry} />
+              ))}
+            </ul>
+          )}
+        </Tray>
+      )}
+    </main>
+  )
+}
+
+function SavedJobRow({ job, held }: { job: Job; held: readonly KitMapSavedEntry[] }) {
+  const nameId = useId()
+  return (
+    <li className="py-3.5">
+      <div role="group" aria-labelledby={nameId}>
+        <p id={nameId} className="text-base font-bold">
+          {job.name}
+        </p>
+        {held.length === 0 ? (
+          <p className="mt-0.5 text-sm text-[var(--p-ink-2)]">No skill yet.</p>
+        ) : (
+          <ul className="mt-1">
+            {held.map((entry) => (
+              <SavedRow key={entry.key} entry={entry} />
+            ))}
+          </ul>
+        )}
+      </div>
+    </li>
+  )
+}
+
+/**
+ * A saved skill: its name (its page, when it's on Skillet), and where it came
+ * from when that's anyone but the person: a plugin, a maker, an organization.
+ */
+function SavedRow({ entry }: { entry: KitMapSavedEntry }) {
+  const ref = entry.skillet?.ref ?? null
+  const from = entry.source === 'local' ? null : sourceText(entry)
+  return (
+    <li className="flex items-start gap-2.5">
+      <Mark name={entry.name} className="mt-3" />
+      <p className="min-w-0 flex-1 py-3 text-sm leading-5">
+        {ref ? (
+          <a
+            href={pageOf(ref)}
+            className="font-medium underline decoration-transparent underline-offset-4 transition-colors hover:decoration-[var(--p-ink-2)]"
+          >
+            {entry.name}
+          </a>
+        ) : (
+          <span className="font-medium">{entry.name}</span>
+        )}
+        {from && <span className="text-[var(--p-ink-2)]"> {from}</span>}
+      </p>
+    </li>
   )
 }
