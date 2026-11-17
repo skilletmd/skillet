@@ -139,6 +139,10 @@ export function saveReducer(state: SaveState, event: SaveEvent): SaveState {
           return { phase: 'failed', started: state.phase === 'progress' }
         case 'ended':
           return { phase: 'ended' }
+        case 'confirm':
+          // A connected computer's account confirm belongs to the save flow,
+          // which draws it from the status's handle; the bar doesn't move yet.
+          return state
       }
   }
 }

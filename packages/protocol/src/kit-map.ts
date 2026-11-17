@@ -190,6 +190,12 @@ export interface KitMapScan {
   entries: KitMapEntry[];
   looked: KitMapLooked[];
   unchecked: KitMapUnchecked[];
+  /**
+   * Whether this computer already has a Skillet connection, read from its own
+   * files with no network call. Absent means not connected. A connected Save
+   * skips the map-session handshake and confirms the account in the frame.
+   */
+  connected?: boolean;
 }
 
 /** Whether Save backs this skill up: the person's own folders, unless the scan found a reason not to. */
@@ -438,10 +444,16 @@ export type KitMapPendingChange = KitMapPendingRemove | KitMapPendingMerge | Kit
 // Bridge messages
 // ---------------------------------------------------------------------------
 
-/** Where Save is, as the loopback page reports it. `ended` means its server stopped. */
+/**
+ * Where Save is, as the loopback page reports it. `ended` means its server
+ * stopped. `confirm` comes only on a connected computer: the CLI looked up the
+ * computer's account after Save was pressed, and the frame asks the person to
+ * confirm saving to it (the status carries `handle`).
+ */
 export type KitMapStatusState =
   | 'waiting'
   | 'signing-in'
+  | 'confirm'
   | 'saving'
   | 'applying'
   | 'done'
@@ -451,6 +463,7 @@ export type KitMapStatusState =
 const STATUS_STATES: readonly KitMapStatusState[] = [
   'waiting',
   'signing-in',
+  'confirm',
   'saving',
   'applying',
   'done',
@@ -466,21 +479,31 @@ export interface KitMapScanMessage {
   scan: KitMapScan;
 }
 
-/** Loopback page to frame: the map session Save opened, for the save tab. */
+/**
+ * Loopback page to frame: the map session Save opened, for the save tab.
+ * `proof` is the one-time secret whose hash the CLI registered with the
+ * session. It crosses only by postMessage, never a URL, and the save tab trades
+ * it for its binding before any sign-in.
+ */
 export interface KitMapSessionMessage {
   type: 'session';
   v: Version;
   session: string;
   /** Epoch milliseconds. */
   expiresAt: number;
+  proof: string;
 }
 
-/** Loopback page to frame. `reason` is a short code, mostly for `failed`. */
+/**
+ * Loopback page to frame. `reason` is a short code, mostly for `failed`.
+ * `handle` comes with `confirm` and only then.
+ */
 export interface KitMapStatusMessage {
   type: 'status';
   v: Version;
   state: KitMapStatusState;
   reason?: string;
+  handle?: string;
 }
 
 /** Frame to loopback page: loaded, send the scan. */
@@ -503,6 +526,12 @@ export interface KitMapSaveMessage {
   drafts: KitMapDraft[];
 }
 
+/** Frame to loopback page, on a connected computer: the person confirmed saving to the account `confirm` named. */
+export interface KitMapConfirmMessage {
+  type: 'confirm';
+  v: Version;
+}
+
 /** Save tab to frame. */
 export interface KitMapProofRequestMessage {
   type: 'proof-request';
@@ -510,11 +539,12 @@ export interface KitMapProofRequestMessage {
   session: string;
 }
 
-/** Frame to save tab: counts only, never a name. */
+/** Frame to save tab: the session's one-time proof and counts only, never a skill name. */
 export interface KitMapProofMessage {
   type: 'proof';
   v: Version;
   session: string;
+  proof: string;
   counts: KitMapSaveCounts;
 }
 
@@ -525,6 +555,7 @@ export type KitMapMessage =
   | KitMapReadyMessage
   | KitMapDraftsMessage
   | KitMapSaveMessage
+  | KitMapConfirmMessage
   | KitMapProofRequestMessage
   | KitMapProofMessage;
 
@@ -538,6 +569,9 @@ const HASH_RE = /^sha256:[0-9a-f]{64}$/;
 const TOOL_RE = /^[a-z][a-z0-9-]{0,31}$/;
 const CODE_RE = /^[a-z][a-z0-9-]{0,47}$/;
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+/** The map session's proof, binding and poll secret share the registry's shape. */
+const PROOF_RE = /^[A-Za-z0-9_-]{32,256}$/;
+const HANDLE_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,38}$/;
 
 /** Thrown inside a read and caught at the top of each parse; it never leaves this module. */
 const INVALID = Symbol('kit-map invalid');
@@ -727,7 +761,8 @@ function uniqueKeys(entries: readonly { key: string }[]): Set<string> {
 }
 
 function readScan(value: unknown): KitMapScan {
-  const rec = fields(value, ['entries', 'looked', 'unchecked']);
+  const rec = fields(value, ['entries', 'looked', 'unchecked', 'connected']);
+  if (rec.connected !== undefined && typeof rec.connected !== 'boolean') invalid();
   const entries = list(rec.entries, MAX_ENTRIES).map(readEntry);
   uniqueKeys(entries);
   const looked = list(rec.looked, MAX_TOOLS).map((item) => {
@@ -736,7 +771,9 @@ function readScan(value: unknown): KitMapScan {
   });
   if (new Set(looked.map((l) => l.tool)).size !== looked.length) invalid();
   const unchecked = list(rec.unchecked, MAX_ENTRIES).map(readUnchecked);
-  return { entries, looked, unchecked };
+  const scan: KitMapScan = { entries, looked, unchecked };
+  if (rec.connected !== undefined) scan.connected = rec.connected as boolean;
+  return scan;
 }
 
 /** A scan payload, or null when anything in it is malformed or holds a field it shouldn't. */
@@ -883,15 +920,27 @@ function readMessage(value: unknown, entries: readonly KitMapEntry[] | undefined
     case 'scan':
       return { type: 'scan', v, scan: readScan(fields(value, ['type', 'v', 'scan']).scan) };
     case 'session': {
-      const rec = fields(value, ['type', 'v', 'session', 'expiresAt']);
-      return { type: 'session', v, session: matching(rec.session, ID_RE), expiresAt: count(rec.expiresAt) };
+      const rec = fields(value, ['type', 'v', 'session', 'expiresAt', 'proof']);
+      return {
+        type: 'session',
+        v,
+        session: matching(rec.session, ID_RE),
+        expiresAt: count(rec.expiresAt),
+        proof: matching(rec.proof, PROOF_RE),
+      };
     }
     case 'status': {
-      const rec = fields(value, ['type', 'v', 'state', 'reason']);
+      const rec = fields(value, ['type', 'v', 'state', 'reason', 'handle']);
       const status: KitMapStatusMessage = { type: 'status', v, state: oneOf(rec.state, STATUS_STATES) };
       if (rec.reason !== undefined) status.reason = matching(rec.reason, CODE_RE);
+      // The account handle travels with `confirm` and with nothing else.
+      if (status.state === 'confirm') status.handle = matching(rec.handle, HANDLE_RE);
+      else if (rec.handle !== undefined) invalid();
       return status;
     }
+    case 'confirm':
+      fields(value, ['type', 'v']);
+      return { type: 'confirm', v };
     case 'ready':
       fields(value, ['type', 'v']);
       return { type: 'ready', v };
@@ -905,8 +954,14 @@ function readMessage(value: unknown, entries: readonly KitMapEntry[] | undefined
     case 'proof-request':
       return { type: 'proof-request', v, session: matching(fields(value, ['type', 'v', 'session']).session, ID_RE) };
     case 'proof': {
-      const rec = fields(value, ['type', 'v', 'session', 'counts']);
-      return { type: 'proof', v, session: matching(rec.session, ID_RE), counts: readCounts(rec.counts) };
+      const rec = fields(value, ['type', 'v', 'session', 'proof', 'counts']);
+      return {
+        type: 'proof',
+        v,
+        session: matching(rec.session, ID_RE),
+        proof: matching(rec.proof, PROOF_RE),
+        counts: readCounts(rec.counts),
+      };
     }
     default:
       return invalid();

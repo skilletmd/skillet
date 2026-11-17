@@ -156,7 +156,7 @@ describe('the embed bridge', () => {
     const on = events()
     const bridge = openEmbedBridge(child, on)
     deliver(child, { type: 'status', v: KIT_MAP_VERSION, state: 'saving' }, LOOPBACK)
-    deliver(child, { type: 'session', v: KIT_MAP_VERSION, session: 'map_1', expiresAt: 1 }, LOOPBACK)
+    deliver(child, { type: 'session', v: KIT_MAP_VERSION, session: 'map_1', expiresAt: 1, proof: 'pRoOf_0123456789abcdefghijklmnopqrstuv' }, LOOPBACK)
     expect(on.status).not.toHaveBeenCalled()
     expect(on.session).not.toHaveBeenCalled()
     bridge.close()

@@ -88,17 +88,22 @@ const SCAN: KitMapScan = {
 
 const roundTrip = <T>(value: T): unknown => JSON.parse(JSON.stringify(value));
 
+/** A stand-in one-time proof in the registry's shape: 32 to 256 of A-Z, a-z, 0-9, _ and -. */
+const PROOF = 'pRoOf_0123456789abcdefghijklmnopqrstuv';
+
 const MESSAGES: KitMapMessage[] = [
   { type: 'scan', v: 1, scan: SCAN },
-  { type: 'session', v: 1, session: 'map_4f9c2a7e1b', expiresAt: 1_790_000_000_000 },
+  { type: 'session', v: 1, session: 'map_4f9c2a7e1b', expiresAt: 1_790_000_000_000, proof: PROOF },
   { type: 'status', v: 1, state: 'saving' },
   { type: 'status', v: 1, state: 'failed', reason: 'locked' },
   { type: 'status', v: 1, state: 'ended' },
+  { type: 'status', v: 1, state: 'confirm', handle: 'test-handle' },
+  { type: 'confirm', v: 1 },
   { type: 'ready', v: 1 },
   { type: 'drafts', v: 1, drafts: [{ kind: 'move', key: A, job: 'writing.docs' }] },
   { type: 'save', v: 1, drafts: [{ kind: 'remove', key: E }, { kind: 'fill', job: 'writing.emails', ref: '@openclaudia/email-sequence' }] },
   { type: 'proof-request', v: 1, session: 'map_4f9c2a7e1b' },
-  { type: 'proof', v: 1, session: 'map_4f9c2a7e1b', counts: { backups: 2, removals: 1, fills: 1, merges: 0 } },
+  { type: 'proof', v: 1, session: 'map_4f9c2a7e1b', proof: PROOF, counts: { backups: 2, removals: 1, fills: 1, merges: 0 } },
 ];
 
 describe('the scan payload', () => {
@@ -112,6 +117,14 @@ describe('the scan payload', () => {
   it('accepts an empty scan, the map with every job open', () => {
     const empty: KitMapScan = { entries: [], looked: [], unchecked: [] };
     assert.deepEqual(parseKitMapScan(empty), empty);
+  });
+
+  it('says whether this computer is connected, as a plain flag', () => {
+    const connected: KitMapScan = { ...SCAN, connected: true };
+    assert.deepEqual(parseKitMapScan(roundTrip(connected)), connected);
+    assert.deepEqual(parseKitMapScan({ ...SCAN, connected: false }), { ...SCAN, connected: false });
+    assert.equal(parseKitMapScan({ ...SCAN, connected: 'yes' }), null);
+    assert.equal(parseKitMapScan({ ...SCAN, connected: { handle: 'test-handle' } }), null, 'never the account itself');
   });
 
   it('rejects an entry carrying a path, in any field', () => {
@@ -171,6 +184,21 @@ describe('bridge messages', () => {
     assert.equal(parseKitMapMessage({ type: 'hello', v: 1 }), null);
     assert.equal(parseKitMapMessage({ type: 'ready', v: 1, from: 'frame' }), null);
     assert.equal(parseKitMapMessage({ type: 'status', v: 1, state: 'thinking' }), null);
+  });
+
+  it('carry the one-time proof only in its own shape, and the account handle only with confirm', () => {
+    const session = MESSAGES.find((m) => m.type === 'session')!;
+    const proof = MESSAGES.find((m) => m.type === 'proof')!;
+    for (const message of [session, proof]) {
+      const { proof: _proof, ...withoutProof } = message as { proof: string };
+      assert.equal(parseKitMapMessage(withoutProof), null, `${message.type} without its proof`);
+      assert.equal(parseKitMapMessage({ ...message, proof: 'short' }), null, `${message.type} with a short proof`);
+      assert.equal(parseKitMapMessage({ ...message, proof: 'x'.repeat(31) + '!' }), null, `${message.type} with a bad character`);
+    }
+    assert.equal(parseKitMapMessage({ type: 'status', v: 1, state: 'confirm' }), null, 'confirm without a handle');
+    assert.equal(parseKitMapMessage({ type: 'status', v: 1, state: 'saving', handle: 'test-handle' }), null, 'a handle outside confirm');
+    assert.equal(parseKitMapMessage({ type: 'status', v: 1, state: 'confirm', handle: 'not a handle' }), null, 'a malformed handle');
+    assert.equal(parseKitMapMessage({ type: 'confirm', v: 1, handle: 'test-handle' }), null, 'confirm carries nothing');
   });
 
   it('reject drafts or a save when there is no scan to check their keys against', () => {
@@ -398,7 +426,7 @@ describe('what Save counts', () => {
     );
     assert.deepEqual(derived.counts, { backups: 1, removals: 2, fills: 1, merges: 0 });
     // The proof the frame answers with carries exactly these counts.
-    const proof = { type: 'proof', v: 1, session: 'map_4f9c2a7e1b', counts: derived.counts };
+    const proof = { type: 'proof', v: 1, session: 'map_4f9c2a7e1b', proof: PROOF, counts: derived.counts };
     assert.deepEqual(parseKitMapMessage(proof), proof);
   });
 });
