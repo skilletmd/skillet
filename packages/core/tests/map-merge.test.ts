@@ -852,9 +852,13 @@ describe("running the AI tool with no tools (KTD12)", () => {
 
   it("stops a run that takes too long, and the tool with it", async () => {
     const tool = await claudeTool("hang");
-    const err = await runMergeTool(tool, "Merge.", { timeoutMs: 300 }).catch((e: unknown) => e);
+    // Long enough for the fake tool to start and log its pid under a loaded
+    // full-repo test run: at 300 ms it was sometimes killed before it logged.
+    const err = await runMergeTool(tool, "Merge.", { timeoutMs: 3_000 }).catch((e: unknown) => e);
     expect((err as MergeWriterError).reason).toBe("timeout");
-    expect(alive(toolCalls(join(HOME, "claude.log"))[0]!.pid)).toBe(false);
+    const calls = toolCalls(join(HOME, "claude.log"));
+    expect(calls, "the tool started before the timeout").toHaveLength(1);
+    expect(alive(calls[0]!.pid)).toBe(false);
   });
 
   it("stops an answer past its size cap", async () => {
