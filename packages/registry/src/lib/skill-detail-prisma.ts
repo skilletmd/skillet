@@ -7,6 +7,7 @@ import { toSkillSummary } from '../routes/skill-summary.js'
 import { loadSkillSummaryByIdPrisma } from './skill-summary-prisma.js'
 import { canReadSkillPrisma } from '../auth/skill-read-access.js'
 import { platformAttestationKeyPrisma } from './platform-signing.js'
+import { readMergedFrom } from './merged-from.js'
 
 export type SkillDetailPrismaResult =
   | { kind: 'not_found' }
@@ -195,6 +196,8 @@ export async function buildSkillDetailPrisma(
     }
   }
   const { modelInvoked, hasCommand } = resolveInvocationFacts(metadataJson, !!row.description)
+  // A merged skill names the public skills it was made from and counts the rest (kit map U15, R23).
+  const mergedFrom = await readMergedFrom(prisma, metadataJson)
 
   // Served author identity keys to the signer of the latest version, matching
   // the manifest/version routes: platform identity when the latest version is
@@ -319,6 +322,7 @@ export async function buildSkillDetailPrisma(
       author_public_key: servedPublicKey,
       manifest_url: `/api/v1/skills/${canonAuthor}/${canonSlug}/manifest`,
       triggers,
+      ...(mergedFrom ? { merged_from: mergedFrom } : {}),
       eval: evalStatus,
       model_invoked: modelInvoked,
       has_command: hasCommand,

@@ -20,10 +20,12 @@ import {
   backsUp,
   deriveKitMapChanges,
   kitMapMergeCredits,
+  kitMapMergeWins,
   kitMapMessageVersion,
   parseKitMapDocument,
   parseKitMapDrafts,
   parseKitMapMerge,
+  parseKitMapMergePick,
   parseKitMapMergeReport,
   parseKitMapMessage,
   parseKitMapPendingChange,
@@ -671,6 +673,38 @@ describe('merges', () => {
     assert.equal(parseKitMapMergeReport({ ...ready, merged: B }, keys), null, 'an original is not the merge');
     assert.equal(parseKitMapMergeReport({ ...ready, keys }, keys), null, 'the originals come from the change, not the report');
     assert.equal(parseKitMapMergeReport({ status: 'writing', merged: MERGED }, keys), null, 'nothing extra while writing');
+  });
+
+  it('name the public skill the person made from a merged one, and only beside a merged skill', () => {
+    const published = { ...written, status: 'applied' as const, published: '@test-user/editing' };
+    assert.deepEqual(parseKitMapMerge(roundTrip(published)), roundTrip(published));
+    const base = { id: 'pc-1', device: 'dev-1', job: 'writing.editing', keys: [A, B], updatedAt: 1 };
+    assert.equal(parseKitMapMerge({ ...base, status: 'waiting', published: '@test-user/editing' }), null, 'nothing to publish yet');
+    assert.equal(parseKitMapMerge({ ...published, published: 'test-user/editing' }), null, 'a ref in its @owner/slug form');
+    assert.equal(parseKitMapMerge({ ...published, published: 'https://skillet.md/test-user/editing' }), null, 'never a URL');
+  });
+
+  it('AE1: offer "Use merged" only when the merge won more than half its rounds', () => {
+    assert.equal(kitMapMergeWins(3, 4), true, '3 of 4');
+    assert.equal(kitMapMergeWins(2, 4), false, 'a tie keeps the originals');
+    assert.equal(kitMapMergeWins(1, 4), false);
+    assert.equal(kitMapMergeWins(2, 3), true, '2 of 3');
+    assert.equal(kitMapMergeWins(1, 2), false, '1 of 2 is a tie');
+    assert.equal(kitMapMergeWins(0, 0), false, 'no rounds, no win');
+  });
+
+  it('take the pick: the side the person chose and the originals the merge beat, each once', () => {
+    const keys = [A, B, C, D];
+    assert.deepEqual(parseKitMapMergePick({ use: 'merged', won: [A, B, C] }, keys), { use: 'merged', won: [A, B, C] });
+    assert.deepEqual(parseKitMapMergePick({ use: 'originals', won: [A, B] }, keys), { use: 'originals', won: [A, B] });
+    assert.deepEqual(parseKitMapMergePick(roundTrip({ use: 'originals', won: [] }), keys), { use: 'originals', won: [] });
+
+    assert.equal(parseKitMapMergePick({ use: 'both', won: [] }, keys), null, 'merged or originals');
+    assert.equal(parseKitMapMergePick({ use: 'merged' }, keys), null, 'it says which rounds the merge won');
+    assert.equal(parseKitMapMergePick({ use: 'merged', won: [A, A, B] }, keys), null, 'each original once');
+    assert.equal(parseKitMapMergePick({ use: 'merged', won: [A, B, E] }, keys), null, 'only its own originals');
+    assert.equal(parseKitMapMergePick({ use: 'merged', won: [A, B, C], status: 'picked' }, keys), null, 'nothing else');
+    assert.equal(parseKitMapMergePick('merged', keys), null);
   });
 });
 

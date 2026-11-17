@@ -26,6 +26,7 @@ import { fetchEvidenceFileTexts } from '@/lib/skill-bundle-evidence'
 import { SkillOwnerControls } from '@/components/skills/skill-owner-controls'
 import { Tooltip } from '@/components/ui/tooltip'
 import { VersionHistory } from '@/components/skills/version-history'
+import { MergedFrom } from '@/components/skills/merged-from'
 import { DeprecatedBadge } from '@/components/deprecated-badge'
 import {
   SkillInstallSkeleton,
@@ -390,6 +391,8 @@ export async function SkillPageView({
                 </ul>
               </div>
             )}
+
+            {skill.mergedFrom && <MergedFrom from={skill.mergedFrom} />}
 
             {noServableVersion && !quarantined && (
               <div className="mt-6 rounded-xl border border-(--danger-line) bg-(--danger-bg) px-4 py-3">

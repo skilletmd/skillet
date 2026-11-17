@@ -28,7 +28,7 @@ main [README](../README.md) and [packages/registry/README.md](../packages/regist
 - **Rate limits.** Per-client-IP classes (ambient / write / heavy); see
   `packages/registry/README.md`.
 
-_202 routes across 39 areas._
+_203 routes across 39 areas._
 
 ## Account
 
@@ -272,6 +272,7 @@ _202 routes across 39 areas._
 | GET | `/api/v1/map-merges` |
 | GET | `/api/v1/map-merges/:id` |
 | PUT | `/api/v1/map-merges/:id` |
+| POST | `/api/v1/map-merges/:id/pick` |
 
 ## Map Sessions
 

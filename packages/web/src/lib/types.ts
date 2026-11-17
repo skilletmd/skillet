@@ -179,6 +179,12 @@ export interface SkillSecurity {
   findings: SecurityFinding[]
 }
 
+/** What a merged skill was made from: the public sources by ref and name, the private ones as a count. */
+export interface SkillMergedFrom {
+  sources: Array<{ ref: string; name: string }>
+  privateCount: number
+}
+
 export interface Skill {
   author: string
   slug: string
@@ -193,6 +199,8 @@ export interface Skill {
   tags?: string[]
   /** Declarative activation cues from SKILL.md `triggers:`. */
   triggers?: string[]
+  /** For a skill merged from others (kit map U15): its public sources, and how many were private. */
+  mergedFrom?: SkillMergedFrom
   /** Runtimes this skill targets. Real API slot: Skill.runtimes[] */
   runtimes?: Runtime[]
   /** Auto-assigned primary browse category (taxonomy key); null when private/unclassified. */

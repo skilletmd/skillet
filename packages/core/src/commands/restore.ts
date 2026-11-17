@@ -3,11 +3,11 @@
 // (`~/.skillet/trash/<stamp>/manifest.json`); it never reconstructs paths
 // heuristically, and it only ever touches dirs matching the prune stamp format.
 //
-// The kit map's Remove keeps its runs apart, in `~/.skillet/map-trash`
-// (../map/remove-trash.ts): they are listed and restored here beside the prune
-// runs, but restore them through their own rules (never re-import, never
-// overwrite, back only into the compile-time allowlist), and `clearOldTrash`
-// never reads that root.
+// The kit map's Remove and a picked merge's replace keep their runs apart, in
+// `~/.skillet/map-trash` (../map/remove-trash.ts): they are listed and restored
+// here beside the prune runs, but restore them through their own rules (never
+// re-import, never overwrite, back only into the compile-time allowlist), and
+// `clearOldTrash` never reads that root.
 import { readdir, readFile, rm, lstat } from 'node:fs/promises';
 import { realpathSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
@@ -75,10 +75,13 @@ export interface TrashRun {
   /** The trash dir name (the prune run stamp). */
   id: string;
   trashedAt: string;
-  /** Distinct skill refs in this run (a map-remove run lists the skills' names). */
+  /** Distinct skill refs in this run (a map run lists the skills' names). */
   skills: string[];
-  /** `map-remove` for a run the kit map's Remove made; absent for sync's own trash. */
-  kind?: 'map-remove';
+  /**
+   * `map-remove` for a run the kit map's Remove made, `map-replace` for one a
+   * picked merge made in place of its originals; absent for sync's own trash.
+   */
+  kind?: 'map-remove' | 'map-replace';
 }
 
 export interface RestoreResult {
@@ -161,8 +164,9 @@ export async function restoreTrash(runId?: string): Promise<RestoreResult | null
   if (runs.length === 0) return null;
   const target = runId ? runs.find((r) => r.id === runId) : runs[0];
   if (!target) return null;
-  // A map-remove run goes back by its own rules, and never re-imports.
-  if (target.kind === 'map-remove') return restoreMapTrash(target.id);
+  // A map run goes back by its own rules, and never re-imports. A replace run
+  // first moves the merged folders it wrote to the map trash.
+  if (target.kind === 'map-remove' || target.kind === 'map-replace') return restoreMapTrash(target.id);
   const ledger = await readLedger(join(trashRoot(), target.id));
   if (!ledger) return null;
 

@@ -21,27 +21,44 @@
  *      removal (sync then takes its folders), and a plugin, synced, app-managed
  *      or own published skill changes no file: the result names what to turn
  *      off. Each one is acknowledged.
- *   5. Fill each pick through the normal kit add. Moves change assignments
+ *   5. Put each picked merge in place of its originals (a waiting replace,
+ *      plan U15, KTD9 KTD13). Only a merged skill this computer wrote itself,
+ *      from exactly these originals, by its own merge record (./merge-run.ts),
+ *      and only while every original is still here under the hash the merge
+ *      was written from; otherwise nothing changes and the replace is
+ *      acknowledged with why. The merged skill goes into every tool folder
+ *      that held an original, inside the allowlist, before any original moves.
+ *      Then the originals leave by the folder rules, into one replace run of
+ *      the map trash that restore can undo.
+ *   6. Once sync has written the person's own published copy of a merged skill
+ *      (KTD14), move the local merged folders it now doubles to the map trash,
+ *      in each tool the published copy reached, so the job keeps one skill.
+ *   7. Fill each pick through the normal kit add. Moves change assignments
  *      only. Merges stay waiting for the merge step (./merge-run.ts), which
- *      runs once this one is done; a replace too.
- *   6. Save the map with the version read, re-reading on a conflict.
+ *      runs once this one is done.
+ *   8. Save the map with the version read, re-reading on a conflict.
  *
  * Every step can run again: backups go by hash, the trash moves only folders
- * still present, and a waiting remove whose skill is gone is acknowledged as
- * gone. Paths never leave this module: the account sees hashes, names and jobs.
+ * still present, a waiting remove whose skill is gone is acknowledged as gone,
+ * and a replace reads back its own runs, so a second run finishes it without
+ * moving anything twice. Paths never leave this module: the account sees
+ * hashes, names and jobs.
  */
-import { lstat, readdir, readFile, realpath, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { lstat, mkdtemp, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
+import { basename, join } from "node:path";
 import {
   SKILL_ENTRYPOINT,
   canonicalContentHash,
   encodeBundle,
   isSkilletBackupPath,
+  slugify,
   type BundleFiles,
   type DecodedBundle,
 } from "@skillet/protocol";
 import type { JobId } from "@skillet/protocol/jobs";
 import {
+  KIT_MAP_DESCRIPTION_MAX,
+  KIT_MAP_NAME_MAX,
   deriveKitMapChanges,
   parseKitMapDocument,
   toSavedEntry,
@@ -54,8 +71,17 @@ import {
   type KitMapSavedEntry,
 } from "@skillet/protocol/kit-map";
 import { readState, writeState } from "../kit/store.js";
+import { mapFolderRootOf } from "../util/pathsafe.js";
 import type { MapSource } from "./folder-rules.js";
-import { trashMapFolders, type MapTrashResult, type MapTrashTarget } from "./remove-trash.js";
+import { readMapMergeRecords, type MapMergeRecord } from "./merge-run.js";
+import {
+  listMapReplaceRuns,
+  trashMapFolders,
+  type MapPlacedFolder,
+  type MapReplaceRun,
+  type MapTrashResult,
+  type MapTrashTarget,
+} from "./remove-trash.js";
 import type { MapScanEntry, MapScanResult } from "./scan.js";
 
 // ---------------------------------------------------------------------------
@@ -171,6 +197,21 @@ export interface MapApplyResult {
   trashRun: string | null;
   /** Whether anything on this computer or the account changed. */
   changed: boolean;
+  /** Picked merges this run put in place of their originals (U15). */
+  replaced?: MapReplaced[];
+  /** Local merged folders this run moved to the map trash because their published copy landed (KTD14). */
+  published?: { moved: number; run: string | null };
+}
+
+/** A picked merge in place of its originals. */
+export interface MapReplaced {
+  job: JobId;
+  /** The merged skill's name. */
+  name: string;
+  /** How many originals it replaced. */
+  originals: number;
+  /** The replace run restore undoes, when this run moved an original. */
+  run: string | null;
 }
 
 function zero(): KitMapSaveCounts {
@@ -284,6 +325,246 @@ async function leaveKitStore(slugs: readonly string[]): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Replace: a picked merge in place of its originals (U15, KTD9 KTD13)
+// ---------------------------------------------------------------------------
+
+type ReplaceChange = Extract<KitMapPendingChange, { kind: "replace" }>;
+
+/** How a replace is acknowledged when it changes nothing: why. */
+type ReplaceRefusal = "not-written-here" | "sources-changed" | "not-replaceable";
+
+type ReplaceOutcome =
+  | { kind: "refused"; outcome: ReplaceRefusal }
+  | {
+      kind: "done";
+      record: MapMergeRecord;
+      tools: string[];
+      run: string | null;
+      unremoved: MapUnremoved[];
+      changed: boolean;
+    }
+  /** Something failed partway that the next run can finish. */
+  | { kind: "retry"; changed: boolean };
+
+const sameKeySet = (a: readonly string[], b: readonly string[]): boolean =>
+  a.length === b.length && new Set(a).size === a.length && a.every((key) => b.includes(key));
+
+const mergedBundle = (skill: string): DecodedBundle => new Map([[SKILL_ENTRYPOINT, Buffer.from(skill, "utf8")]]);
+
+/** Present without following links. */
+async function exists(path: string): Promise<boolean> {
+  try {
+    await lstat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The folder name a merged skill takes: its name as a slug, never one the folder rules read as Skillet's. */
+function mergedFolderName(name: string): string {
+  return slugify(name, { maxLength: 64, fallback: "merged-skill" });
+}
+
+/**
+ * Write the merged SKILL.md into `root` under a free name: its own slug, or
+ * the slug with a number when another folder holds that name. It is written
+ * into a dot-folder first, which no tool or scan reads, and renamed into
+ * place, so a tool never sees half of it. Nothing is ever overwritten.
+ */
+async function writeMergedFolder(root: string, name: string, skill: string): Promise<MapPlacedFolder | null> {
+  const base = mergedFolderName(name);
+  for (let n = 1; n <= 50; n++) {
+    const folder = n === 1 ? base : `${base}-${n}`;
+    const dest = join(root, folder);
+    if (mapFolderRootOf(dest) !== root) return null;
+    if (await exists(dest)) continue;
+    const tmp = await mkdtemp(join(root, ".skillet-merge-"));
+    try {
+      await writeFile(join(tmp, SKILL_ENTRYPOINT), skill, { encoding: "utf8", mode: 0o644 });
+      if (await exists(dest)) {
+        await rm(tmp, { recursive: true, force: true });
+        continue;
+      }
+      await rename(tmp, dest);
+      return { root, folder, from: dest };
+    } catch {
+      await rm(tmp, { recursive: true, force: true });
+      return null;
+    }
+  }
+  return null;
+}
+
+interface ReplaceContext {
+  client: MapApplyClient;
+  scanByKey: ReadonlyMap<string, MapScanEntry>;
+  records: readonly MapMergeRecord[];
+  runs: readonly MapReplaceRun[];
+  nameOf: (key: string, entry?: MapScanEntry) => string;
+}
+
+/**
+ * Put one picked merge in place of its originals, or say why not. Checks come
+ * first and change nothing: this computer wrote the merged skill, from exactly
+ * these originals (its own merge record, whose text hashes to the merged
+ * hash), and every original is still here under the hash the merge was written
+ * from, or was already moved by an earlier run of this same replace. Then the
+ * merged skill goes into every tool folder that held an original (reusing one
+ * that already holds it), Skillet's imports leave the kit store, the person's
+ * own folders and imports go to the map trash in one replace run, and another
+ * maker's originals leave the kit.
+ */
+async function applyReplace(change: ReplaceChange, ctx: ReplaceContext): Promise<ReplaceOutcome> {
+  const record = ctx.records.find((r) => r.merged === change.merged && sameKeySet(r.keys, change.keys));
+  if (!record || canonicalContentHash(mergedBundle(record.skill)) !== change.merged) {
+    return { kind: "refused", outcome: "not-written-here" };
+  }
+
+  const earlier = ctx.runs.filter((run) => run.change === change.id);
+  const done = new Set(earlier.flatMap((run) => [...run.moved.map((m) => m.key), ...run.kit.map((k) => k.key)]));
+  const present: MapScanEntry[] = [];
+  for (const key of change.keys) {
+    const entry = ctx.scanByKey.get(key);
+    if (entry !== undefined) {
+      if (!REMOVABLE.has(entry.source)) return { kind: "refused", outcome: "not-replaceable" };
+      present.push(entry);
+    } else if (!done.has(key)) {
+      // Edited, removed or replaced since the merge was written: never trash it.
+      return { kind: "refused", outcome: "sources-changed" };
+    }
+  }
+
+  // Every tool folder that held an original gets the merged skill.
+  const roots: string[] = [];
+  const addRoot = (root: string | null): void => {
+    if (root !== null && !roots.includes(root)) roots.push(root);
+  };
+  for (const run of earlier) {
+    for (const moved of run.moved) addRoot(moved.root);
+    for (const placed of run.placed) addRoot(placed.root);
+  }
+  const targets: MapTrashTarget[] = [];
+  const imports: string[] = [];
+  const kit: Array<{ key: string; owner: string; slug: string }> = [];
+  const tools = new Set<string>();
+  for (const entry of present) {
+    for (const tool of entry.tools) tools.add(tool);
+    const name = ctx.nameOf(entry.key, entry);
+    for (const location of entry.locations) {
+      const root = mapFolderRootOf(location.path);
+      if (location.source === "local" || location.source === "skillet-imported") {
+        if (root === null) return { kind: "refused", outcome: "not-replaceable" };
+        targets.push({ key: entry.key, name, source: location.source, path: location.path });
+        const slug = location.source === "skillet-imported" ? location.skillet?.slug : undefined;
+        if (slug && !imports.includes(slug)) imports.push(slug);
+      } else if (location.source === "skillet-added" && location.skillet?.maker) {
+        const ref = { key: entry.key, owner: location.skillet.maker, slug: location.skillet.slug };
+        if (!kit.some((k) => k.owner === ref.owner && k.slug === ref.slug)) kit.push(ref);
+      }
+      addRoot(root);
+    }
+  }
+
+  // No tool folder to put it in: taking the originals out would leave the job empty.
+  if (roots.length === 0) return { kind: "refused", outcome: "not-replaceable" };
+
+  // The merged skill first: no original moves until every tool folder holds it.
+  const already = ctx.scanByKey.get(change.merged)?.locations ?? [];
+  const placed: MapPlacedFolder[] = [];
+  const created: MapPlacedFolder[] = [];
+  const undo = async (): Promise<void> => {
+    for (const folder of created) await rm(folder.from, { recursive: true, force: true }).catch(() => {});
+  };
+  for (const root of roots) {
+    const there = already.find((location) => mapFolderRootOf(location.path) === root);
+    if (there) {
+      placed.push({ root, folder: basename(there.path), from: join(root, basename(there.path)) });
+      continue;
+    }
+    const written = await writeMergedFolder(root, record.name, record.skill);
+    if (written === null) {
+      await undo();
+      return { kind: "retry", changed: false };
+    }
+    placed.push(written);
+    created.push(written);
+  }
+
+  // Imports leave the kit store first: if that fails, nothing has moved.
+  if (!(await leaveKitStore(imports))) {
+    await undo();
+    return { kind: "retry", changed: false };
+  }
+
+  let retry = false;
+  let run: string | null = null;
+  if (targets.length > 0 || kit.length > 0) {
+    let trash: MapTrashResult;
+    try {
+      trash = await trashMapFolders(targets, { change: change.id, merge: record.id, merged: change.merged, placed, kit });
+    } catch {
+      return { kind: "retry", changed: created.length > 0 || imports.length > 0 };
+    }
+    if (trash.moved.length > 0) run = trash.runId;
+    if (trash.skipped.some((skip) => skip.reason !== "missing")) retry = true;
+  }
+
+  const unremoved: MapUnremoved[] = [];
+  for (const ref of kit) {
+    let removal: MapKitRemoval;
+    try {
+      removal = await ctx.client.removeFromKit({ owner: ref.owner, slug: ref.slug });
+    } catch {
+      retry = true;
+      continue;
+    }
+    if (!removal.ok) {
+      if (removal.final) unremoved.push({ name: ctx.nameOf(ref.key), reason: removal.reason });
+      else retry = true;
+    }
+  }
+  const changed = created.length > 0 || targets.length > 0 || kit.length > 0 || imports.length > 0;
+  if (retry) return { kind: "retry", changed };
+  return { kind: "done", record, tools: [...tools], run, unremoved, changed };
+}
+
+/** The merged skill as the saved map keeps it, in the job its originals were merged for. */
+function mergedEntry(record: MapMergeRecord, tools: readonly string[]): KitMapEntry {
+  const name = record.name.replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, KIT_MAP_NAME_MAX) || "Merged skill";
+  return {
+    key: record.merged,
+    name,
+    description: record.description.slice(0, KIT_MAP_DESCRIPTION_MAX),
+    source: "local",
+    tools: tools.map((tool) => ({ tool, copies: 1 })),
+    job: record.job,
+    usage: { state: "unknown", reason: null },
+  };
+}
+
+/**
+ * KTD14: once sync writes the person's own published copy of a merged skill,
+ * the local merged folder it doubles goes to the map trash, in each tool the
+ * published copy reached, so every tool keeps one copy.
+ */
+function publishedDoubles(records: readonly MapMergeRecord[], scanByKey: ReadonlyMap<string, MapScanEntry>): MapTrashTarget[] {
+  const targets: MapTrashTarget[] = [];
+  for (const record of records) {
+    const entry = scanByKey.get(record.merged);
+    if (!entry) continue;
+    const reached = new Set(entry.locations.filter((l) => l.source === "skillet-own").flatMap((l) => l.tools));
+    if (reached.size === 0) continue;
+    for (const location of entry.locations) {
+      if (location.source !== "local" || location.tools.length === 0) continue;
+      if (!location.tools.every((tool) => reached.has(tool)) || mapFolderRootOf(location.path) === null) continue;
+      targets.push({ key: entry.key, name: entry.name, source: "local", path: location.path });
+    }
+  }
+  return targets;
 }
 
 // ---------------------------------------------------------------------------
@@ -566,7 +847,66 @@ export async function runMapApply(opts: MapApplyOptions): Promise<MapApplyResult
     }
   }
 
-  // 5. Fill each pick through the normal kit add.
+  // 5. Put each picked merge in place of its originals (U15).
+  const replaces = waiting.filter((c): c is ReplaceChange => c.kind === "replace");
+  const mergedEntries: KitMapEntry[] = [];
+  let replaceLeft = false;
+  let records: MapMergeRecord[] | null = null;
+  const mergeRecords = async (): Promise<MapMergeRecord[]> => (records ??= await readMapMergeRecords());
+  if (replaces.length > 0 && !signal?.aborted) {
+    const ctx: ReplaceContext = { client, scanByKey, records: await mergeRecords(), runs: await listMapReplaceRuns(), nameOf };
+    for (const change of replaces) {
+      if (signal?.aborted) {
+        replaceLeft = true;
+        break;
+      }
+      const outcome = await applyReplace(change, ctx);
+      if (outcome.kind === "retry") {
+        replaceLeft = true;
+        if (outcome.changed) out.changed = true;
+        continue;
+      }
+      if (outcome.kind === "done") {
+        if (outcome.changed) out.changed = true;
+        out.unremoved.push(...outcome.unremoved);
+        for (const key of change.keys) removed.add(key);
+        mergedEntries.push(mergedEntry(outcome.record, outcome.tools));
+        (out.replaced ??= []).push({
+          job: outcome.record.job,
+          name: outcome.record.name,
+          originals: change.keys.length,
+          run: outcome.run,
+        });
+      }
+      try {
+        await client.ackChange(change.id, outcome.kind === "done" ? "applied" : outcome.outcome);
+        out.changed = true;
+      } catch {
+        // Still waiting: the next run finds it done by its own replace run and acknowledges it then.
+        if (outcome.kind === "done") replaceLeft = true;
+      }
+    }
+  } else if (replaces.length > 0) {
+    replaceLeft = true;
+  }
+
+  // 6. Once a merged skill's published copy has landed, its local merged folders go (KTD14).
+  if (!signal?.aborted) {
+    const doubles = publishedDoubles(await mergeRecords(), scanByKey);
+    if (doubles.length > 0) {
+      try {
+        const trash = await trashMapFolders(doubles);
+        if (trash.moved.length > 0) {
+          out.changed = true;
+          out.published = { moved: trash.moved.length, run: trash.runId };
+        }
+      } catch {
+        // They stay until the next run.
+      }
+    }
+  }
+
+  // 7. Fill each pick through the normal kit add.
   const filled: Array<Extract<KitMapDraft, { kind: "fill" }>> = [];
   for (const fill of fillDrafts) {
     if (signal?.aborted) {
@@ -588,8 +928,9 @@ export async function runMapApply(opts: MapApplyOptions): Promise<MapApplyResult
     else out.left.fills++;
   }
 
-  // 6. Save the map: on Save, with this computer's entries; on apply, only to
-  // take out what left, so nothing new about this computer's skills goes up.
+  // 8. Save the map: on Save, with this computer's entries; on apply, only to
+  // take out what left and put a merged skill in its originals' place, so
+  // nothing new about this computer's skills goes up.
   let mapSaved = true;
   if (!signal?.aborted && (opts.mode === "save" || removed.size > 0)) {
     let final: readonly KitMapEntry[] = opts.mode === "save" ? wire : [];
@@ -600,6 +941,7 @@ export async function runMapApply(opts: MapApplyOptions): Promise<MapApplyResult
         // The picks join the map on the next Save.
       }
     }
+    final = [...final.filter((entry) => !mergedEntries.some((m) => m.key === entry.key)), ...mergedEntries];
     const jobOf = (entry: KitMapEntry, saved: JobId | null | undefined): JobId | null => {
       if (moved.has(entry.key)) return derived.jobs.get(entry.key) ?? null;
       if (saved !== undefined) return saved;
@@ -611,13 +953,13 @@ export async function runMapApply(opts: MapApplyOptions): Promise<MapApplyResult
     if (mapSaved) out.changed = true;
   }
 
-  const leftOver = Object.values(out.left).some((n) => n > 0);
+  const leftOver = Object.values(out.left).some((n) => n > 0) || replaceLeft;
   if (signal?.aborted) {
     out.result = "partial";
     out.reason = "stopped";
   } else if (leftOver || !mapSaved) {
     out.result = "partial";
-    out.reason = mapSaved ? "registry-unreachable" : "map-not-saved";
+    out.reason = !mapSaved ? "map-not-saved" : replaceLeft ? "replace-unfinished" : "registry-unreachable";
   }
   return out;
 }

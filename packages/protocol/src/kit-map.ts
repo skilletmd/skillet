@@ -517,8 +517,31 @@ export interface KitMapMerge {
   rounds?: KitMapMergeRound[];
   /** Who the merged skill credits, one per original, from its backup. */
   sources?: KitMapMergeSource[];
+  /** The public skill (`@owner/slug`) the person published from the merged one, once they have. */
+  published?: string;
   /** When it last changed, in epoch seconds. */
   updatedAt: number;
+}
+
+/** What the person keeps after the blind rounds: the merged skill, or the originals. */
+export type KitMapMergeChoice = 'merged' | 'originals';
+
+/**
+ * The pick, as skillet.md sends it: the side kept, and the originals the
+ * merged skill beat, one per round it won. "Use merged" is offered only when
+ * it won more than half the rounds ({@link kitMapMergeWins}).
+ */
+export interface KitMapMergePick {
+  use: KitMapMergeChoice;
+  won: string[];
+}
+
+/**
+ * Whether the merged skill won more than half its rounds (KTD13). A tie keeps
+ * the originals (AE1), and so does a merge with no rounds.
+ */
+export function kitMapMergeWins(won: number, rounds: number): boolean {
+  return rounds > 0 && won * 2 > rounds;
 }
 
 /** What the computer writing a merge reports. A pick, and putting a merge in place, are never a computer's to report. */
@@ -1078,7 +1101,20 @@ function mergedHash(value: unknown, keys: readonly string[]): string {
 const WRITTEN: ReadonlySet<KitMapMergeStatus> = new Set<KitMapMergeStatus>(['ready', 'picked', 'applied']);
 
 function readMerge(value: unknown): KitMapMerge {
-  const rec = fields(value, ['id', 'device', 'job', 'keys', 'status', 'reason', 'merged', 'brief', 'rounds', 'sources', 'updatedAt']);
+  const rec = fields(value, [
+    'id',
+    'device',
+    'job',
+    'keys',
+    'status',
+    'reason',
+    'merged',
+    'brief',
+    'rounds',
+    'sources',
+    'published',
+    'updatedAt',
+  ]);
   const keys = mergeKeys(rec.keys);
   const status = oneOf(rec.status, KIT_MAP_MERGE_STATUSES);
   const merge: KitMapMerge = {
@@ -1107,7 +1143,28 @@ function readMerge(value: unknown): KitMapMerge {
     if (merge.merged === undefined) invalid();
     merge.sources = onePerKey(list(rec.sources, KIT_MAP_MERGE_MAX_SOURCES).map(readMergeSource), keys);
   }
+  if (rec.published !== undefined) {
+    if (merge.merged === undefined) invalid();
+    merge.published = wireRef(rec.published);
+  }
   return merge;
+}
+
+function readMergePick(value: unknown, keys: readonly string[]): KitMapMergePick {
+  const rec = fields(value, ['use', 'won']);
+  const use = oneOf(rec.use, ['merged', 'originals'] as const);
+  const won = list(rec.won, KIT_MAP_MERGE_MAX_SOURCES).map((key) => matching(key, HASH_RE));
+  if (new Set(won).size !== won.length || !won.every((key) => keys.includes(key))) invalid();
+  return { use, won };
+}
+
+/**
+ * The person's pick, checked against the merge's own originals, or null. It
+ * says only what was kept and which rounds the merged skill won; whether it
+ * won enough for "Use merged" is {@link kitMapMergeWins}.
+ */
+export function parseKitMapMergePick(value: unknown, keys: readonly string[]): KitMapMergePick | null {
+  return attempt(() => readMergePick(value, keys));
 }
 
 /**

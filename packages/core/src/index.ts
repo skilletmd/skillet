@@ -116,6 +116,7 @@ export {
   type MapKeptRemove,
   type MapNotBackedUp,
   type MapRefusedFill,
+  type MapReplaced,
   type MapUnremoved,
 } from "./map/apply.js";
 // The merge step (plan U14): drafted merges written by the person's own AI
@@ -156,10 +157,13 @@ export {
   restoreMapTrash,
   mapTrashRoot,
   MAP_REMOVE_RUN,
+  MAP_REPLACE_RUN,
   type MapTrashTarget,
   type MapTrashItem,
   type MapTrashResult,
   type MapTrashRun,
+  type MapPlacedFolder,
+  type MapReplaceRecord,
 } from "./map/remove-trash.js";
 export {
   acquireMapSaveLock,
