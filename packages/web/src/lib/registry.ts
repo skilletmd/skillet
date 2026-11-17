@@ -1,4 +1,5 @@
 import { cache } from 'react'
+import { isWireRef } from '@skillet/protocol/skill-id'
 import type {
   AuthorProfile,
   CapabilityAnalysis,
@@ -362,13 +363,11 @@ function mapSummary(s: SkillSummary): Skill {
   }
 }
 
-const MERGED_REF_RE = /^@[a-z0-9][a-z0-9-]{0,62}\/[a-z0-9][a-z0-9-]{0,62}$/
-
-/** The registry's `merged_from`, kept only where every part reads: a ref in `@owner/slug` form, a name, a count. */
+/** The registry's `merged_from`, kept only where every part reads: a ref in its canonical `@owner/slug` form, a name, a count. */
 function mapMergedFrom(raw: SkillDetailResponse['merged_from']): SkillMergedFrom | undefined {
   if (!raw || !Array.isArray(raw.sources)) return undefined
   const sources = raw.sources.flatMap((s) =>
-    typeof s?.ref === 'string' && MERGED_REF_RE.test(s.ref) && typeof s.name === 'string' && s.name.trim() !== ''
+    isWireRef(s?.ref) && typeof s.name === 'string' && s.name.trim() !== ''
       ? [{ ref: s.ref, name: s.name }]
       : [],
   )

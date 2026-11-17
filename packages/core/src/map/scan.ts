@@ -9,7 +9,9 @@
  * not check lands in the unreadable list.
  *
  * Read-only (R5, AE4). The only filesystem calls are lstat, stat, realpath,
- * readdir and readFile, and nothing goes over the network. A folder that
+ * readdir and readFile, and nothing goes over the network. Folders are found
+ * one at a time, in order; then the skills in them are read a few at once,
+ * and everything they give lands in the order they were found. A folder that
  * resolves into ~/Documents, ~/Desktop or ~/Downloads is read only when this
  * process already has access (util/tcc-access.ts); otherwise reading it would
  * bring up a macOS prompt before the person has seen anything, so it is named
@@ -40,11 +42,11 @@ import {
 import { classifyJob, type JobId } from "@skillet/protocol/jobs";
 import type { Adapter } from "../adapter.js";
 import { loadIdentity } from "../identity/index.js";
+import { mapInOrder } from "../util/in-order.js";
 import { isPathWithin } from "../util/pathsafe.js";
 import { describeTccRoot, detectTccInvocation, isTccParkedPath } from "../util/tcc-access.js";
 import {
   CONTAINER_SEARCH_DEPTH,
-  MAP_SOURCE_RULES,
   UNIVERSAL_SKILLS_READERS,
   dominantSource,
   isSkippedName,
@@ -65,6 +67,8 @@ import {
   reasonForError,
   type PluginSkillsSource,
 } from "./plugin-sources.js";
+import { SAFE_MATTER } from "./safe-matter.js";
+import { entryKind } from "./skill-fs.js";
 
 /** Why a skill can't be backed up. */
 export type MapBackupBlock = "links-outside" | "over-25-mb" | "instructions-over-1-mb" | "git-folder";
@@ -109,17 +113,14 @@ export interface MapScanEntry {
   /** The plugin (with its on/off state), organization or app behind `source`. */
   owner: MapOwner | null;
   tools: string[];
-  /** Every path per tool. */
-  paths: Record<string, string[]>;
   /** How many copies each tool loads. */
   copies: Record<string, number>;
+  /** Every folder it was found in, with the tools that load each. */
   locations: MapScanLocation[];
   /** The job it does, or null for "Not sorted". */
   jobId: JobId | null;
   /** Every reason any copy has. */
   flags: MapFlags;
-  /** The source backs up and nothing in `flags.cantBackUp` stops it. */
-  backsUp: boolean;
 }
 
 /** A folder the scan read. */
@@ -194,6 +195,9 @@ interface ReadSkill {
   cantBackUp: Set<MapBackupBlock>;
   cantMerge: Set<MapMergeBlock>;
 }
+
+/** How many skills are read at once. */
+const READS_AT_ONCE = 8;
 
 interface ScanState {
   candidates: Candidate[];
@@ -508,7 +512,7 @@ async function walkSkill(
     if (name.startsWith(".") || isSkilletBackupPath(name)) continue;
     const abs = join(dir, name);
     const relPath = rel === "" ? name : `${rel}/${name}`;
-    const info = await lstat(abs);
+    const info = await entryKind(entry, abs);
     if (info.isSymbolicLink()) {
       const target = await realpath(abs).catch(() => null);
       if (target !== null && isPathWithin(target, root)) out.linksInside = true;
@@ -527,15 +531,6 @@ async function walkSkill(
   }
 }
 
-function refuseCode(): object {
-  throw new Error("front matter that runs code is not read");
-}
-
-// gray-matter evaluates `---js` front matter by default; a scan of every
-// skill on the computer must never run one. Passing options also keeps
-// gray-matter from caching every SKILL.md it parses.
-const SAFE_MATTER = { engines: { javascript: refuseCode, js: refuseCode } };
-
 function readFrontmatter(text: string): { data: Record<string, unknown>; body: string } {
   try {
     const parsed = matter(text, SAFE_MATTER);
@@ -545,7 +540,10 @@ function readFrontmatter(text: string): { data: Record<string, unknown>; body: s
   }
 }
 
-async function readCandidate(candidate: Candidate, state: ScanState): Promise<ReadSkill | null> {
+/** One candidate read: the skill, or the row saying why it couldn't be. */
+type CandidateRead = { skill: ReadSkill } | { unreadable: MapUnreadable };
+
+async function readCandidate(candidate: Candidate): Promise<CandidateRead> {
   const contents: SkillContents = {
     files: new Map(),
     totalBytes: 0,
@@ -553,10 +551,9 @@ async function readCandidate(candidate: Candidate, state: ScanState): Promise<Re
     linksInside: false,
     hasGit: false,
   };
-  const fail = (reason: MapUnreadableReason, detail?: string): null => {
-    state.unreadable.push(unreadableRow(candidate.path, reason, candidate.tools, candidate.plugin, detail));
-    return null;
-  };
+  const fail = (reason: MapUnreadableReason, detail?: string): CandidateRead => ({
+    unreadable: unreadableRow(candidate.path, reason, candidate.tools, candidate.plugin, detail),
+  });
   try {
     const { folder } = candidate;
     await walkSkill(folder.real, folder.real, "", folder.entries, contents);
@@ -590,13 +587,15 @@ async function readCandidate(candidate: Candidate, state: ScanState): Promise<Re
   const rawName = typeof data["name"] === "string" ? data["name"].trim() : "";
   const description = typeof data["description"] === "string" ? data["description"].trim() : "";
   return {
-    candidate,
-    key,
-    name: rawName.length > 0 ? rawName : candidate.slug,
-    description,
-    body,
-    cantBackUp,
-    cantMerge,
+    skill: {
+      candidate,
+      key,
+      name: rawName.length > 0 ? rawName : candidate.slug,
+      description,
+      body,
+      cantBackUp,
+      cantMerge,
+    },
   };
 }
 
@@ -613,15 +612,13 @@ function buildEntry(copies: ReadSkill[]): MapScanEntry {
   const lead = copies.find((c) => c.candidate.source === source)!;
 
   const tools: string[] = [];
-  const paths: Record<string, string[]> = {};
+  const counts: Record<string, number> = {};
   for (const location of locations) {
     for (const tool of location.tools) {
       if (!tools.includes(tool)) tools.push(tool);
-      (paths[tool] ??= []).push(location.path);
+      counts[tool] = (counts[tool] ?? 0) + 1;
     }
   }
-  const counts: Record<string, number> = {};
-  for (const tool of tools) counts[tool] = paths[tool]!.length;
 
   const cantBackUp = BACKUP_BLOCKS.filter((block) => copies.some((c) => c.cantBackUp.has(block)));
   const cantMerge = MERGE_BLOCKS.filter((block) => copies.some((c) => c.cantMerge.has(block)));
@@ -632,7 +629,6 @@ function buildEntry(copies: ReadSkill[]): MapScanEntry {
     source,
     owner: lead.candidate.owner,
     tools,
-    paths,
     copies: counts,
     locations,
     jobId: classifyJob({
@@ -642,7 +638,6 @@ function buildEntry(copies: ReadSkill[]): MapScanEntry {
       body: lead.body,
     }),
     flags: { cantBackUp, cantMerge },
-    backsUp: MAP_SOURCE_RULES[source].backsUp && cantBackUp.length === 0,
   };
 }
 
@@ -679,10 +674,16 @@ export async function scanMap(opts: MapScanOptions): Promise<MapScanResult> {
     for (const source of plugins.sources) await scanPluginSource(source, state);
   }
 
+  // A few at once, each result taken in the order its folder was found, so
+  // entries, their copies and the unreadable rows come out as they would one by one.
+  const reads = await mapInOrder(state.candidates, READS_AT_ONCE, readCandidate);
   const byKey = new Map<string, ReadSkill[]>();
-  for (const candidate of state.candidates) {
-    const skill = await readCandidate(candidate, state);
-    if (!skill) continue;
+  for (const read of reads) {
+    if ("unreadable" in read) {
+      state.unreadable.push(read.unreadable);
+      continue;
+    }
+    const { skill } = read;
     const copies = byKey.get(skill.key);
     if (copies) copies.push(skill);
     else byKey.set(skill.key, [skill]);

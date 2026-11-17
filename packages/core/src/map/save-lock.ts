@@ -92,19 +92,6 @@ function isLive(read: { lock: LockFile | null; ageMs: number }): boolean {
   return processAlive(read.lock.pid);
 }
 
-/** The live holder, or null when nothing holds the lock (a stale one counts as nothing). */
-export async function readMapSaveLock(): Promise<MapSaveLockHolder | null> {
-  const read = await readLockFile();
-  if (read === null || !isLive(read) || read.lock === null) return null;
-  return { pid: read.lock.pid, startedAt: read.lock.startedAt };
-}
-
-/** Whether a live Save holds the lock: what the app's sync checks before its tick. */
-export async function isMapSaveLocked(): Promise<boolean> {
-  const read = await readLockFile();
-  return read !== null && isLive(read);
-}
-
 async function tryCreate(): Promise<MapSaveLock | null> {
   const path = mapSaveLockPath();
   await mkdir(skilletDir(), { recursive: true, mode: 0o700 });

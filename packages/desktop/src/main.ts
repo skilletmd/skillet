@@ -23,13 +23,7 @@ import {
   withAdded,
   type MapAddedSkill,
 } from './map-watch'
-import {
-  createOnboardingFlow,
-  welcomeActionsHtml,
-  welcomeAgents,
-  welcomeAgentsHtml,
-  type OnboardingStep,
-} from './onboarding-flow'
+import { createOnboardingFlow, welcomeActionsHtml, welcomeAgents, welcomeAgentsHtml } from './onboarding-flow'
 import { vocabularyEntry } from '@skillet/protocol/scan-vocabulary'
 import {
   clearPersistedDeviceSyncSeq,
@@ -400,6 +394,8 @@ async function getAdaptersUncached(background: boolean): Promise<Adapter[]> {
     mapChanged: () => {
       void mapWatchCheck({ force: true })
     },
+    // Detached: it writes under the save lock while the ticks meanwhile skip.
+    writeMerges: () => invoke('map_write_merges'),
   })
   if (tick.kind === 'locked') {
     traySaveLocked = true
@@ -3204,7 +3200,6 @@ if (view === 'tray') {
 // Save connects it; the pair code stays as the fallback. The decisions live in
 // onboarding-flow.ts; this paints them.
 async function renderOnboarding() {
-  let step: OnboardingStep = 'start'
   let connecting = false
   let linkMsg = ''
   let mapMsg = ''
@@ -3234,9 +3229,9 @@ async function renderOnboarding() {
 
   const flow = createOnboardingFlow({
     authStatus: () => invoke<string>('auth_status'),
+    authStamps: () => invoke<(string | null)[]>('auth_file_stamps'),
     openMap: () => invoke('open_map'),
-    onStep: (next) => {
-      step = next
+    onStep: () => {
       paint()
     },
     onConnected: (auth, how) => {
@@ -3255,7 +3250,7 @@ async function renderOnboarding() {
   // this computer's lock right after it connected: then the sync waits for it.
   const settleSync = async (attempt = 0): Promise<void> => {
     const synced = await getAdapters()
-    if (step !== 'sync') return
+    if (flow.step !== 'sync') return
     if (synced.length > 0) {
       const byName = new Map(synced.map((a) => [a.name, a]))
       found = found.map((f) => (byName.has(f.name) ? { ...byName.get(f.name)!, label: f.label } : f))
@@ -3297,7 +3292,7 @@ async function renderOnboarding() {
   void getDetectedAgents()
     .then((a) => {
       welcomeFound = a
-      if (step === 'welcome') paint()
+      if (flow.step === 'welcome') paint()
     })
     .catch(() => {})
 
@@ -3313,8 +3308,9 @@ async function renderOnboarding() {
     paint()
   })
 
+  // Every read of the step is the flow's own, live: paint() awaits on the way.
   async function paint() {
-    if (step === 'start') {
+    if (flow.step === 'start') {
       // The moment before `auth status` answers: nothing to show yet.
       app.innerHTML = `<div class="panel onboarding" data-tauri-drag-region><button class="ob-close" id="ob-close" aria-label="Close">×</button></div>`
       document
@@ -3322,16 +3318,16 @@ async function renderOnboarding() {
         ?.addEventListener('click', () => void getCurrentWindow().close())
       return
     }
-    const granted = step === 'permission' ? await axGranted() : false
+    const granted = flow.step === 'permission' ? await axGranted() : false
     // The prompt is one-per-app. Once spent, "Allow access" would be a lie —
     // pressing it can only open System Settings from then on.
-    const asked = step === 'permission' ? await axAsked() : false
+    const asked = flow.step === 'permission' ? await axAsked() : false
     const noun = deviceNoun() // platform noun: Mac/PC/device, from platform-copy
     const Noun = noun.charAt(0).toUpperCase() + noun.slice(1)
     // The map and the pair code are two ways through one step.
     const dotSteps = startedConnected ? ['sync'] : ['welcome', 'connect', 'sync']
     if (needsPerm) dotSteps.push('permission')
-    const dotOn = (s: string) => s === step || (s === 'connect' && (step === 'link' || step === 'map'))
+    const dotOn = (s: string) => s === flow.step || (s === 'connect' && (flow.step === 'link' || flow.step === 'map'))
     // One step has nothing to count.
     const dots =
       dotSteps.length > 1
@@ -3339,25 +3335,36 @@ async function renderOnboarding() {
         : ''
     // One header per moment: welcome carries the promise; every later step
     // carries only its own job. Never a task list before a reason.
-    const header =
-      step === 'welcome'
-        ? `<div class="ob-head" data-tauri-drag-region>${brandMark('ob-logo ob-brand')}<div class="ob-title">Skills worth running.</div><div class="ob-sub">${escapeHtml(`See every skill on ${noun}, sorted by job.`)}</div></div>`
-        : step === 'map'
-          ? `<div class="ob-head" data-tauri-drag-region>${brandMark('ob-logo ob-brand ob-logo-sm')}<div class="ob-title">Your map is open</div><div class="ob-sub">${escapeHtml(`Save it in your browser to connect ${noun}.`)}</div></div>`
-          : step === 'link'
-            ? `<div class="ob-head" data-tauri-drag-region>${brandMark('ob-logo ob-brand ob-logo-sm')}<div class="ob-title">Connect ${noun}</div></div>`
-            : step === 'sync'
-              ? `<div class="ob-head" data-tauri-drag-region>${brandMark('ob-logo ob-brand ob-logo-sm')}<div class="ob-title">Connected${connectedHandle ? ` to @${escapeHtml(connectedHandle)}` : ''} <span class="ob-ok">✓</span></div><div class="ob-sub">${
-                syncedTotal === null
-                  ? `Syncing your skills to ${noun}.`
-                  : syncedTotal > 0
-                    ? `${syncedTotal} skill${syncedTotal === 1 ? '' : 's'} just landed in your agents.`
-                    : 'Your agents are ready for their first skill.'
-              }</div></div>`
-              : `<div class="ob-head" data-tauri-drag-region>${brandMark('ob-logo ob-brand ob-logo-sm')}<div class="ob-title">One more thing</div></div>`
+    const head = (mark: string, title: string, sub?: string) =>
+      `<div class="ob-head" data-tauri-drag-region>${mark}<div class="ob-title">${title}</div>${sub === undefined ? '' : `<div class="ob-sub">${sub}</div>`}</div>`
+    let header: string
+    switch (flow.step) {
+      case 'welcome':
+        header = head(brandMark('ob-logo ob-brand'), 'Skills worth running.', escapeHtml(`See every skill on ${noun}, sorted by job.`))
+        break
+      case 'map':
+        header = head(brandMark('ob-logo ob-brand ob-logo-sm'), 'Your map is open', escapeHtml(`Save it in your browser to connect ${noun}.`))
+        break
+      case 'link':
+        header = head(brandMark('ob-logo ob-brand ob-logo-sm'), `Connect ${noun}`)
+        break
+      case 'sync': {
+        const landed =
+          syncedTotal === null
+            ? `Syncing your skills to ${noun}.`
+            : syncedTotal > 0
+              ? `${syncedTotal} skill${syncedTotal === 1 ? '' : 's'} just landed in your agents.`
+              : 'Your agents are ready for their first skill.'
+        const title = `Connected${connectedHandle ? ` to @${escapeHtml(connectedHandle)}` : ''} <span class="ob-ok">✓</span>`
+        header = head(brandMark('ob-logo ob-brand ob-logo-sm'), title, landed)
+        break
+      }
+      default:
+        header = head(brandMark('ob-logo ob-brand ob-logo-sm'), 'One more thing')
+    }
     let body = ''
 
-    if (step === 'welcome') {
+    if (flow.step === 'welcome') {
       // Only the tools this computer has (R29): no stock list, no "+ more".
       // Until detection answers the row stays empty, so a slow scan never
       // flashes "no tools". Bare lockups, not pills: containers on
@@ -3365,9 +3372,9 @@ async function renderOnboarding() {
       const row =
         welcomeFound === null ? '' : welcomeAgentsHtml(welcomeAgents(welcomeFound, pretty), agentLogoSvg, noun)
       body = `${row}${welcomeActionsHtml(noun, { message: mapMsg })}`
-    } else if (step === 'map') {
+    } else if (flow.step === 'map') {
       body = welcomeActionsHtml(noun, { reopen: true, message: mapMsg })
-    } else if (step === 'link') {
+    } else if (flow.step === 'link') {
       body = `<div class="ob-note">Get your pair code at <button class="ob-link" id="ob-web">skillet.md/settings ↗</button></div>
         ${pairCodeBoxesHtml('ob-code-boxes')}
         <div class="ob-msg" id="ob-msg">${escapeHtml(linkMsg)}</div>
@@ -3375,7 +3382,7 @@ async function renderOnboarding() {
         <div class="ob-privacy">Connecting never uploads your local skills.</div>
         <div class="ob-fine">No account? Getting a code creates one.</div>
         <button class="ob-skip" id="ob-open-map">Open my map instead</button>`
-    } else if (step === 'sync') {
+    } else if (flow.step === 'sync') {
       const detected = found.filter((a) => a.status !== 'skipped-not-detected')
       const rows = detecting
         ? `<div class="ob-row"><span class="todo">◌</span> Syncing to your runtimes…</div>`
@@ -3414,8 +3421,8 @@ async function renderOnboarding() {
         : `<div class="ob-card center"><div class="ob-big" style="color:var(--accent)">⌨</div><b>Let Skillet paste for you</b><span class="ob-sub2">${escapeHtml(permNeeded)}</span></div><button class="ob-cta" id="allow">${escapeHtml(accessibilityActionLabel(asked))}</button><button class="ob-skip" id="skip">Skip for now</button><div class="ob-fine">${escapeHtml(permFine)}</div>`
     }
 
-    const stepChanged = lastPaintedStep !== step
-    lastPaintedStep = step
+    const stepChanged = lastPaintedStep !== flow.step
+    lastPaintedStep = flow.step
     app.innerHTML = `<div class="panel onboarding" data-tauri-drag-region><button class="ob-close" id="ob-close" aria-label="Close">×</button><div class="ob-step${stepChanged ? ' ob-enter' : ''}">${header}${body}</div>${dots}</div>`
 
     document
@@ -3455,7 +3462,7 @@ async function renderOnboarding() {
         connectBtn.disabled = (getCode?.() ?? '').replace(/[^A-Za-z0-9]/g, '').length !== PAIR_CODE_LEN
       }
     }
-    if (step === 'link') {
+    if (flow.step === 'link') {
       getCode = wirePairCodeBoxes(
         'ob-code-boxes',
         () => connectBtn?.click(),
@@ -3517,7 +3524,7 @@ async function renderOnboarding() {
     document.getElementById('done')?.addEventListener('click', () => invoke('finish_onboarding'))
   }
   setInterval(() => {
-    if (step === 'permission') paint()
+    if (flow.step === 'permission') paint()
   }, 1200)
   paint()
   void flow.start()

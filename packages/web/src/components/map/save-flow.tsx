@@ -7,6 +7,8 @@ import type { DropSaveResult } from '@/lib/map-drop-store'
 import { loginHref } from '@/lib/urls'
 import { KIT_MAP_VERSION, parseKitMapMessage, type KitMapFlag, type KitMapSaveCounts } from '@skillet/protocol/kit-map'
 import s from '@/components/packs/packs.module.css'
+import type { MapSaveResult, MapSaveStatus, NotBackedUp } from './save-types'
+import { andList, plural } from './words'
 
 /**
  * Save, on skillet.md (kit map onboarding, KTD6). Three places draw it:
@@ -53,64 +55,9 @@ export const saveHref = (session: string) => `${SAVE_PATH}?s=${encodeURIComponen
 const sessionApi = (session: string, leaf: 'binding' | 'bind' | 'approve') => `/api/map-sessions/${session}/${leaf}`
 
 // ---------------------------------------------------------------------------
-// The wire between the save tab and its routes
-// ---------------------------------------------------------------------------
-
-/** A skill Save didn't back up, by name, and why. Never a path on the computer. */
-export interface NotBackedUp {
-  name: string
-  reason: string
-  /** The file to clean: its name, or its path inside the skill when this browser read it. */
-  file?: string
-  /** The line a secret starts on, when the registry said. */
-  line?: number
-}
-
-/** How Save went on the computer, as the terminal reported it. */
-export interface MapSaveResult {
-  result: 'applied' | 'partial' | 'failed'
-  /** What it did. */
-  counts: KitMapSaveCounts | null
-  /** What's left for the next run or the app. */
-  left: KitMapSaveCounts | null
-  notBackedUp: NotBackedUp[]
-}
-
-/** A map session as the save tab reads it. */
-export interface MapSaveSession {
-  state: 'pending' | 'approved' | 'connected' | 'applied' | 'partial' | 'failed' | 'expired'
-  /** Why it expired: never approved, or approved and the terminal never used its code. */
-  reason: 'not-approved' | 'code-unused' | null
-  /** The computer, as the terminal named it. */
-  label: string
-  /** Epoch seconds: when a session nobody approved expires. */
-  expiresAt: number
-  /** Epoch seconds, for the approving account only. */
-  approvedAt: number | null
-  /** The terminal picked up its connect code. */
-  codeDelivered: boolean
-  result: MapSaveResult | null
-}
-
-/** GET /api/map-sessions/:id/binding. */
-export interface MapSaveStatus {
-  /** The same-origin request token bind and approve echo back. */
-  token: string
-  /** This browser holds a live binding for the session. */
-  bound: boolean
-  /** What Save will do, from the map's proof: counts only. */
-  counts: KitMapSaveCounts | null
-  /** Null when this browser can't see the session: no binding, and not the account that approved it. */
-  session: MapSaveSession | null
-}
-
-// ---------------------------------------------------------------------------
 // Words
 // ---------------------------------------------------------------------------
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
-const andList = (items: readonly string[]) =>
-  items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`
 const present = <T,>(items: (T | null)[]): T[] => items.filter((item): item is T => item !== null)
 
 /** What Save will do, in one line of counts. It names no skill. */

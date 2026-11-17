@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useId, useState } from 'react'
 import { jobById } from '@skillet/protocol/jobs'
-import { kitMapMergeWins, parseKitMapMerge, type KitMapMerge } from '@skillet/protocol/kit-map'
+import { kitMapMergeWins, parseKitMapMerge, type KitMapMerge, type KitMapMergePick } from '@skillet/protocol/kit-map'
 import { SKILL_SLUG_RE, isReservedSkillSlug } from '@skillet/protocol/reserved-skill-slugs'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/cn'
@@ -13,6 +13,7 @@ import type { BundleFiles } from '@/lib/skill-bundle'
 import { slugifySkillName } from '@/lib/skill-md-metadata'
 import { publishSkillFromBrowser } from '@/lib/skill-studio-client'
 import s from '@/components/packs/packs.module.css'
+import { andList, plural } from './words'
 
 /**
  * The merges on /map (plan U15, KTD13 KTD14; R22 R23 R25, AE1 AE5).
@@ -55,9 +56,6 @@ export interface MapMergesDemo {
   wins?: boolean[]
 }
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
-const listOf = (items: readonly string[]) =>
-  items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`
 const jobName = (job: string) => jobById(job)?.name ?? 'A job'
 
 const rowPill = cn(s.pill, 'h-11 min-w-[96px] shrink-0 px-4 text-sm')
@@ -153,7 +151,7 @@ function statusLine(item: MapMergeItem, computer: MergeComputer | undefined): st
 /** What "Use merged" does, said before the tap. */
 function useEffectText(item: MapMergeItem, computer: MergeComputer | undefined): string {
   const tools = (item.skill?.tools ?? []).map(runtimeLabel)
-  const where = `${tools.length > 0 ? ` in ${listOf(tools)}` : ''}${computer ? ` on ${computer.label}` : ''}`
+  const where = `${tools.length > 0 ? ` in ${andList(tools)}` : ''}${computer ? ` on ${computer.label}` : ''}`
   return `Replaces ${plural(item.merge.keys.length, 'skill')}${where}. The originals go to the trash and can be restored. ${whenText(computer)}`
 }
 
@@ -161,10 +159,8 @@ function useEffectText(item: MapMergeItem, computer: MergeComputer | undefined):
 // Talking to the registry
 // ---------------------------------------------------------------------------
 
-type Pick = { use: 'merged' | 'originals'; won: string[] }
-
 /** The pick, saved. The merge as it is now, or null when the originals were kept. */
-async function sendPick(id: string, pick: Pick): Promise<KitMapMerge | null> {
+async function sendPick(id: string, pick: KitMapMergePick): Promise<KitMapMerge | null> {
   const res = await fetchRegistryWithRetry(`map-merges/${encodeURIComponent(id)}/pick`, {
     init: { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(pick) },
   })
@@ -399,7 +395,7 @@ function PickSheet({
   const lost = rounds.filter((_, i) => wins[i] === false).map((r) => name(r.key))
   const merged = kitMapMergeWins(beat.length, total)
 
-  const send = async (use: Pick['use']) => {
+  const send = async (use: KitMapMergePick['use']) => {
     if (busy) return
     setBusy(true)
     setError(null)
@@ -448,9 +444,9 @@ function PickSheet({
           <div className="mt-4">
             <p className="text-base leading-6 font-bold">{`Merged won ${beat.length} of ${total}.`}</p>
             <p className="mt-1 text-sm leading-5 text-pretty">
-              {beat.length > 0 && `Merged beat ${listOf(beat.map(name))}.`}
+              {beat.length > 0 && `Merged beat ${andList(beat.map(name))}.`}
               {beat.length > 0 && lost.length > 0 && ' '}
-              {lost.length > 0 && `${listOf(lost)} beat it.`}
+              {lost.length > 0 && `${andList(lost)} beat it.`}
             </p>
           </div>
         )}

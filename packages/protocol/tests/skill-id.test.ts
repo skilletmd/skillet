@@ -5,6 +5,7 @@ import {
   toSkillId,
   tryToSkillId,
   toWireRef,
+  isWireRef,
   toSlugDir,
   toSlugDirParts,
   fromSlugDir,
@@ -122,6 +123,22 @@ describe('toSkillId / toWireRef — canonical conversions', () => {
     assert.equal(toSkillId('@vercel/deploy'), 'vercel:deploy')
     assert.equal(toSkillId('vercel/deploy'), 'vercel:deploy')
     assert.equal(toSkillId('vercel:deploy'), 'vercel:deploy')
+  })
+})
+
+describe('isWireRef — only the canonical @owner/slug form, never a throw', () => {
+  it('accepts a wireRef exactly as toWireRef writes it', () => {
+    assert.equal(isWireRef('@vercel/deploy'), true)
+    assert.equal(isWireRef('@alice-/tool'), true)
+    assert.equal(isWireRef(toWireRef('vercel:deploy')), true)
+  })
+  it('rejects the other two forms, malformed refs and non-strings', () => {
+    for (const value of ['vercel/deploy', 'vercel:deploy', '@vercel:deploy', '@Vercel/deploy', '@vercel/deploy/x', '@vercel/', '@/deploy', '', '@vercel/de ploy', '@vercel/..']) {
+      assert.equal(isWireRef(value), false, value)
+    }
+    for (const value of [undefined, null, 42, { ref: '@vercel/deploy' }, ['@vercel/deploy']]) {
+      assert.equal(isWireRef(value), false, String(value))
+    }
   })
 })
 

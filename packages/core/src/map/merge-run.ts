@@ -48,8 +48,12 @@ import {
 } from "@skillet/protocol";
 import { isJobId, jobById, type Job, type JobId } from "@skillet/protocol/jobs";
 import {
+  KIT_MAP_HASH_RE,
   KIT_MAP_MERGE_MAX_SOURCES,
   KIT_MAP_NAME_MAX,
+  KIT_MAP_RECORD_ID_RE,
+  KIT_MAP_TOOL_RE,
+  isMergeableSource,
   type KitMapMerge,
   type KitMapMergeReport,
   type KitMapMergeRound,
@@ -61,8 +65,6 @@ import { readState } from "../kit/store.js";
 import type { KitState } from "../kit/types.js";
 import { skilletDir } from "../session-token.js";
 import { atomicWrite } from "../util/atomic.js";
-import { readMapSkillBundle, type MapBackupBody, type MapBackupPut } from "./apply.js";
-import type { MapSource } from "./folder-rules.js";
 import {
   MergeWriterError,
   readBrief,
@@ -73,38 +75,21 @@ import {
   type MergeWriterCall,
 } from "./merge-writer.js";
 import type { MapScanEntry, MapScanResult } from "./scan.js";
+import { readMapSkillBundle, skillMdBundle, type MapBackupBody, type MapBackupPut } from "./skill-fs.js";
 
 // ---------------------------------------------------------------------------
 // Which skills a merge is written from (KTD12)
 // ---------------------------------------------------------------------------
 
 /**
- * The person's own folders and Skillet-managed copies. Their own published
- * skills stay out because sync writes them back, and plugin, synced and
- * app-managed skills because they're never changed (R7).
- */
-const MERGE_SOURCES: ReadonlySet<MapSource> = new Set<MapSource>(["local", "skillet-imported", "skillet-added"]);
-
-/**
  * Whether a merge can be written from this skill: one of the person's own
- * folders or a Skillet-managed copy, and a lone SKILL.md with no links out.
- * The writer answers with one SKILL.md, so a skill's scripts and references
- * would go to the trash with it while no blind sample ever used them.
+ * folders or a Skillet-managed copy (the protocol's mergeable sources), and a
+ * lone SKILL.md with no links out. The writer answers with one SKILL.md, so a
+ * skill's scripts and references would go to the trash with it while no blind
+ * sample ever used them.
  */
 export function isMergeableEntry(entry: MapScanEntry): boolean {
-  return MERGE_SOURCES.has(entry.source) && entry.flags.cantMerge.length === 0;
-}
-
-/**
- * The skills in a job a merge would be written from, or none when the job
- * offers no merge: fewer than two can be merged, or the job holds as many
- * skills as you like (Platforms).
- */
-export function mapMergeSources(job: JobId, held: readonly MapScanEntry[]): MapScanEntry[] {
-  const slot: Job | undefined = jobById(job as string);
-  if (slot === undefined || slot.many) return [];
-  const able = held.filter(isMergeableEntry);
-  return able.length >= 2 ? able : [];
+  return isMergeableSource(entry.source) && entry.flags.cantMerge.length === 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -225,21 +210,13 @@ export interface MapMergeRecord {
   storedAt?: string;
 }
 
-const RECORD_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
-const HASH_RE = /^sha256:[0-9a-f]{64}$/;
-const TOOL_RE = /^[a-z][a-z0-9-]{0,31}$/;
-
 export function mapMergeRecordsDir(): string {
   return join(skilletDir(), "map-merges");
 }
 
 function recordPath(id: string): string {
-  if (!RECORD_ID_RE.test(id)) throw new Error("not a merge change id");
+  if (!KIT_MAP_RECORD_ID_RE.test(id)) throw new Error("not a merge change id");
   return join(mapMergeRecordsDir(), `${id}.json`);
-}
-
-function skillBundle(skill: string): DecodedBundle {
-  return new Map([[SKILL_ENTRYPOINT, Buffer.from(skill, "utf8")]]);
 }
 
 const isText = (value: unknown): value is string => typeof value === "string";
@@ -247,7 +224,7 @@ const isText = (value: unknown): value is string => typeof value === "string";
 function parseRecord(value: unknown, id: string): MapMergeRecord | null {
   if (typeof value !== "object" || value === null) return null;
   const rec = value as Record<string, unknown>;
-  const keys = Array.isArray(rec.keys) && rec.keys.every((k) => isText(k) && HASH_RE.test(k)) ? (rec.keys as string[]) : null;
+  const keys = Array.isArray(rec.keys) && rec.keys.every((k) => isText(k) && KIT_MAP_HASH_RE.test(k)) ? (rec.keys as string[]) : null;
   const rounds = Array.isArray(rec.rounds) ? (rec.rounds as unknown[]) : null;
   if (
     rec.id !== id ||
@@ -255,7 +232,7 @@ function parseRecord(value: unknown, id: string): MapMergeRecord | null {
     !isJobId(rec.job) ||
     keys === null ||
     !isText(rec.merged) ||
-    !HASH_RE.test(rec.merged) ||
+    !KIT_MAP_HASH_RE.test(rec.merged) ||
     !isText(rec.name) ||
     !isText(rec.description) ||
     !isText(rec.skill) ||
@@ -273,7 +250,7 @@ function parseRecord(value: unknown, id: string): MapMergeRecord | null {
     readRounds.push({ key: r.key, merged: r.merged, original: r.original });
   }
   // A record whose text doesn't hash to its merged hash is no record of what was written.
-  if (canonicalContentHash(skillBundle(rec.skill)) !== rec.merged) return null;
+  if (canonicalContentHash(skillMdBundle(rec.skill)) !== rec.merged) return null;
   return {
     id,
     job: rec.job,
@@ -291,7 +268,7 @@ function parseRecord(value: unknown, id: string): MapMergeRecord | null {
 
 /** What this computer wrote for one merge change, or null. */
 export async function readMapMergeRecord(id: string): Promise<MapMergeRecord | null> {
-  if (!RECORD_ID_RE.test(id)) return null;
+  if (!KIT_MAP_RECORD_ID_RE.test(id)) return null;
   try {
     return parseRecord(JSON.parse(await readFile(recordPath(id), "utf8")) as unknown, id);
   } catch {
@@ -449,7 +426,7 @@ async function compose(
   const job = jobById(change.job);
 
   const merged = readMergedSkill(await ask((call) => writer.merge({ job, sources }, call)));
-  const bundle = skillBundle(merged.text);
+  const bundle = skillMdBundle(merged.text);
   try {
     validateBundle(bundle);
   } catch (err) {
@@ -518,7 +495,7 @@ async function creditsFor(sources: readonly PlanSource[], client: MapMergeClient
   sources.forEach((source, i) => {
     asks.add(source.key);
     const installed = kits[i]?.hash;
-    if (installed !== undefined && HASH_RE.test(installed)) asks.add(installed);
+    if (installed !== undefined && KIT_MAP_HASH_RE.test(installed)) asks.add(installed);
   });
   const found = await client.lookupSources([...asks]);
   return sources.map((source, i): KitMapMergeSource => {
@@ -533,9 +510,9 @@ async function creditsFor(sources: readonly PlanSource[], client: MapMergeClient
 
 function backupOf(record: MapMergeRecord, sources: readonly PlanSource[], credits: KitMapMergeSource[]): MapBackupBody {
   // The merged skill goes into every tool that held an original (KTD13).
-  const tools = [...new Set(sources.flatMap((source) => source.entry.tools))].filter((tool) => TOOL_RE.test(tool)).slice(0, 64);
+  const tools = [...new Set(sources.flatMap((source) => source.entry.tools))].filter((tool) => KIT_MAP_TOOL_RE.test(tool)).slice(0, 64);
   return {
-    files: encodeBundle(skillBundle(record.skill)),
+    files: encodeBundle(skillMdBundle(record.skill)),
     name: record.name,
     description: record.description,
     tools,

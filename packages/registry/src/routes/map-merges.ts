@@ -30,6 +30,7 @@
 import type { FastifyInstance } from 'fastify'
 import { Prisma, type PrismaClient } from '@prisma/client'
 import {
+  KIT_MAP_CODE_RE,
   KIT_MAP_MERGE_MAX_SOURCES,
   KIT_MAP_VERSION,
   kitMapMergeWins,
@@ -48,7 +49,6 @@ import { bumpUserDeviceSyncPrisma } from '../lib/device-sync-stream.js'
 const REPORT_BODY_LIMIT = 8 * 1024 * 1024
 /** Statuses only the person (the pick) or a replace moves a merge into, and no report moves it out of. */
 const LOCKED = ['picked', 'applied']
-const CODE_RE = /^[a-z][a-z0-9-]{0,47}$/
 
 /** The replace change a pick makes, named after its merge: one per merge, however often the person taps. */
 export function replaceChangeId(mergeId: string): string {
@@ -194,7 +194,7 @@ async function settle(
       if (ack.outcome === 'applied') settled.status = 'applied'
       else {
         settled.status = 'out-of-date'
-        settled.reason = ack.outcome && CODE_RE.test(ack.outcome) ? ack.outcome : 'not-applied'
+        settled.reason = ack.outcome && KIT_MAP_CODE_RE.test(ack.outcome) ? ack.outcome : 'not-applied'
       }
     }
   }

@@ -18,6 +18,7 @@ import {
   type MapSkill,
   type MapSlot,
 } from '@/lib/packs/kit-map'
+import { runsText } from '@/components/map/words'
 import { Coverage, JobChip, SectionCard, SkillLine, secVars } from './kit-parts'
 import s from './packs.module.css'
 import { Tray } from './tray'
@@ -26,7 +27,6 @@ const TAYLOR_AVATAR = TAYLOR_KIT[0].slots[0].skills[0].avatarUrl
 const isFilled = (sl: MapSlot) => sl.skills.length > 0
 const hasExtras = (sl: MapSlot) => !sl.many && sl.skills.length > 1
 const filledCount = (sec: MapSection) => sec.slots.filter(isFilled).length
-const runsText = (n: number) => (n === 0 ? 'never ran' : n === 1 ? '1 run' : `${n} runs`)
 
 /**
  * The kit framework, drawn: every kind of work is a section, every job in it a

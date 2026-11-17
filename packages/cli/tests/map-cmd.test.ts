@@ -338,6 +338,58 @@ test("`skillet map --json` prints the scan, entries with no paths, and writes no
   }
 });
 
+test("`skillet map --json --no-usage`, the app's light check, prints the same skills with no usage and calls no one, even when connected", { timeout: 60_000 }, async () => {
+  const fx = await makeFixture();
+  const registry = await trap();
+  const web = await trap();
+  try {
+    // Connected: without --no-usage this run would ask the account for its waiting changes.
+    await writeJson(join(fx.skilletDir, "device.json"), { device_token: "sk_dev_light", label: "test-machine" });
+    // Spawned without blocking, so the trap registry answers while the CLI runs and counts what it asks.
+    const run = (args: string[]) =>
+      new Promise<{ status: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+        const child = spawn(process.execPath, cliArgs(args), { cwd: CLI_ROOT, env: childEnv(fx, registry.url, web.url) });
+        let stdout = "";
+        let stderr = "";
+        child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString("utf8")));
+        child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString("utf8")));
+        child.on("error", reject);
+        child.on("close", (status) => resolve({ status, stdout, stderr }));
+      });
+    const light = await run(["map", "--json", "--no-usage"]);
+    assert.equal(light.status, 0, light.stderr);
+    assert.deepEqual(registry.hits, [], "the light check never asks the account");
+    const parsed = JSON.parse(light.stdout) as { ok: boolean; scan: KitMapScan };
+    assert.equal(parsed.ok, true);
+    assert.ok(parseKitMapScan(parsed.scan), "the same validation as any scan");
+    assert.ok(!light.stdout.includes(fx.root), "no path anywhere in the output");
+    assert.deepEqual(parsed.scan.looked, []);
+    assert.equal(parsed.scan.connected, undefined);
+    for (const entry of parsed.scan.entries) assert.deepEqual(entry.usage, { state: "unknown", reason: "no-history" });
+
+    const full = await run(["map", "--json"]);
+    assert.equal(full.status, 0, full.stderr);
+    const fullScan = (JSON.parse(full.stdout) as { scan: KitMapScan }).scan;
+    const shape = (scan: KitMapScan) => scan.entries.map(({ key, name, job }) => ({ key, name, job }));
+    assert.deepEqual(shape(parsed.scan), shape(fullScan), "the same skills, keys and jobs as the full scan");
+    assert.equal(fullScan.connected, true);
+    assert.deepEqual(registry.hits, ["GET /api/v1/kit-map/changes"], "the full scan does ask a connected account");
+    assert.deepEqual(web.hits, []);
+  } finally {
+    await registry.close();
+    await web.close();
+    await rm(fx.root, { recursive: true, force: true });
+  }
+});
+
+test("--no-usage is hidden from help", () => {
+  const program = new Command("skillet").version("test");
+  registerAllCommands(program, { legacyManagement: false });
+  const map = program.commands.find((c) => c.name() === "map")!;
+  assert.ok(map.options.some((o) => o.long === "--no-usage"), "the app passes it, so the command takes it");
+  assert.doesNotMatch(map.helpInformation(), /no-usage/);
+});
+
 // ---------------------------------------------------------------------------
 // Connected, read from local files only
 // ---------------------------------------------------------------------------
@@ -391,12 +443,10 @@ function scanEntry(over: Partial<MapScanEntry> & { key: string }): MapScanEntry 
     source: "local",
     owner: null,
     tools: ["claude-code"],
-    paths: { "claude-code": [path] },
     copies: { "claude-code": 1 },
     locations: [{ path, tools: ["claude-code"], source: "local", owner: null, linkTarget: null, skillet: null }],
     jobId: "business.docs-and-pdfs",
     flags: { cantBackUp: [], cantMerge: [] },
-    backsUp: true,
     ...over,
   };
 }
@@ -439,7 +489,6 @@ test("the scan payload holds no path, passes the frame's validator, and keeps on
       tools: ["claude-code", "codex"],
       copies: { "claude-code": 2, codex: 1 },
       flags: { cantBackUp: ["links-outside", "git-folder"], cantMerge: ["extra-files"] },
-      backsUp: false,
     }),
     scanEntry({
       key: hex(2),
@@ -447,22 +496,19 @@ test("the scan payload holds no path, passes the frame's validator, and keeps on
       source: "plugin",
       owner: { kind: "plugin", name: "alpha", marketplace: "market", enabled: false },
       flags: { cantBackUp: ["git-folder"], cantMerge: ["extra-files"] },
-      backsUp: false,
       jobId: "development.code-review",
     }),
-    scanEntry({ key: hex(3), name: "brand-voice", source: "synced", owner: null, backsUp: false, jobId: null }),
+    scanEntry({ key: hex(3), name: "brand-voice", source: "synced", owner: null, jobId: null }),
     scanEntry({
       key: hex(4),
       name: "helper",
       source: "app",
       owner: { kind: "app", name: "someapp", folder: `${FAKE_HOME}/.claude/skills/someapp` },
-      backsUp: false,
     }),
     scanEntry({
       key: hex(5),
       name: "write-landing",
       source: "skillet-added",
-      backsUp: false,
       locations: [
         {
           path: `${FAKE_HOME}/.claude/skills/openclaudia--write-landing`,
@@ -478,7 +524,6 @@ test("the scan payload holds no path, passes the frame's validator, and keeps on
       key: hex(6),
       name: "agent-browser",
       source: "skillet-imported",
-      backsUp: false,
       flags: { cantBackUp: [], cantMerge: ["links-outside"] },
       locations: [
         {

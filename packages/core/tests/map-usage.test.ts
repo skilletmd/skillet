@@ -46,11 +46,11 @@ function loc(path: string, tools: string[], extra: Partial<MapScanLocation> = {}
 let keyCount = 0;
 function entry(name: string, ...locations: MapScanLocation[]): MapScanEntry {
   const tools: string[] = [];
-  const paths: Record<string, string[]> = {};
+  const copies: Record<string, number> = {};
   for (const location of locations) {
     for (const tool of location.tools) {
       if (!tools.includes(tool)) tools.push(tool);
-      (paths[tool] ??= []).push(location.path);
+      copies[tool] = (copies[tool] ?? 0) + 1;
     }
   }
   return {
@@ -60,12 +60,10 @@ function entry(name: string, ...locations: MapScanLocation[]): MapScanEntry {
     source: locations[0]!.source,
     owner: locations[0]!.owner,
     tools,
-    paths,
-    copies: Object.fromEntries(tools.map((tool) => [tool, paths[tool]!.length])),
+    copies,
     locations,
     jobId: null,
     flags: { cantBackUp: [], cantMerge: [] },
-    backsUp: false,
   };
 }
 

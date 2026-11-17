@@ -6,7 +6,7 @@
 // description; anything that is not a job lands in Other.
 
 import { JOB_SECTIONS, TOOLS_SECTION, type Job, type JobId, type JobSection, type SectionId } from '@skillet/protocol/jobs'
-import { PACKS } from './data'
+import { SECTION_HUES } from './section-hues'
 
 export interface MapSkill {
   name: string
@@ -27,19 +27,6 @@ export interface MapSection {
   color: string
   ink: string
   slots: MapSlot[]
-}
-
-/** Each section's band colour and the ink on it. */
-export const SECTION_HUES: Record<SectionId, { color: string; ink: string }> = {
-  writing: { color: '#2f57e8', ink: '#ffffff' },
-  marketing: { color: PACKS[0].color, ink: '#ffffff' },
-  sales: { color: '#0c7f50', ink: '#ffffff' },
-  design: { color: '#5b3df5', ink: '#ffffff' },
-  development: { color: '#0b7285', ink: '#ffffff' },
-  research: { color: '#b4417a', ink: '#ffffff' },
-  business: { color: '#f5b11a', ink: '#1b1609' },
-  media: { color: '#c9356d', ink: '#ffffff' },
-  tools: { color: '#3f3b36', ink: '#ffffff' },
 }
 
 const TAYLOR = 'https://pub-5793f7ad27084cca99209bc8f7274036.r2.dev/729d9894e2d7258164f69e4ffe2035b92a188653017c00c8ff95c6c4c0ff0980'

@@ -155,6 +155,8 @@ export async function buildSkillDetailPrisma(
   let triggers: string[] = []
   let evalStatus: 'passed' | 'failed' | 'none' = 'none'
   let metadataJson: string | null = null
+  /** The latest version's metadata, parsed once; undefined when it wouldn't parse. */
+  let metadata: unknown
   let latestSignerKeyId: string | null = null
   // Context-weight metering: the latest version's headline token count and its
   // standing (ambient) portion, for the skill hero's "~1.3K tokens". Null until
@@ -180,7 +182,8 @@ export async function buildSkillDetailPrisma(
       tokenAmbient = metaRow.token_ambient
       tokenMethod = metaRow.token_method
       try {
-        const meta = JSON.parse(metaRow.metadata_json) as {
+        metadata = JSON.parse(metaRow.metadata_json) as unknown
+        const meta = metadata as {
           triggers?: unknown
           eval?: unknown
         }
@@ -197,7 +200,7 @@ export async function buildSkillDetailPrisma(
   }
   const { modelInvoked, hasCommand } = resolveInvocationFacts(metadataJson, !!row.description)
   // A merged skill names the public skills it was made from and counts the rest (kit map U15, R23).
-  const mergedFrom = await readMergedFrom(prisma, metadataJson)
+  const mergedFrom = await readMergedFrom(prisma, metadata)
 
   // Served author identity keys to the signer of the latest version, matching
   // the manifest/version routes: platform identity when the latest version is

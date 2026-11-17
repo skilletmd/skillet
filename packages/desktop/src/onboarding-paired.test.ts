@@ -5,7 +5,8 @@
  * already connected starts at sync with no second sign-in, and one nobody
  * connected leads with "Open my map", whose Save connects it. The pair code
  * stays as the fallback. Every CLI answer is mocked `auth status --json`
- * output; the flow only ever sees it through the app's invoke.
+ * output, and the connection files' stamps are mocked `auth_file_stamps`; the
+ * flow only ever sees them through the app's invoke.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -39,28 +40,35 @@ const CONNECTED = JSON.stringify({
   hints: [],
 })
 
-/** The app's invoke, answering only what onboarding may call. A pair-code connect is a test failure here. */
-function fakeApp(authAnswers: string[]) {
+/**
+ * The app's invoke, answering only what onboarding may call. `auth status`
+ * answers from `answer`, and `connect()` is the map's Save landing: it writes
+ * `device.json`, which moves that file's stamp. A pair-code connect is a test
+ * failure here.
+ */
+function fakeApp(answer: string = UNCONNECTED) {
   const calls: string[] = []
-  let last = authAnswers[authAnswers.length - 1] ?? UNCONNECTED
-  const invoke = vi.fn(async (cmd: string): Promise<string> => {
+  let writes = 0
+  const invoke = vi.fn(async (cmd: string): Promise<unknown> => {
     calls.push(cmd)
-    if (cmd === 'auth_status') {
-      const next = authAnswers.shift()
-      if (next !== undefined) last = next
-      return last
-    }
+    if (cmd === 'auth_status') return answer
+    if (cmd === 'auth_file_stamps') return [writes === 0 ? null : `device.json@${writes}`, null]
     if (cmd === 'open_map') return ''
     throw new Error(`onboarding must not call ${cmd}`)
   })
-  return { invoke, calls }
+  const connect = (next = CONNECTED): void => {
+    answer = next
+    writes++
+  }
+  return { invoke, calls, connect }
 }
 
 function flowOn(app: ReturnType<typeof fakeApp>) {
   const steps: OnboardingStep[] = []
   const onConnected = vi.fn()
   const flow = createOnboardingFlow({
-    authStatus: () => app.invoke('auth_status'),
+    authStatus: () => app.invoke('auth_status') as Promise<string>,
+    authStamps: () => app.invoke('auth_file_stamps') as Promise<(string | null)[]>,
     openMap: async () => {
       await app.invoke('open_map')
     },
@@ -78,13 +86,13 @@ afterEach(() => {
 
 describe('onboarding after the line connected this computer (R27)', () => {
   it('a connected computer starts onboarding at sync', async () => {
-    const app = fakeApp([CONNECTED])
+    const app = fakeApp(CONNECTED)
     const { flow, steps, onConnected } = flowOn(app)
     await flow.start()
     expect(flow.step).toBe('sync')
     expect(steps).toEqual(['sync'])
     expect(onConnected).toHaveBeenCalledWith({ connected: true, handle: 'test-handle' }, 'already')
-    expect(app.calls).toEqual(['auth_status'])
+    expect(app.calls).toEqual(['auth_file_stamps', 'auth_status'])
   })
 
   it('reads auth status the way the tray does', () => {
@@ -104,7 +112,7 @@ describe('onboarding on a computer nobody connected (KTD11)', () => {
     // Unconnected at launch, still unconnected at the first look after the
     // map opens, then connected: the browser was already signed in from the
     // dropped-folder Save, so the map's Save was one confirm.
-    const app = fakeApp([UNCONNECTED, UNCONNECTED, CONNECTED])
+    const app = fakeApp(UNCONNECTED)
     const { flow, steps, onConnected } = flowOn(app)
     await flow.start()
     expect(flow.step).toBe('welcome')
@@ -120,22 +128,70 @@ describe('onboarding on a computer nobody connected (KTD11)', () => {
     expect(flow.step).toBe('map')
     await vi.advanceTimersByTimeAsync(2_000)
     expect(flow.step).toBe('map')
+    // The map's Save lands: it writes this computer's connection, and the next look sees it.
+    app.connect()
     await vi.advanceTimersByTimeAsync(2_000)
     expect(flow.step).toBe('sync')
     expect(steps).toEqual(['welcome', 'map', 'sync'])
     expect(onConnected).toHaveBeenCalledTimes(1)
     expect(onConnected).toHaveBeenCalledWith({ connected: true, handle: 'test-handle' }, 'map')
-    expect(app.calls).toEqual(['auth_status', 'open_map', 'auth_status', 'auth_status'])
+    // Looks only stat the connection files; `auth status` runs again only once one changed.
+    expect(app.calls).toEqual(['auth_file_stamps', 'auth_status', 'open_map', 'auth_file_stamps', 'auth_file_stamps', 'auth_status'])
     expect(app.calls).not.toContain('connect')
 
     // Connected: no more looking.
     await vi.advanceTimersByTimeAsync(20_000)
-    expect(app.calls).toHaveLength(4)
+    expect(app.calls).toHaveLength(6)
+  })
+
+  it('while the map is open and nothing writes the connection files, auth status never runs again', async () => {
+    vi.useFakeTimers()
+    const app = fakeApp(UNCONNECTED)
+    const { flow, steps } = flowOn(app)
+    await flow.start()
+    await flow.openMap()
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(flow.step).toBe('map')
+    expect(steps).toEqual(['welcome', 'map'])
+    expect(app.calls.filter((call) => call === 'auth_status')).toHaveLength(1)
+    expect(app.calls.filter((call) => call === 'auth_file_stamps').length).toBeGreaterThan(20)
+  })
+
+  it('a credential the account did not confirm, or files it cannot stat, keep auth status asked at every look', async () => {
+    vi.useFakeTimers()
+    // A device token the registry couldn't confirm: confirming it later writes no file.
+    const unconfirmed = JSON.stringify({ ...JSON.parse(UNCONNECTED), bearer: { kind: 'device', tokenPreview: 'sk_dev_conta…' } })
+    const app = fakeApp(unconfirmed)
+    const { flow } = flowOn(app)
+    await flow.start()
+    await flow.openMap()
+    await vi.advanceTimersByTimeAsync(2_000)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(app.calls.filter((call) => call === 'auth_status')).toHaveLength(3)
+
+    const blind = fakeApp(UNCONNECTED)
+    const steps: OnboardingStep[] = []
+    const blindFlow = createOnboardingFlow({
+      authStatus: () => blind.invoke('auth_status') as Promise<string>,
+      authStamps: async () => {
+        throw new Error('auth_file_stamps is not a command this app knows')
+      },
+      openMap: async () => undefined,
+      onStep: (step) => steps.push(step),
+      onConnected: vi.fn(),
+      pollMs: 2_000,
+    })
+    await blindFlow.start()
+    await blindFlow.openMap()
+    blind.connect()
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(blindFlow.step).toBe('sync')
+    expect(steps).toEqual(['welcome', 'map', 'sync'])
   })
 
   it('keeps the pair code as the fallback, and stops waiting on the map once it is chosen', async () => {
     vi.useFakeTimers()
-    const app = fakeApp([UNCONNECTED])
+    const app = fakeApp(UNCONNECTED)
     const { flow, steps, onConnected } = flowOn(app)
     await flow.start()
     await flow.openMap()
@@ -149,10 +205,11 @@ describe('onboarding on a computer nobody connected (KTD11)', () => {
   })
 
   it('a map that would not open stays on welcome and says so', async () => {
-    const app = fakeApp([UNCONNECTED])
+    const app = fakeApp(UNCONNECTED)
     const steps: OnboardingStep[] = []
     const flow = createOnboardingFlow({
-      authStatus: () => app.invoke('auth_status'),
+      authStatus: () => app.invoke('auth_status') as Promise<string>,
+      authStamps: () => app.invoke('auth_file_stamps') as Promise<(string | null)[]>,
       openMap: async () => {
         throw new Error('skillet CLI not found')
       },
@@ -172,6 +229,7 @@ describe('onboarding on a computer nobody connected (KTD11)', () => {
     const steps: OnboardingStep[] = []
     const flow = createOnboardingFlow({
       authStatus: () => new Promise<string>(() => undefined),
+      authStamps: async () => [null, null],
       openMap: async () => undefined,
       onStep: (step) => steps.push(step),
       onConnected: vi.fn(),

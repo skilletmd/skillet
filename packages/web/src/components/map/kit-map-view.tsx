@@ -5,11 +5,12 @@ import { Avatar } from '@/components/ui/avatar'
 import { ArrowLeft, Check } from '@/components/ui/icons'
 import { cn } from '@/lib/cn'
 import { HOME_PICKS, STACKS, type HomeSkill } from '@/lib/packs/home-picks'
-import { SECTION_HUES } from '@/lib/packs/kit-map'
+import { SECTION_HUES } from '@/lib/packs/section-hues'
 import { runtimeLabel } from '@/lib/runtime-labels'
 import { JOB_SECTIONS, TOOLS_SECTION, jobById, type Job, type JobId, type JobSection, type SectionId } from '@skillet/protocol/jobs'
 import {
   deriveKitMapChanges,
+  isMergeableSource,
   isRemovableSource,
   type KitMapChanges,
   type KitMapDocument,
@@ -19,7 +20,6 @@ import {
   type KitMapSaveCounts,
   type KitMapSavedEntry,
   type KitMapScan,
-  type KitMapSource,
   type KitMapStatusState,
 } from '@skillet/protocol/kit-map'
 import { CountUp, Coverage, JobChip, SectionCard, landDelay, secVars, type Hue } from '@/components/packs/kit-parts'
@@ -35,8 +35,9 @@ import {
   flagReason,
   saveSummary,
   useCopy,
-  type NotBackedUp,
 } from './save-flow'
+import type { NotBackedUp } from './save-types'
+import { andList, orList, plural } from './words'
 
 export { CommandBox, MAP_COMMAND }
 
@@ -71,15 +72,9 @@ const LOOSE_CHIPS = 24
 /** Platforms is picked by stack, not by one skill. */
 const PLATFORMS: JobId = 'development.platforms'
 
-/** The sources a merge is written from: the person's own folders and Skillet-managed copies (the plan's KTD12). */
-const MERGE_SOURCES: ReadonlySet<KitMapSource> = new Set<KitMapSource>(['local', 'skillet-imported', 'skillet-added'])
-const canMerge = (entry: KitMapEntry) => MERGE_SOURCES.has(entry.source) && entry.noMerge === undefined
+/** A merge is written from the person's own folders and Skillet-managed copies (the plan's KTD12). */
+const canMerge = (entry: KitMapEntry) => isMergeableSource(entry.source) && entry.noMerge === undefined
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
-const joinList = (items: readonly string[], last: string) =>
-  items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} ${last} ${items.at(-1)}`
-const andList = (items: readonly string[]) => joinList(items, 'and')
-const orList = (items: readonly string[]) => joinList(items, 'or')
 const jobName = (id: JobId | null) => (id === null ? 'Not sorted' : jobById(id).name)
 const refOf = (pick: HomeSkill) => `@${pick.handle}/${pick.slug}`
 /** `@owner/slug` → its page on this site. */

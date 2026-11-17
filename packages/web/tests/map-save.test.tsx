@@ -34,10 +34,12 @@ vi.mock('@/components/choose-username', () => ({
   ChooseUsername: () => <p>Choose a username</p>,
 }))
 
-import { SaveFlow, saveSummary, type MapSaveStatus } from '@/components/map/save-flow'
+import { SaveFlow, saveSummary } from '@/components/map/save-flow'
+import type { MapSaveStatus } from '@/components/map/save-types'
 import { answerSaveTab } from '@/components/map/embed-bridge'
 import { KitMapView } from '@/components/map/kit-map-view'
 import { MapEmbed } from '@/app/map/embed/map-embed'
+import { DEMO_SCAN } from '@/app/map/embed/map-demo'
 import { buildSecurityHeaders } from '@/lib/security-headers'
 import { MAP_TOKEN_HEADER } from '@/app/api/map-sessions/map-session-guard'
 import MapSavePage from '@/app/(consumer)/map/save/page'
@@ -453,6 +455,28 @@ describe("the frame's side of Save", () => {
       { type: 'proof', v: KIT_MAP_VERSION, session: SID, proof: PROOF, counts: { backups: 2, removals: 0, fills: 0, merges: 0 } },
       window.location.origin,
     )
+  })
+
+  it("draws the sample scan for `?demo` off production, and in production ignores it, like the other demo pages", async () => {
+    const realUrl = window.location.href
+    window.history.replaceState(null, '', '/map/embed?demo')
+    try {
+      const { unmount } = render(<MapEmbed />)
+      expect(await screen.findByText(`${DEMO_SCAN.entries.length} skills, sorted by job`)).toBeInTheDocument()
+      unmount()
+
+      vi.stubEnv('NODE_ENV', 'production')
+      render(<MapEmbed />)
+      // Opened with no parent: the page says where the map comes from, and no sample loads.
+      expect(screen.getByRole('heading', { name: 'Sort your skills into jobs' })).toBeInTheDocument()
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      })
+      expect(screen.queryByText(/sorted by job/)).toBeNull()
+    } finally {
+      vi.unstubAllEnvs()
+      window.history.replaceState(null, '', realUrl)
+    }
   })
 
   it('answerSaveTab ignores everything but a proof-request from its tab on its own origin', () => {

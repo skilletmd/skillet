@@ -15,10 +15,14 @@
  *    device-less ones whose skills are here. While a Save holds this
  *    computer's lock the CLI answers `locked` at once, and the whole tick is
  *    skipped and tried again a minute later. Core decides what a live lock
- *    is; the app only reads the answer.
+ *    is; the app only reads the answer. A merge waiting to be written runs the
+ *    person's AI tool for minutes, so the apply step only counts it: once the
+ *    sync is done, the app starts `skillet map --apply` on its own to write
+ *    it, under the same lock, so the ticks meanwhile skip as during a Save.
  */
 import { ADAPTER_TABLE } from '@skillet/protocol/adapter-table'
 import { isJobId, jobById, type JobId } from '@skillet/protocol/jobs'
+import type { KitMapSaveCounts } from '@skillet/protocol/kit-map'
 import { parseCliJson } from './cli-json'
 
 /** How often the light check runs between tray opens. */
@@ -286,24 +290,18 @@ export function createMapWatch(deps: MapWatchDeps): MapWatch {
 
 // ── The sync tick ───────────────────────────────────────────────────────────
 
-/** What a run did or left, as `skillet map --apply --json` counts it. */
-export interface MapCounts {
-  backups: number
-  removals: number
-  fills: number
-  merges: number
-}
-
 export type MapApplyOutcome =
   /** A Save holds this computer's lock: the whole tick waits (KTD10). */
   | { kind: 'locked' }
   /** No device token: the tick runs as it always has, and sync says why. */
   | { kind: 'not-connected' }
-  | { kind: 'done'; result: 'applied' | 'partial' | 'failed'; changed: boolean; counts: MapCounts; left: MapCounts }
+  /** `counts` what the run did and `left` what it left, Save's own counts. */
+  | { kind: 'done'; result: 'applied' | 'partial' | 'failed'; changed: boolean; counts: KitMapSaveCounts; left: KitMapSaveCounts }
   /** Nothing the app can read: an older CLI with no `map`, or a sidecar that didn't start. */
   | { kind: 'unavailable' }
 
-function countsOf(value: unknown): MapCounts {
+/** Read leniently: anything that isn't a positive number counts as none. */
+function countsOf(value: unknown): KitMapSaveCounts {
   const n = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0)
   const c = isRecord(value) ? value : {}
   return { backups: n(c.backups), removals: n(c.removals), fills: n(c.fills), merges: n(c.merges) }
@@ -344,12 +342,15 @@ export interface SyncTickDeps<T> {
   retryLater(ms: number): void
   /** The apply step changed this computer: bring the map up to date. Runs after the sync. */
   mapChanged(): unknown
+  /** The apply step left merges waiting: start `skillet map --apply` to write them (Tauri `map_write_merges`). Runs after the sync. */
+  writeMerges(): unknown
 }
 
 export type SyncTick<T> = { kind: 'locked' } | { kind: 'synced'; value: T; apply: MapApplyOutcome }
 
 /**
- * One sync tick (KTD10): the map's waiting changes first, then the sync. A
+ * One sync tick (KTD10): the map's waiting changes first, then the sync, then
+ * the merges the first step left waiting, written by a run of their own. A
  * live Save lock skips the whole tick and asks for a retry. Any answer the
  * app can't read lets the sync run as it always has, so an older bundled CLI
  * never wedges sync; kinds of change it doesn't know stay waiting in the
@@ -368,5 +369,12 @@ export async function runSyncTick<T>(deps: SyncTickDeps<T>): Promise<SyncTick<T>
   }
   const value = await deps.sync()
   if (apply.kind === 'done' && apply.changed) await deps.mapChanged()
+  if (apply.kind === 'done' && apply.left.merges > 0) {
+    try {
+      await deps.writeMerges()
+    } catch {
+      // Not started: the next tick counts the merges again.
+    }
+  }
   return { kind: 'synced', value, apply }
 }

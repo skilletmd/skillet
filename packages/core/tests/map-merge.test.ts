@@ -34,7 +34,7 @@ const HOME = vi.hoisted(() => {
 });
 
 import type { Adapter } from "../src/adapter.js";
-import type { MapBackupBody, MapBackupPut } from "../src/map/apply.js";
+import type { MapBackupBody, MapBackupPut } from "../src/map/skill-fs.js";
 import { scanMap, type MapScanEntry, type MapScanResult } from "../src/map/scan.js";
 import { writeState } from "../src/kit/store.js";
 import {
@@ -49,7 +49,6 @@ import {
 } from "../src/map/merge-writer.js";
 import {
   isMergeableEntry,
-  mapMergeSources,
   readMapMergeRecord,
   readMapMergeRecords,
   runMapMerges,
@@ -397,7 +396,6 @@ describe("which skills a merge is written from (KTD12)", () => {
     expect(plugin.source).toBe("plugin");
     expect(isMergeableEntry(plugin)).toBe(false);
     expect(isMergeableEntry(local)).toBe(true);
-    expect(mapMergeSources("writing.editing", [plugin, local])).toEqual([]);
   });
 
   it("a job holding one SKILL.md-only skill and one with a script beside it offers no merge", async () => {
@@ -407,7 +405,7 @@ describe("which skills a merge is written from (KTD12)", () => {
     const scripted = byName(result, "copy-editor");
     expect(scripted.flags.cantMerge).toContain("extra-files");
     expect(isMergeableEntry(scripted)).toBe(false);
-    expect(mapMergeSources("writing.editing", [byName(result, "plain-prose"), scripted])).toEqual([]);
+    expect(isMergeableEntry(byName(result, "plain-prose"))).toBe(true);
   });
 
   it("two of the person's own SKILL.md-only skills merge, except in a job that holds as many as you like", async () => {
@@ -416,8 +414,14 @@ describe("which skills a merge is written from (KTD12)", () => {
     const result = await scan();
     const held = [byName(result, "plain-prose"), byName(result, "copy-editor")];
     expect(held[1]!.source).toBe("skillet-added");
-    expect(mapMergeSources("writing.editing", held).map((e) => e.key)).toEqual(held.map((e) => e.key));
-    expect(mapMergeSources("development.platforms", held)).toEqual([]);
+    expect(held.every(isMergeableEntry)).toBe(true);
+    // Recorded for Platforms anyway, the merge is dropped before anything is written.
+    const fake = account();
+    const change = addMerge(fake, "development.platforms", held.map((e) => e.key));
+    const writer = fakeWriter();
+    const res = await runMapMerges({ scan: result, client: fake.client, writer: async () => writer });
+    expect(writer.calls).toEqual([]);
+    expect(res.outcomes).toEqual([{ id: change.id, job: "development.platforms", result: "dropped", reason: "not-mergeable" }]);
   });
 });
 

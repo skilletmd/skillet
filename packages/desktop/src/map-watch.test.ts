@@ -96,6 +96,8 @@ class FakeComputer {
   connected = true
   locked = false
   folders = 1
+  /** Merges waiting for this computer: the apply step counts them in `left` and writes none. */
+  mergesWaiting = 0
   calls: string[] = []
 
   constructor(skills: FakeSkill[]) {
@@ -161,7 +163,7 @@ class FakeComputer {
     const data = {
       result: 'applied',
       counts,
-      left: { ...ZERO },
+      left: { ...ZERO, merges: this.mergesWaiting },
       not_backed_up: [],
       kept: [],
       unremoved,
@@ -197,6 +199,9 @@ function tickDeps(computer: FakeComputer, watch: MapWatch) {
     retryLater: vi.fn(),
     mapChanged: vi.fn(async () => {
       await watch.check({ force: true })
+    }),
+    writeMerges: vi.fn(async () => {
+      computer.calls.push('map_write_merges')
     }),
   }
 }
@@ -515,6 +520,37 @@ describe('the sync tick (KTD9, KTD10)', () => {
     expect(keysOf(watch)).toEqual([hash(1)])
   })
 
+  it('a merge the apply step leaves waiting is written after the sync, by a `skillet map --apply` the app starts on its own', async () => {
+    const computer = new FakeComputer([skill(1, 'plain-prose', 'writing.editing'), skill(2, 'copy-editor', 'writing.editing')])
+    computer.mergesWaiting = 1
+    const watch = watchOn(computer)
+    const deps = tickDeps(computer, watch)
+
+    const tick = await runSyncTick(deps)
+    expect(tick).toMatchObject({ kind: 'synced', apply: { kind: 'done', result: 'applied', left: { merges: 1 } } })
+    // The sync never waits on the AI tool: the merge run starts once the sync is done.
+    expect(computer.calls).toEqual(['map_apply', 'sync_skills', 'map_write_merges'])
+
+    // That run holds the save lock while it writes, so the next tick skips as during a Save.
+    computer.locked = true
+    expect(await runSyncTick(deps)).toEqual({ kind: 'locked' })
+    // Written: nothing waits, and no run starts.
+    computer.locked = false
+    computer.mergesWaiting = 0
+    await runSyncTick(deps)
+    expect(deps.writeMerges).toHaveBeenCalledTimes(1)
+    expect(deps.sync).toHaveBeenCalledTimes(2)
+  })
+
+  it('a merge run that would not start leaves the tick synced', async () => {
+    const computer = new FakeComputer([skill(1, 'plain-prose', 'writing.editing')])
+    computer.mergesWaiting = 2
+    const watch = watchOn(computer)
+    const deps = tickDeps(computer, watch)
+    deps.writeMerges.mockRejectedValueOnce(new Error('skillet CLI not found'))
+    expect(await runSyncTick(deps)).toMatchObject({ kind: 'synced', value: 'synced' })
+  })
+
   it('an older CLI with no map command never wedges the tick', async () => {
     const sync = vi.fn(async () => 'synced')
     const retryLater = vi.fn()
@@ -525,6 +561,7 @@ describe('the sync tick (KTD9, KTD10)', () => {
       sync,
       retryLater,
       mapChanged: vi.fn(),
+      writeMerges: vi.fn(),
     })
     expect(tick).toEqual({ kind: 'synced', value: 'synced', apply: { kind: 'unavailable' } })
     expect(sync).toHaveBeenCalledTimes(1)

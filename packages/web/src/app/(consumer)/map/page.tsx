@@ -120,7 +120,7 @@ export default async function SavedMapPage({ searchParams }: { searchParams: Pro
         </>
       )
     }
-    const demo = sp.demo === 'map' ? DEMO_MAP : sp.demo === 'empty' ? null : sp.demo === 'error' ? 'error' : undefined
+    const demo = demoDoc(sp.demo)
     if (demo !== undefined) return <SavedMap doc={demo} />
   }
 
@@ -171,6 +171,20 @@ const DEMO_MAP: KitMapDocument = {
   version: 1,
   entries: DEMO_ROWS.map(([entry]) => entry),
   assignments: Object.fromEntries(DEMO_ROWS.map(([entry, job]) => [entry.key, job])),
+}
+
+/** The saved map a `?demo` draws: the fixture, none yet, or one that couldn't be read. Undefined for any other demo. */
+function demoDoc(demo: string): KitMapDocument | null | 'error' | undefined {
+  switch (demo) {
+    case 'map':
+      return DEMO_MAP
+    case 'empty':
+      return null
+    case 'error':
+      return 'error'
+    default:
+      return undefined
+  }
 }
 
 // ---------------------------------------------------------------------------

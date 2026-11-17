@@ -1,0 +1,670 @@
+{
+  "entries": [
+    {
+      "key": "sha256:50fa7a4a9c07ea20355da1d90f4b594892742c9c2b9d9bf0f990a7054c4df39a",
+      "name": "agents-only",
+      "description": "agents-only helper",
+      "source": "local",
+      "owner": null,
+      "tools": [
+        "codex"
+      ],
+      "copies": {
+        "codex": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.agents/skills/agents-only",
+          "tools": [
+            "codex"
+          ],
+          "source": "local",
+          "owner": null,
+          "linkTarget": null,
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [],
+        "cantMerge": [
+          "extra-files"
+        ]
+      }
+    },
+    {
+      "key": "sha256:e53223b59f5df9161e3474ac84802a32bd7b3bbe7fca75a7541df3ee356f676b",
+      "name": "alpha",
+      "description": "alpha helper",
+      "source": "local",
+      "owner": null,
+      "tools": [
+        "codex",
+        "claude-code"
+      ],
+      "copies": {
+        "codex": 1,
+        "claude-code": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.agents/skills/alpha",
+          "tools": [
+            "codex"
+          ],
+          "source": "local",
+          "owner": null,
+          "linkTarget": null,
+          "skillet": null
+        },
+        {
+          "path": "<home>/.claude/skills/alpha",
+          "tools": [
+            "claude-code"
+          ],
+          "source": "local",
+          "owner": null,
+          "linkTarget": null,
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [],
+        "cantMerge": []
+      }
+    },
+    {
+      "key": "sha256:5fbbf2b1834b66ff0dcfa97f692ed90060ca54f1f250940cf7e268ec25d948f5",
+      "name": "b1",
+      "description": "b1 helper",
+      "source": "local",
+      "owner": null,
+      "tools": [
+        "claude-code"
+      ],
+      "copies": {
+        "claude-code": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.claude/skills/b1",
+          "tools": [
+            "claude-code"
+          ],
+          "source": "local",
+          "owner": null,
+          "linkTarget": null,
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [],
+        "cantMerge": []
+      }
+    },
+    {
+      "key": "sha256:ef1349db3fc9c1a7a4a56aeae0154f4355806254689deae79bec67509f226658",
+      "name": "b2",
+      "description": "b2 helper",
+      "source": "local",
+      "owner": null,
+      "tools": [
+        "claude-code"
+      ],
+      "copies": {
+        "claude-code": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.claude/skills/b2",
+          "tools": [
+            "claude-code"
+          ],
+          "source": "local",
+          "owner": null,
+          "linkTarget": null,
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [],
+        "cantMerge": []
+      }
+    },
+    {
+      "key": "sha256:a19da3df7190d0b1a15f9f48845bd7a731d55e6974e94ef0fdf440c8013d6616",
+      "name": "b3",
+      "description": "b3 helper",
+      "source": "local",
+      "owner": null,
+      "tools": [
+        "claude-code"
+      ],
+      "copies": {
+        "claude-code": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.claude/skills/b3",
+          "tools": [
+            "claude-code"
+          ],
+          "source": "local",
+          "owner": null,
+          "linkTarget": null,
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [],
+        "cantMerge": []
+      }
+    },
+    {
+      "key": "sha256:2b9b34c37750d05231a3b9c60b75fa8c3702198f306bf52834edad34ef83ae44",
+      "name": "b4",
+      "description": "b4 helper",
+      "source": "local",
+      "owner": null,
+      "tools": [
+        "claude-code"
+      ],
+      "copies": {
+        "claude-code": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.claude/skills/b4",
+          "tools": [
+            "claude-code"
+          ],
+          "source": "local",
+          "owner": null,
+          "linkTarget": null,
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [],
+        "cantMerge": []
+      }
+    },
+    {
+      "key": "sha256:8f436092ca02ef73f297dbdead524468df1ef526be1b3b3d1a491bad44279464",
+      "name": "b5",
+      "description": "b5 helper",
+      "source": "local",
+      "owner": null,
+      "tools": [
+        "claude-code"
+      ],
+      "copies": {
+        "claude-code": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.claude/skills/b5",
+          "tools": [
+            "claude-code"
+          ],
+          "source": "local",
+          "owner": null,
+          "linkTarget": null,
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [],
+        "cantMerge": []
+      }
+    },
+    {
+      "key": "sha256:940ed6cbcac3892171d48c2659f4c27bb93e5a82aef028823ca19f52fd9951f3",
+      "name": "b6",
+      "description": "b6 helper",
+      "source": "local",
+      "owner": null,
+      "tools": [
+        "claude-code"
+      ],
+      "copies": {
+        "claude-code": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.claude/skills/b6",
+          "tools": [
+            "claude-code"
+          ],
+          "source": "local",
+          "owner": null,
+          "linkTarget": null,
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [],
+        "cantMerge": []
+      }
+    },
+    {
+      "key": "sha256:76f42b187b3538dffa3cb31cbc5588ebe0fa4a9395d2614e613b869621a25a54",
+      "name": "brand-voice",
+      "description": "brand-voice helper",
+      "source": "synced",
+      "owner": {
+        "kind": "organization",
+        "name": "acme"
+      },
+      "tools": [
+        "claude-code"
+      ],
+      "copies": {
+        "claude-code": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.claude/skills/synced/acme/brand-voice",
+          "tools": [
+            "claude-code"
+          ],
+          "source": "synced",
+          "owner": {
+            "kind": "organization",
+            "name": "acme"
+          },
+          "linkTarget": null,
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [],
+        "cantMerge": []
+      }
+    },
+    {
+      "key": "sha256:b1d291d5414c905cb3ba6852d023c45c5a366eca4890d853140b40278305d577",
+      "name": "broken-inner",
+      "description": "broken-inner helper",
+      "source": "local",
+      "owner": null,
+      "tools": [
+        "claude-code"
+      ],
+      "copies": {
+        "claude-code": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.claude/skills/broken-inner",
+          "tools": [
+            "claude-code"
+          ],
+          "source": "local",
+          "owner": null,
+          "linkTarget": null,
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [
+          "links-outside"
+        ],
+        "cantMerge": [
+          "links-outside"
+        ]
+      }
+    },
+    {
+      "key": "sha256:784fddc3174087db1f07bc7eb6f8a30e3b7ee53d78c58cafe37eb8f9546fdb37",
+      "name": "deep",
+      "description": "deep helper",
+      "source": "local",
+      "owner": null,
+      "tools": [
+        "claude-code"
+      ],
+      "copies": {
+        "claude-code": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.claude/skills/deep",
+          "tools": [
+            "claude-code"
+          ],
+          "source": "local",
+          "owner": null,
+          "linkTarget": null,
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [
+          "git-folder"
+        ],
+        "cantMerge": [
+          "extra-files"
+        ]
+      }
+    },
+    {
+      "key": "sha256:b36586afe592f90a8f00d0bed2bbf40183db2ebd3bf2293505c1d00b71a3d578",
+      "name": "helper",
+      "description": "helper helper",
+      "source": "app",
+      "owner": {
+        "kind": "app",
+        "name": "someapp",
+        "folder": "<home>/.claude/skills/someapp"
+      },
+      "tools": [
+        "claude-code"
+      ],
+      "copies": {
+        "claude-code": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.claude/skills/someapp/skills/helper",
+          "tools": [
+            "claude-code"
+          ],
+          "source": "app",
+          "owner": {
+            "kind": "app",
+            "name": "someapp",
+            "folder": "<home>/.claude/skills/someapp"
+          },
+          "linkTarget": null,
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [],
+        "cantMerge": []
+      }
+    },
+    {
+      "key": "sha256:1565488c77e3c6b99fbd28d01116018e89ea5e1dca58e3b1a242fc2c8cf3f208",
+      "name": "inside-link",
+      "description": "inside-link helper",
+      "source": "local",
+      "owner": null,
+      "tools": [
+        "claude-code"
+      ],
+      "copies": {
+        "claude-code": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.claude/skills/inside-link",
+          "tools": [
+            "claude-code"
+          ],
+          "source": "local",
+          "owner": null,
+          "linkTarget": null,
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [],
+        "cantMerge": [
+          "extra-files"
+        ]
+      }
+    },
+    {
+      "key": "sha256:4c1921a20600149da8794facc5858e94af5dd5bff6e1a40538410baa39602347",
+      "name": "linked-entry",
+      "description": "linked-entry helper",
+      "source": "local",
+      "owner": null,
+      "tools": [
+        "claude-code"
+      ],
+      "copies": {
+        "claude-code": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.claude/skills/linked-entry",
+          "tools": [
+            "claude-code"
+          ],
+          "source": "local",
+          "owner": null,
+          "linkTarget": null,
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [
+          "links-outside"
+        ],
+        "cantMerge": [
+          "links-outside"
+        ]
+      }
+    },
+    {
+      "key": "sha256:352d11cc0f3c83d3782948e8765a42116d90887ab2a6a7a952493221a6e77c2d",
+      "name": "linked-skill",
+      "description": "linked-skill helper",
+      "source": "local",
+      "owner": null,
+      "tools": [
+        "claude-code"
+      ],
+      "copies": {
+        "claude-code": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.claude/skills/folder-link",
+          "tools": [
+            "claude-code"
+          ],
+          "source": "local",
+          "owner": null,
+          "linkTarget": "<home>/src/linked-skill",
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [],
+        "cantMerge": [
+          "extra-files"
+        ]
+      }
+    },
+    {
+      "key": "sha256:b327a34db0b34d8208c29ee369b6d2188b7196fa41cc2bb35caea60a84f84886",
+      "name": "one",
+      "description": "one helper",
+      "source": "plugin",
+      "owner": {
+        "kind": "plugin",
+        "name": "alpha",
+        "marketplace": "market",
+        "enabled": true
+      },
+      "tools": [
+        "claude-code"
+      ],
+      "copies": {
+        "claude-code": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.claude/plugins/cache/market/alpha/1.0.0/skills/one",
+          "tools": [
+            "claude-code"
+          ],
+          "source": "plugin",
+          "owner": {
+            "kind": "plugin",
+            "name": "alpha",
+            "marketplace": "market",
+            "enabled": true
+          },
+          "linkTarget": null,
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [],
+        "cantMerge": []
+      }
+    },
+    {
+      "key": "sha256:de0c13154e3176fb7adf64725e5361562e14b34a56de95503a380995df16968e",
+      "name": "outside-link",
+      "description": "outside-link helper",
+      "source": "local",
+      "owner": null,
+      "tools": [
+        "claude-code"
+      ],
+      "copies": {
+        "claude-code": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.claude/skills/outside-link",
+          "tools": [
+            "claude-code"
+          ],
+          "source": "local",
+          "owner": null,
+          "linkTarget": null,
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [
+          "links-outside"
+        ],
+        "cantMerge": [
+          "links-outside"
+        ]
+      }
+    },
+    {
+      "key": "sha256:8989066cb6a09b8eda49b0e0a8734d777e332203de4bc91110342ae2f29d9cce",
+      "name": "two",
+      "description": "two helper",
+      "source": "plugin",
+      "owner": {
+        "kind": "plugin",
+        "name": "alpha",
+        "marketplace": "market",
+        "enabled": true
+      },
+      "tools": [
+        "claude-code"
+      ],
+      "copies": {
+        "claude-code": 1
+      },
+      "locations": [
+        {
+          "path": "<home>/.claude/plugins/cache/market/alpha/1.0.0/skills/two",
+          "tools": [
+            "claude-code"
+          ],
+          "source": "plugin",
+          "owner": {
+            "kind": "plugin",
+            "name": "alpha",
+            "marketplace": "market",
+            "enabled": true
+          },
+          "linkTarget": null,
+          "skillet": null
+        }
+      ],
+      "jobId": null,
+      "flags": {
+        "cantBackUp": [],
+        "cantMerge": [
+          "extra-files"
+        ]
+      }
+    }
+  ],
+  "tools": [
+    "codex",
+    "claude-code"
+  ],
+  "folders": [
+    {
+      "path": "<home>/.agents/skills",
+      "tools": [
+        "codex"
+      ]
+    },
+    {
+      "path": "<home>/.claude/skills",
+      "tools": [
+        "claude-code"
+      ]
+    },
+    {
+      "path": "<home>/.claude/plugins/cache/market/alpha/1.0.0/skills",
+      "tools": [
+        "claude-code"
+      ]
+    }
+  ],
+  "unreadable": [
+    {
+      "path": "<home>/.claude/skills/dangling",
+      "reason": "broken-link",
+      "tools": [
+        "claude-code"
+      ]
+    },
+    {
+      "path": "<home>/.claude/skills/locked",
+      "reason": "permission-denied",
+      "tools": [
+        "claude-code"
+      ],
+      "detail": "EACCES"
+    },
+    {
+      "path": "<home>/.claude/skills/broken-entry",
+      "reason": "broken-link",
+      "tools": [
+        "claude-code"
+      ]
+    },
+    {
+      "path": "<home>/.claude/skills/locked-inner",
+      "reason": "permission-denied",
+      "tools": [
+        "claude-code"
+      ],
+      "detail": "EACCES"
+    }
+  ]
+}

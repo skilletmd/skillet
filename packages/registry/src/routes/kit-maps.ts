@@ -18,6 +18,8 @@
 import type { FastifyInstance } from 'fastify'
 import { Prisma, type PrismaClient } from '@prisma/client'
 import {
+  KIT_MAP_CODE_RE,
+  KIT_MAP_HASH_RE,
   KIT_MAP_VERSION,
   parseKitMapDocument,
   parseKitMapPendingChange,
@@ -28,8 +30,6 @@ import { newId } from '../db/index.js'
 import { runPrismaTransaction } from '../db/prisma-client.js'
 import { bumpUserDeviceSyncPrisma } from '../lib/device-sync-stream.js'
 
-const HASH_RE = /^sha256:[0-9a-f]{64}$/
-const CODE_RE = /^[a-z][a-z0-9-]{0,47}$/
 /** A whole map of 10,000 entries with full descriptions fits. */
 const MAP_BODY_LIMIT = 16 * 1024 * 1024
 const MAX_CHANGES_PER_WRITE = 10_000
@@ -287,7 +287,7 @@ export function registerKitMapRoutes(app: FastifyInstance, prismaArg?: PrismaCli
       if (
         !Array.isArray(keys) ||
         keys.length > MAX_CLAIM_KEYS ||
-        !keys.every((key) => typeof key === 'string' && HASH_RE.test(key))
+        !keys.every((key) => typeof key === 'string' && KIT_MAP_HASH_RE.test(key))
       ) {
         return reply.code(422).send({
           error: 'invalid_keys',
@@ -335,7 +335,7 @@ export function registerKitMapRoutes(app: FastifyInstance, prismaArg?: PrismaCli
       if (!principal.user_id) return reply.code(403).send({ error: 'user_token_required' })
       const userId = principal.user_id
       const outcome = req.body?.outcome
-      if (outcome !== undefined && (typeof outcome !== 'string' || !CODE_RE.test(outcome))) {
+      if (outcome !== undefined && (typeof outcome !== 'string' || !KIT_MAP_CODE_RE.test(outcome))) {
         return reply.code(422).send({ error: 'invalid_outcome', message: 'outcome is a short code, such as applied' })
       }
       const mine = { id: req.params.id, user_id: userId, device_id: principal.device_id }

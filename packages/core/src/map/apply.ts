@@ -44,35 +44,27 @@
  * moving anything twice. Paths never leave this module: the account sees
  * hashes, names and jobs.
  */
-import { lstat, mkdtemp, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import {
-  SKILL_ENTRYPOINT,
-  canonicalContentHash,
-  encodeBundle,
-  isSkilletBackupPath,
-  slugify,
-  type BundleFiles,
-  type DecodedBundle,
-} from "@skillet/protocol";
+import { SKILL_ENTRYPOINT, canonicalContentHash, encodeBundle, slugify, type DecodedBundle } from "@skillet/protocol";
 import type { JobId } from "@skillet/protocol/jobs";
 import {
   KIT_MAP_DESCRIPTION_MAX,
   KIT_MAP_NAME_MAX,
   deriveKitMapChanges,
+  isRemovableSource,
   parseKitMapDocument,
   toSavedEntry,
   type KitMapDocument,
   type KitMapDraft,
   type KitMapEntry,
-  type KitMapMergeSource,
   type KitMapPendingChange,
   type KitMapSaveCounts,
   type KitMapSavedEntry,
 } from "@skillet/protocol/kit-map";
 import { readState, writeState } from "../kit/store.js";
+import { mapInOrder } from "../util/in-order.js";
 import { mapFolderRootOf } from "../util/pathsafe.js";
-import type { MapSource } from "./folder-rules.js";
 import { readMapMergeRecords, type MapMergeRecord } from "./merge-run.js";
 import {
   listMapReplaceRuns,
@@ -83,25 +75,12 @@ import {
   type MapTrashTarget,
 } from "./remove-trash.js";
 import type { MapScanEntry, MapScanResult } from "./scan.js";
+import { present, readMapSkillBundle, skillMdBundle, type MapBackupBody, type MapBackupPut } from "./skill-fs.js";
 
 // ---------------------------------------------------------------------------
 // The account, as Save needs it
 // ---------------------------------------------------------------------------
 
-/** What a backup carries besides its hash: the registry's `PUT /backups/:hash` body. */
-export interface MapBackupBody {
-  files: BundleFiles;
-  name: string;
-  description: string;
-  tools: string[];
-  /** `scan`: a skill of the person's own, as Save found it. `merge`: a merged skill this computer wrote (./merge-run.ts). */
-  origin: "scan" | "merge";
-  /** A merge's sources, one per original: named when public, counted when private. */
-  sources?: KitMapMergeSource[];
-}
-
-/** `final`: retrying won't help (a secret, a quota, a size cap); otherwise the next run tries again. */
-export type MapBackupPut = { ok: true } | { ok: false; reason: string; file?: string; final: boolean };
 export type MapFillResult = { ok: true } | { ok: false; reason: string; final: boolean };
 export type MapKitRemoval = { ok: true } | { ok: false; reason: string; final: boolean };
 
@@ -218,43 +197,23 @@ function zero(): KitMapSaveCounts {
   return { backups: 0, removals: 0, fills: 0, merges: 0 };
 }
 
-const REMOVABLE: ReadonlySet<MapSource> = new Set<MapSource>(["local", "skillet-imported", "skillet-added"]);
-
-// ---------------------------------------------------------------------------
-// Reading a skill the way the scan keys it
-// ---------------------------------------------------------------------------
-
-async function walkSkill(dir: string, rel: string, out: DecodedBundle): Promise<void> {
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    const name = entry.name;
-    if (name.startsWith(".") || isSkilletBackupPath(name)) continue;
-    const abs = join(dir, name);
-    const relPath = rel === "" ? name : `${rel}/${name}`;
-    const info = await lstat(abs);
-    if (info.isSymbolicLink()) {
-      // A link is never part of a skill, except a linked SKILL.md, read as SKILL.md.
-      if (relPath === SKILL_ENTRYPOINT) {
-        const target = await realpath(abs);
-        if ((await stat(target)).isFile()) out.set(SKILL_ENTRYPOINT, await readFile(target));
-      }
-      continue;
-    }
-    if (info.isDirectory()) await walkSkill(abs, relPath, out);
-    else if (info.isFile()) out.set(relPath, await readFile(abs));
-  }
+/** A run that has done nothing yet: where every run starts. */
+export function emptyMapApplyResult(): MapApplyResult {
+  return {
+    result: "applied",
+    counts: zero(),
+    left: zero(),
+    notBackedUp: [],
+    kept: [],
+    unremoved: [],
+    refused: [],
+    trashRun: null,
+    changed: false,
+  };
 }
 
-/**
- * A skill folder's files by the scan's key rule (./scan.ts): the folder is
- * walked without following links, names that start with a dot and Skillet's
- * `*.skillet-backup` files are skipped, and a linked SKILL.md is read as
- * SKILL.md. Its canonical hash is the scan's key for it.
- */
-export async function readMapSkillBundle(dir: string): Promise<DecodedBundle> {
-  const out: DecodedBundle = new Map();
-  await walkSkill(await realpath(dir), "", out);
-  return out;
-}
+/** How many backups go up at once. The registry client spaces their starts. */
+const BACKUPS_AT_ONCE = 3;
 
 // ---------------------------------------------------------------------------
 // Remove, by the folder rules
@@ -291,7 +250,7 @@ function keptOf(entry: MapScanEntry, name: string): MapKeptRemove {
 function planRemove(entry: MapScanEntry | undefined, name: string): RemovePlan {
   if (entry === undefined) return { kind: "gone" };
   // R7: a plugin's, an organization's, an app's or the person's own published skill is never touched.
-  if (!REMOVABLE.has(entry.source)) return { kind: "kept", kept: keptOf(entry, name) };
+  if (!isRemovableSource(entry.source)) return { kind: "kept", kept: keptOf(entry, name) };
   const plan: Extract<RemovePlan, { kind: "remove" }> = { kind: "remove", name, trash: [], imports: [], kit: [] };
   for (const location of entry.locations) {
     if (location.source === "local") {
@@ -352,18 +311,6 @@ type ReplaceOutcome =
 const sameKeySet = (a: readonly string[], b: readonly string[]): boolean =>
   a.length === b.length && new Set(a).size === a.length && a.every((key) => b.includes(key));
 
-const mergedBundle = (skill: string): DecodedBundle => new Map([[SKILL_ENTRYPOINT, Buffer.from(skill, "utf8")]]);
-
-/** Present without following links. */
-async function exists(path: string): Promise<boolean> {
-  try {
-    await lstat(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** The folder name a merged skill takes: its name as a slug, never one the folder rules read as Skillet's. */
 function mergedFolderName(name: string): string {
   return slugify(name, { maxLength: 64, fallback: "merged-skill" });
@@ -381,11 +328,11 @@ async function writeMergedFolder(root: string, name: string, skill: string): Pro
     const folder = n === 1 ? base : `${base}-${n}`;
     const dest = join(root, folder);
     if (mapFolderRootOf(dest) !== root) return null;
-    if (await exists(dest)) continue;
+    if (await present(dest)) continue;
     const tmp = await mkdtemp(join(root, ".skillet-merge-"));
     try {
       await writeFile(join(tmp, SKILL_ENTRYPOINT), skill, { encoding: "utf8", mode: 0o644 });
-      if (await exists(dest)) {
+      if (await present(dest)) {
         await rm(tmp, { recursive: true, force: true });
         continue;
       }
@@ -420,7 +367,7 @@ interface ReplaceContext {
  */
 async function applyReplace(change: ReplaceChange, ctx: ReplaceContext): Promise<ReplaceOutcome> {
   const record = ctx.records.find((r) => r.merged === change.merged && sameKeySet(r.keys, change.keys));
-  if (!record || canonicalContentHash(mergedBundle(record.skill)) !== change.merged) {
+  if (!record || canonicalContentHash(skillMdBundle(record.skill)) !== change.merged) {
     return { kind: "refused", outcome: "not-written-here" };
   }
 
@@ -430,7 +377,7 @@ async function applyReplace(change: ReplaceChange, ctx: ReplaceContext): Promise
   for (const key of change.keys) {
     const entry = ctx.scanByKey.get(key);
     if (entry !== undefined) {
-      if (!REMOVABLE.has(entry.source)) return { kind: "refused", outcome: "not-replaceable" };
+      if (!isRemovableSource(entry.source)) return { kind: "refused", outcome: "not-replaceable" };
       present.push(entry);
     } else if (!done.has(key)) {
       // Edited, removed or replaced since the merge was written: never trash it.
@@ -612,17 +559,7 @@ function dedupe(changes: readonly KitMapPendingChange[]): KitMapPendingChange[] 
 /** Run Save's steps on this computer (see the module comment). */
 export async function runMapApply(opts: MapApplyOptions): Promise<MapApplyResult> {
   const { client, signal } = opts;
-  const out: MapApplyResult = {
-    result: "applied",
-    counts: zero(),
-    left: zero(),
-    notBackedUp: [],
-    kept: [],
-    unremoved: [],
-    refused: [],
-    trashRun: null,
-    changed: false,
-  };
+  const out = emptyMapApplyResult();
   const wire = opts.wire(opts.scan);
   const wireByKey = new Map(wire.map((entry) => [entry.key, entry]));
   const scanByKey = new Map(opts.scan.entries.map((entry) => [entry.key, entry]));
@@ -663,7 +600,7 @@ export async function runMapApply(opts: MapApplyOptions): Promise<MapApplyResult
   // On Save every hash this map is about to save goes up anyway; on apply, only hashes the saved map already holds.
   const known = new Set((doc?.entries ?? []).map((e) => e.key));
   const claimKeys = opts.scan.entries
-    .filter((e) => REMOVABLE.has(e.source) && (opts.mode === "save" || known.has(e.key)))
+    .filter((e) => isRemovableSource(e.source) && (opts.mode === "save" || known.has(e.key)))
     .map((e) => e.key);
   if (claimKeys.length > 0 && (opts.mode === "save" || docRead)) {
     try {
@@ -719,36 +656,38 @@ export async function runMapApply(opts: MapApplyOptions): Promise<MapApplyResult
     } catch {
       out.left.backups += able.length;
     }
-    for (const entry of stored === null ? [] : able) {
-      if (signal?.aborted) {
-        out.left.backups++;
-        continue;
-      }
-      if (stored!.has(entry.key)) {
+    // A few at once; each outcome is told in map order, however they land.
+    const held = stored;
+    const outcomes =
+      held === null
+        ? []
+        : await mapInOrder(able, BACKUPS_AT_ONCE, async (entry): Promise<BackupOutcome> => {
+            if (signal?.aborted) return { kind: "left" };
+            if (held.has(entry.key)) return { kind: "held" };
+            const body = await backupBody(entry, wireByKey.get(entry.key));
+            if (body === null) return { kind: "left" };
+            let put: MapBackupPut;
+            try {
+              put = await client.putBackup(entry.key, body);
+            } catch {
+              return { kind: "left" };
+            }
+            if (put.ok) return { kind: "stored" };
+            return put.final ? { kind: "refused", reason: put.reason, file: put.file } : { kind: "left" };
+          });
+    outcomes.forEach((outcome, i) => {
+      const entry = able[i]!;
+      if (outcome.kind === "held") {
         out.counts.backups++;
-        continue;
-      }
-      const body = await backupBody(entry, wireByKey.get(entry.key));
-      if (body === null) {
-        out.left.backups++;
-        continue;
-      }
-      let put: MapBackupPut;
-      try {
-        put = await client.putBackup(entry.key, body);
-      } catch {
-        out.left.backups++;
-        continue;
-      }
-      if (put.ok) {
+      } else if (outcome.kind === "stored") {
         out.counts.backups++;
         out.changed = true;
-      } else if (put.final) {
-        out.notBackedUp.push({ name: nameOf(entry.key, entry), reason: put.reason, ...(put.file ? { file: put.file } : {}) });
+      } else if (outcome.kind === "refused") {
+        out.notBackedUp.push({ name: nameOf(entry.key, entry), reason: outcome.reason, ...(outcome.file ? { file: outcome.file } : {}) });
       } else {
         out.left.backups++;
       }
-    }
+    });
   }
 
   // 4. Remove, by the folder rules.
@@ -963,6 +902,13 @@ export async function runMapApply(opts: MapApplyOptions): Promise<MapApplyResult
   }
   return out;
 }
+
+/** One backup's outcome: already in the account, stored now, refused for good, or left for the next run. */
+type BackupOutcome =
+  | { kind: "held" }
+  | { kind: "stored" }
+  | { kind: "refused"; reason: string; file: string | undefined }
+  | { kind: "left" };
 
 async function backupBody(entry: MapScanEntry, shown: KitMapEntry | undefined): Promise<MapBackupBody | null> {
   const location = entry.locations.find((l) => l.source === "local");

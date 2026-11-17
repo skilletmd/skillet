@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
+import { isMapSessionId } from '@/app/api/map-sessions/map-session-guard'
 import { ChooseUsername } from '@/components/choose-username'
-import { SaveFlow, SaveTab, type MapSaveResult, type SaveTabView } from '@/components/map/save-flow'
+import { SaveFlow, SaveTab, type SaveTabView } from '@/components/map/save-flow'
+import type { MapSaveResult } from '@/components/map/save-types'
 import { getSession } from '@/lib/get-session'
 
 // skillet.md/map/save: the tab Save opens from the framed map on a computer that
@@ -15,15 +17,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-const SESSION_ID_RE = /^[0-9a-f]{32}$/
-
 export default async function MapSavePage({
   searchParams,
 }: {
   searchParams: Promise<{ s?: string | string[]; demo?: string | string[] }>
 }) {
   const sp = await searchParams
-  const session = typeof sp.s === 'string' && SESSION_ID_RE.test(sp.s) ? sp.s : null
+  const session = typeof sp.s === 'string' && isMapSessionId(sp.s) ? sp.s : null
 
   // `?demo=<state>` draws one state with fixtures for visual checks: dev only,
   // and only with no session id, so it can never stand in for a real save.

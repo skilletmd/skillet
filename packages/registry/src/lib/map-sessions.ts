@@ -21,11 +21,21 @@
 // binding. The Origin checks and the same-origin request token live in the web
 // routes that hold the cookie; every call here is either unauthenticated with a
 // secret, or bearer-authenticated, so nothing rides ambient credentials.
-import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { PrismaClient, map_sessions } from '@prisma/client'
+import {
+  KIT_MAP_CODE_RE,
+  KIT_MAP_FILE_NAME_MAX,
+  KIT_MAP_NAME_MAX,
+  KIT_MAP_SECRET_RE,
+  KIT_MAP_SESSION_ID_RE,
+  parseKitMapSaveCounts,
+  type KitMapSaveCounts,
+} from '@skillet/protocol/kit-map'
 import { runPrismaTransaction, type PrismaDb } from '../db/prisma-client.js'
 import { hashToken } from '../auth/tokens.js'
+import { constantTimeEqual } from '../auth/web-internal-sig.js'
 import { mintMapSessionPairCodePrisma } from './connect-pair.js'
 
 /** How long a session waits for its approve. */
@@ -33,15 +43,8 @@ export const MAP_SESSION_TTL_SEC = 600
 /** Sessions are swept this long after creation, whatever their state. */
 const MAP_SESSION_RETENTION_SEC = 86_400
 
-const SESSION_ID_RE = /^[0-9a-f]{32}$/
 const SHA256_HEX_RE = /^[0-9a-f]{64}$/
-/** The proof and the binding are opaque base64url or hex strings. */
-const SECRET_RE = /^[A-Za-z0-9_-]{32,256}$/
-/** Short reason codes, the kit-map protocol's own shape. */
-const CODE_RE = /^[a-z][a-z0-9-]{0,47}$/
 const LABEL_MAX = 80
-const NAME_MAX = 200
-const FILE_NAME_MAX = 255
 const MAX_NOT_BACKED_UP = 1_000
 
 export type MapSessionState =
@@ -68,18 +71,19 @@ const EXPIRED: MapSessionResult = {
 
 /** True for a well-formed session id; anything else is a 404 without a lookup. */
 export function isMapSessionId(id: unknown): id is string {
-  return typeof id === 'string' && SESSION_ID_RE.test(id)
+  return typeof id === 'string' && KIT_MAP_SESSION_ID_RE.test(id)
 }
 
+/** Whether `value` hashes to the stored sha256 hex, compared in constant time. */
 function sameHash(storedHex: string | null, value: string): boolean {
   if (!storedHex || !SHA256_HEX_RE.test(storedHex)) return false
-  const a = Buffer.from(storedHex, 'hex')
-  const b = Buffer.from(hashToken(value), 'hex')
-  return a.length === b.length && timingSafeEqual(a, b)
+  // Both sides are lowercase hex, so equal strings are equal digests.
+  return constantTimeEqual(storedHex, hashToken(value))
 }
 
+/** The proof and the binding are opaque base64url or hex strings. */
 function isSecret(value: unknown): value is string {
-  return typeof value === 'string' && SECRET_RE.test(value)
+  return typeof value === 'string' && KIT_MAP_SECRET_RE.test(value)
 }
 
 function newSecret(): string {
@@ -319,20 +323,13 @@ export async function readMapSessionPrisma(
   return { status: 200, body }
 }
 
-export interface MapSessionCounts {
-  backups: number
-  removals: number
-  fills: number
-  merges: number
-}
-
 export interface MapSessionReport {
   result: 'applied' | 'partial' | 'failed'
   reason?: string
   /** What Save did on the computer. */
-  counts?: MapSessionCounts
+  counts?: KitMapSaveCounts
   /** What's left for the next run. */
-  left?: MapSessionCounts
+  left?: KitMapSaveCounts
   /** Skills that didn't back up and why, by name. Never a path. */
   not_backed_up?: Array<{ name: string; reason: string; file?: string }>
 }
@@ -343,17 +340,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function onlyFields(value: Record<string, unknown>, allowed: readonly string[]): boolean {
   return Object.entries(value).every(([key, field]) => field === undefined || allowed.includes(key))
-}
-
-function readCounts(value: unknown): MapSessionCounts | null {
-  if (!isRecord(value) || !onlyFields(value, ['backups', 'removals', 'fills', 'merges'])) return null
-  const out: Record<string, number> = {}
-  for (const key of ['backups', 'removals', 'fills', 'merges'] as const) {
-    const n = value[key]
-    if (typeof n !== 'number' || !Number.isSafeInteger(n) || n < 0) return null
-    out[key] = n
-  }
-  return out as unknown as MapSessionCounts
 }
 
 function oneLine(value: unknown, max: number): value is string {
@@ -367,12 +353,12 @@ export function parseMapSessionReport(value: unknown): MapSessionReport | null {
   if (result !== 'applied' && result !== 'partial' && result !== 'failed') return null
   const report: MapSessionReport = { result }
   if (value.reason !== undefined) {
-    if (typeof value.reason !== 'string' || !CODE_RE.test(value.reason)) return null
+    if (typeof value.reason !== 'string' || !KIT_MAP_CODE_RE.test(value.reason)) return null
     report.reason = value.reason
   }
   for (const key of ['counts', 'left'] as const) {
     if (value[key] === undefined) continue
-    const counts = readCounts(value[key])
+    const counts = parseKitMapSaveCounts(value[key])
     if (!counts) return null
     report[key] = counts
   }
@@ -382,12 +368,12 @@ export function parseMapSessionReport(value: unknown): MapSessionReport | null {
     const skipped: NonNullable<MapSessionReport['not_backed_up']> = []
     for (const item of list) {
       if (!isRecord(item) || !onlyFields(item, ['name', 'reason', 'file'])) return null
-      if (!oneLine(item.name, NAME_MAX)) return null
-      if (typeof item.reason !== 'string' || !CODE_RE.test(item.reason)) return null
+      if (!oneLine(item.name, KIT_MAP_NAME_MAX)) return null
+      if (typeof item.reason !== 'string' || !KIT_MAP_CODE_RE.test(item.reason)) return null
       const entry: { name: string; reason: string; file?: string } = { name: item.name, reason: item.reason }
       if (item.file !== undefined) {
         // One file's name, never a folder in it.
-        if (!oneLine(item.file, FILE_NAME_MAX) || /[\\/]/.test(item.file) || item.file === '.' || item.file === '..') {
+        if (!oneLine(item.file, KIT_MAP_FILE_NAME_MAX) || /[\\/]/.test(item.file) || item.file === '.' || item.file === '..') {
           return null
         }
         entry.file = item.file
@@ -470,7 +456,9 @@ export function requireMapSessionRateLimit(prisma: PrismaDb | undefined, kind: M
       prisma.map_session_attempts.count({ where: { kind, attempted_at: { gte: minute } } }),
     ])
     await prisma.map_session_attempts.create({ data: { id: randomUUID(), kind, ip, attempted_at: now } })
-    await prisma.map_session_attempts.deleteMany({ where: { attempted_at: { lt: hour } } })
+    // Rows past the hour count toward nothing. Every save starts with a create,
+    // so pruning there keeps the table small without a delete on every poll.
+    if (kind === 'create') await prisma.map_session_attempts.deleteMany({ where: { attempted_at: { lt: hour } } })
 
     const limited = async (scope: string, limit: number, wait: number): Promise<void> => {
       reply.header('Retry-After', String(wait))

@@ -1,5 +1,5 @@
 import type { FolderBlob, FolderDir, FolderFile, FolderItem } from '@/components/map/folder-drop'
-import type { NotBackedUp } from '@/components/map/save-flow'
+import type { NotBackedUp } from '@/components/map/save-types'
 import { addSkillToKit } from '@/lib/add-intent'
 import { registryAuthApi } from '@/lib/registry-proxy'
 import { canonicalContentHash } from '@/lib/webcrypto-content-hash'

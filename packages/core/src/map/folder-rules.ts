@@ -3,8 +3,11 @@
  *
  * Every folder the map scan reads gets one row, and the row decides what a
  * skill found there is: its source, what Remove may do to it, and whether it
- * backs up. This module is the table and the name logic behind it, with no
+ * backs up. This module is the name logic behind the table, with no
  * filesystem access; `./scan.ts` walks the folders and asks it what it found.
+ * Which sources Remove acts on and a merge is written from is the protocol's
+ * (`isRemovableSource`, `isMergeableSource` in `@skillet/protocol/kit-map`),
+ * which `./apply.ts` and `./merge-run.ts` follow; Save backs up `local` only.
  *
  *   Folder                                         Source            Remove does                Backed up
  *   <skills>/<name>/                               local             trash                      yes
@@ -21,45 +24,11 @@
  * into every tool, so those rows apply everywhere; `synced/` is Claude Code's
  * own organization sync, so it only means that inside Claude Code's folder.
  */
+import type { KitMapSource } from "@skillet/protocol/kit-map";
 import { fromSlugDir } from "@skillet/protocol/skill-id";
 
-/** Who a skill on the map belongs to. */
-export type MapSource =
-  | "local"
-  | "skillet-imported"
-  | "skillet-added"
-  | "skillet-own"
-  | "synced"
-  | "app"
-  | "plugin";
-
-/** What Remove may do to a skill. Only `trash` touches the skill's files. */
-export type MapRemove =
-  | "trash"
-  | "leave-kit-store"
-  | "kit-removal"
-  | "name-skill-page"
-  | "name-organization"
-  | "name-folder"
-  | "name-plugin";
-
-export interface MapSourceRule {
-  remove: MapRemove;
-  /** Whether Save backs a skill from this source up. */
-  backsUp: boolean;
-}
-
-export const MAP_SOURCE_RULES: Readonly<Record<MapSource, MapSourceRule>> = Object.freeze({
-  local: { remove: "trash", backsUp: true },
-  "skillet-imported": { remove: "leave-kit-store", backsUp: false },
-  "skillet-added": { remove: "kit-removal", backsUp: false },
-  // Sync restores the person's own published skill, so Remove names its page.
-  "skillet-own": { remove: "name-skill-page", backsUp: false },
-  synced: { remove: "name-organization", backsUp: false },
-  app: { remove: "name-folder", backsUp: false },
-  // R7: no fix moves, edits or deletes a plugin's files.
-  plugin: { remove: "name-plugin", backsUp: false },
-});
+/** Who a skill on the map belongs to: the protocol's sources, as the folder rules assign them. */
+export type MapSource = KitMapSource;
 
 /**
  * When identical copies of one skill sit in folders with different sources,

@@ -683,6 +683,40 @@ test("backups follow Retry-After on a 429 and are spaced", { timeout: 60_000 }, 
   }
 });
 
+test("backups go up three at once, and their starts stay 220 ms apart", { timeout: 60_000 }, async () => {
+  await resetHome();
+  const names = ["alpha", "bravo", "charlie", "delta", "echo"];
+  for (const name of names) await writeSkill(join(CLAUDE, name), name);
+  await connectAs("skillet_d_valid");
+  const registry = await new FakeRegistry().start();
+  const starts: number[] = [];
+  // A slow registry: one upload at a time, each would wait out the answer to the one before.
+  const slowUploads: typeof fetch = async (input, init) => {
+    const upload = init?.method === "PUT" && String(input).includes("/api/v1/backups/");
+    if (upload) starts.push(Date.now());
+    const res = await fetch(input, init);
+    if (upload) await new Promise((resolve) => setTimeout(resolve, 1_000));
+    return res;
+  };
+  const opened = await openMap(registry, { paceMs: 220, fetchImpl: slowUploads });
+  try {
+    await post(opened.frame, { type: "save", v: 1, drafts: [] });
+    await waitFor(opened.frame, isStatus("confirm"));
+    await post(opened.frame, { type: "confirm", v: 1 });
+    await waitFor(opened.frame, isStatus("done"));
+
+    assert.equal(starts.length, names.length);
+    assert.equal(registry.backups.get("user-b")?.size, names.length);
+    const gaps = starts.slice(1).map((at, i) => at - starts[i]!);
+    // Whole milliseconds: a start read a moment after its turn can show one less.
+    for (const gap of gaps) assert.ok(gap >= 219, `uploads start 220 ms apart (${gaps.join(", ")} ms)`);
+    assert.ok(gaps[0]! < 1_000 && gaps[1]! < 1_000, `three go up before the first answers (${gaps.join(", ")} ms)`);
+  } finally {
+    await opened.run.stop("interrupted");
+    await registry.close();
+  }
+});
+
 test("a pick the registry won't serve is reported, and the rest of Save goes on", { timeout: 60_000 }, async () => {
   await resetHome();
   await writeSkill(join(CLAUDE, "notes"), "notes");
@@ -959,7 +993,7 @@ test("after Save, the CLI says it is writing merges with the person's AI tool, a
   }
 });
 
-test("a merge recorded while the CLI had exited is written on the next --apply, the app's sync", { timeout: 60_000 }, async () => {
+test("a merge recorded while the CLI had exited is written on the next --apply, which the app starts after its sync", { timeout: 60_000 }, async () => {
   await resetHome();
   await writeSkill(join(CLAUDE, "plain-prose"), "plain-prose", "Edit prose so it reads plainly.");
   await writeSkill(join(CLAUDE, "every--house-style"), "house-style", "Write in the house style.");
@@ -991,7 +1025,7 @@ test("a merge recorded while the CLI had exited is written on the next --apply, 
     });
     assert.equal(result.result, "applied");
     if (result.result !== "applied") return;
-    assert.equal(result.counts.merges, 1, "the app's JSON counts the merge written");
+    assert.equal(result.counts.merges, 1, "--apply counts the merge written");
     assert.equal(result.left.merges, 0);
     assert.equal(registry.changes.get("merge-1")?.outcome, "written");
     assert.deepEqual(mergeReports(registry).map((r) => r.status), ["writing", "ready"]);
@@ -1044,6 +1078,39 @@ test("with no supported AI tool, --apply leaves the merge waiting and says why",
       ),
       saveSummary(result).join("\n"),
     );
+  } finally {
+    await registry.close();
+  }
+});
+test("the app's --apply --json makes the changes and counts the waiting merge, writing none", { timeout: 60_000 }, async () => {
+  await resetHome();
+  await writeSkill(join(CLAUDE, "plain-prose"), "plain-prose", "Edit prose so it reads plainly.");
+  await writeSkill(join(CLAUDE, "copy-editor"), "copy-editor", "Copy edit prose before it ships.");
+  await connectAs("skillet_d_valid");
+  const scan = await scanThisMachine();
+  const keys = ["plain-prose", "copy-editor"].map((name) => scan.entries.find((e) => e.name === name)!.key);
+  const registry = await new FakeRegistry().start();
+  registry.changes.set("merge-1", { id: "merge-1", user: "user-b", device: "dev-valid", kind: "merge", version: 1, body: { job: "writing.editing", keys } });
+  const writer = fakeWriter();
+  try {
+    const result = await runMapApplyOnly({
+      registryUrl: registry.url,
+      rescan: scanThisMachine,
+      wire: wireEntries,
+      paceMs: 5,
+      lockWaitMs: 0,
+      writeMerges: false,
+      mergeWriter: async () => writer,
+    });
+    assert.equal(result.result, "applied", "a merge left for later is not a failed sync");
+    if (result.result !== "applied") return;
+    assert.equal(result.left.merges, 1, "the merge waits for the app's own `skillet map --apply`");
+    assert.equal(result.counts.merges, 0);
+    assert.equal(result.merges, undefined, "the merge step never ran");
+    assert.deepEqual(writer.calls, [], "no AI tool ran");
+    assert.deepEqual(mergeReports(registry), []);
+    assert.equal(registry.changes.get("merge-1")?.outcome, undefined, "the merge still waits");
+    assert.equal(registry.calls("PUT", "/api/v1/backups/").length, 0);
   } finally {
     await registry.close();
   }

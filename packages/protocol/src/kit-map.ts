@@ -29,7 +29,7 @@
  */
 
 import { isJobId, type JobId } from './jobs.js';
-import { tryToSkillId } from './skill-id.js';
+import { isWireRef } from './skill-id.js';
 
 /** The version every bridge message carries. */
 export const KIT_MAP_VERSION = 1;
@@ -40,11 +40,30 @@ export const KIT_MAP_NAME_MAX = 200;
 /** The scan cuts descriptions to this (the Agent Skills limit for a description). */
 export const KIT_MAP_DESCRIPTION_MAX = 1024;
 
-const MAX_ENTRIES = 10_000;
+/** The longest list a kit map payload holds: its entries, keys or unchecked places. */
+export const KIT_MAP_MAX_ENTRIES = 10_000;
+/** The most identical copies of one skill a single tool is counted as loading. */
+export const KIT_MAP_MAX_COPIES = 1_000;
+/** A file's name, as a flag names the one file to clean. */
+export const KIT_MAP_FILE_NAME_MAX = 255;
+
 const MAX_DRAFTS = 10_000;
 const MAX_TOOLS = 64;
-const MAX_COPIES = 1_000;
-const MAX_FILE_NAME = 255;
+
+/** A skill's content hash, the key of every entry: `sha256:<64 hex>`. */
+export const KIT_MAP_HASH_RE = /^sha256:[0-9a-f]{64}$/;
+/** An AI tool's id, as the adapter table writes it. */
+export const KIT_MAP_TOOL_RE = /^[a-z][a-z0-9-]{0,31}$/;
+/** A short reason or outcome code (`no-recent-run`, `links-outside`, `applied`). */
+export const KIT_MAP_CODE_RE = /^[a-z][a-z0-9-]{0,47}$/;
+/** A record's id: a pending change, a merge, a device, or a session in a bridge message. */
+export const KIT_MAP_RECORD_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+/** The map session's proof, binding and poll secret share the registry's shape. */
+export const KIT_MAP_SECRET_RE = /^[A-Za-z0-9_-]{32,256}$/;
+/** The account handle a connected Save confirms. */
+export const KIT_MAP_HANDLE_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,38}$/;
+/** The registry's map session id: 128 bits of hex. */
+export const KIT_MAP_SESSION_ID_RE = /^[0-9a-f]{32}$/;
 
 // ---------------------------------------------------------------------------
 // The scan
@@ -81,6 +100,7 @@ export const KIT_MAP_SOURCES: readonly KitMapSource[] = Object.freeze([
 ]);
 
 const REMOVABLE: ReadonlySet<KitMapSource> = new Set<KitMapSource>(['local', 'skillet-imported', 'skillet-added']);
+const MERGEABLE: ReadonlySet<KitMapSource> = new Set<KitMapSource>(['local', 'skillet-imported', 'skillet-added']);
 const SKILLET: ReadonlySet<KitMapSource> = new Set<KitMapSource>(['skillet-imported', 'skillet-added', 'skillet-own']);
 
 export type KitMapFromKind = 'plugin' | 'organization' | 'app';
@@ -95,6 +115,21 @@ const FROM_KIND: Partial<Record<KitMapSource, KitMapFromKind>> = {
 /** Whether Remove acts on a skill from this source. For the rest, the map names what to turn off. */
 export function isRemovableSource(source: KitMapSource): boolean {
   return REMOVABLE.has(source);
+}
+
+/**
+ * Whether a merge may be written from a skill from this source (KTD12): the
+ * person's own folders and Skillet-managed copies. Their own published skills
+ * stay out because sync writes them back, and plugin, synced and app-managed
+ * skills because they're never changed (R7).
+ */
+export function isMergeableSource(source: KitMapSource): boolean {
+  return MERGEABLE.has(source);
+}
+
+/** Whether a skill from this source is a copy Skillet manages, so the entry carries `skillet`. */
+export function isSkilletSource(source: KitMapSource): boolean {
+  return SKILLET.has(source);
 }
 
 /** An AI tool that loads the skill, and how many identical copies of it that tool loads. */
@@ -559,6 +594,11 @@ export interface KitMapMergeCredits {
   privateLabel: string | null;
 }
 
+/** How a merged skill counts the sources it never names (R23): "1 private skill", "2 private skills", or null for none. */
+export function kitMapPrivateLabel(privateCount: number): string | null {
+  return privateCount === 0 ? null : `${privateCount} private skill${privateCount === 1 ? '' : 's'}`;
+}
+
 /** How a merged skill lists its sources (R23): the public ones by name, the private ones as a count. */
 export function kitMapMergeCredits(sources: readonly KitMapMergeSource[]): KitMapMergeCredits {
   const linked: KitMapMergeCredits['linked'] = [];
@@ -567,8 +607,7 @@ export function kitMapMergeCredits(sources: readonly KitMapMergeSource[]): KitMa
     if ('private' in source) privateCount++;
     else linked.push(source);
   }
-  const privateLabel = privateCount === 0 ? null : `${privateCount} private skill${privateCount === 1 ? '' : 's'}`;
-  return { linked, privateCount, privateLabel };
+  return { linked, privateCount, privateLabel: kitMapPrivateLabel(privateCount) };
 }
 
 // ---------------------------------------------------------------------------
@@ -696,13 +735,6 @@ export type KitMapMessage =
 
 type Fields = Record<string, unknown>;
 
-const HASH_RE = /^sha256:[0-9a-f]{64}$/;
-const TOOL_RE = /^[a-z][a-z0-9-]{0,31}$/;
-const CODE_RE = /^[a-z][a-z0-9-]{0,47}$/;
-const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
-/** The map session's proof, binding and poll secret share the registry's shape. */
-const PROOF_RE = /^[A-Za-z0-9_-]{32,256}$/;
-const HANDLE_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,38}$/;
 
 /** Thrown inside a read and caught at the top of each parse; it never leaves this module. */
 const INVALID = Symbol('kit-map invalid');
@@ -769,9 +801,13 @@ function hasControl(value: string): boolean {
   return false;
 }
 
-/** A name to show: one line, not blank. */
+/** A name to show: one line, not blank, at most {@link KIT_MAP_NAME_MAX}. */
+export function isKitMapDisplayName(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= KIT_MAP_NAME_MAX && value.trim() !== '' && !hasControl(value);
+}
+
 function displayName(value: unknown): string {
-  if (typeof value !== 'string' || value.length > KIT_MAP_NAME_MAX || value.trim() === '' || hasControl(value)) invalid();
+  if (!isKitMapDisplayName(value)) invalid();
   return value;
 }
 
@@ -798,14 +834,12 @@ function jobOrNull(value: unknown): JobId | null {
 
 /** A ref in its canonical `@owner/slug` form. */
 function wireRef(value: unknown): string {
-  if (typeof value !== 'string' || !value.startsWith('@')) invalid();
-  const id = tryToSkillId(value);
-  if (id === null || `@${id.replace(':', '/')}` !== value) invalid();
+  if (!isWireRef(value)) invalid();
   return value;
 }
 
 function distinctHashes(value: unknown, min: number): string[] {
-  const keys = list(value, MAX_ENTRIES).map((key) => matching(key, HASH_RE));
+  const keys = list(value, KIT_MAP_MAX_ENTRIES).map((key) => matching(key, KIT_MAP_HASH_RE));
   if (keys.length < min || new Set(keys).size !== keys.length) invalid();
   return keys;
 }
@@ -823,27 +857,27 @@ function readSavedFrom(value: unknown, source: KitMapSource): { kind: KitMapFrom
 }
 
 function readSkillet(value: unknown, source: KitMapSource): KitMapSkillet {
-  if (!SKILLET.has(source)) invalid();
+  if (!isSkilletSource(source)) invalid();
   const rec = fields(value, ['ref', 'name']);
   return { ref: rec.ref === null ? null : wireRef(rec.ref), name: displayName(rec.name) };
 }
 
 function readFlag(value: unknown): KitMapFlag {
   const rec = fields(value, ['reason', 'file']);
-  const flag: KitMapFlag = { reason: matching(rec.reason, CODE_RE) };
-  if (rec.file !== undefined) flag.file = singleName(rec.file, MAX_FILE_NAME);
+  const flag: KitMapFlag = { reason: matching(rec.reason, KIT_MAP_CODE_RE) };
+  if (rec.file !== undefined) flag.file = singleName(rec.file, KIT_MAP_FILE_NAME_MAX);
   return flag;
 }
 
 function toolIds(value: unknown): string[] {
-  const tools = list(value, MAX_TOOLS).map((tool) => matching(tool, TOOL_RE));
+  const tools = list(value, MAX_TOOLS).map((tool) => matching(tool, KIT_MAP_TOOL_RE));
   if (new Set(tools).size !== tools.length) invalid();
   return tools;
 }
 
 function readUnchecked(value: unknown): KitMapUnchecked {
   const rec = fields(value, ['reason', 'tools', 'plugin']);
-  const place: KitMapUnchecked = { reason: matching(rec.reason, CODE_RE), tools: toolIds(rec.tools) };
+  const place: KitMapUnchecked = { reason: matching(rec.reason, KIT_MAP_CODE_RE), tools: toolIds(rec.tools) };
   if (rec.plugin !== undefined) place.plugin = singleName(rec.plugin, KIT_MAP_NAME_MAX);
   return place;
 }
@@ -851,7 +885,7 @@ function readUnchecked(value: unknown): KitMapUnchecked {
 function readTools(value: unknown): KitMapToolCopies[] {
   const tools = list(value, MAX_TOOLS).map((item) => {
     const rec = fields(item, ['tool', 'copies']);
-    return { tool: matching(rec.tool, TOOL_RE), copies: count(rec.copies, 1, MAX_COPIES) };
+    return { tool: matching(rec.tool, KIT_MAP_TOOL_RE), copies: count(rec.copies, 1, KIT_MAP_MAX_COPIES) };
   });
   if (new Set(tools.map((t) => t.tool)).size !== tools.length) invalid();
   return tools;
@@ -861,7 +895,7 @@ function readUsage(value: unknown): KitMapUsage {
   const rec = fields(value, ['state', 'reason']);
   return {
     state: oneOf(rec.state, USAGE_STATES),
-    reason: rec.reason === null ? null : matching(rec.reason, CODE_RE),
+    reason: rec.reason === null ? null : matching(rec.reason, KIT_MAP_CODE_RE),
   };
 }
 
@@ -869,7 +903,7 @@ function readEntry(value: unknown): KitMapEntry {
   const rec = fields(value, ['key', 'name', 'description', 'source', 'tools', 'from', 'job', 'usage', 'noBackup', 'noMerge', 'skillet']);
   const source = oneOf(rec.source, KIT_MAP_SOURCES);
   const entry: KitMapEntry = {
-    key: matching(rec.key, HASH_RE),
+    key: matching(rec.key, KIT_MAP_HASH_RE),
     name: displayName(rec.name),
     description: description(rec.description),
     source,
@@ -894,14 +928,14 @@ function uniqueKeys(entries: readonly { key: string }[]): Set<string> {
 function readScan(value: unknown): KitMapScan {
   const rec = fields(value, ['entries', 'looked', 'unchecked', 'connected', 'pending']);
   if (rec.connected !== undefined && typeof rec.connected !== 'boolean') invalid();
-  const entries = list(rec.entries, MAX_ENTRIES).map(readEntry);
+  const entries = list(rec.entries, KIT_MAP_MAX_ENTRIES).map(readEntry);
   uniqueKeys(entries);
   const looked = list(rec.looked, MAX_TOOLS).map((item) => {
     const tool = fields(item, ['tool', 'history']);
-    return { tool: matching(tool.tool, TOOL_RE), history: oneOf(tool.history, HISTORIES) };
+    return { tool: matching(tool.tool, KIT_MAP_TOOL_RE), history: oneOf(tool.history, HISTORIES) };
   });
   if (new Set(looked.map((l) => l.tool)).size !== looked.length) invalid();
-  const unchecked = list(rec.unchecked, MAX_ENTRIES).map(readUnchecked);
+  const unchecked = list(rec.unchecked, KIT_MAP_MAX_ENTRIES).map(readUnchecked);
   const scan: KitMapScan = { entries, looked, unchecked };
   if (rec.connected !== undefined) scan.connected = rec.connected as boolean;
   if (rec.pending !== undefined) {
@@ -919,7 +953,7 @@ export function parseKitMapScan(value: unknown): KitMapScan | null {
 
 function readDraft(value: unknown, byKey: ReadonlyMap<string, KitMapEntry>): KitMapDraft {
   const known = (key: unknown): KitMapEntry => {
-    const entry = byKey.get(matching(key, HASH_RE));
+    const entry = byKey.get(matching(key, KIT_MAP_HASH_RE));
     if (!entry) invalid();
     return entry;
   };
@@ -967,7 +1001,7 @@ function readSavedEntry(value: unknown): KitMapSavedEntry {
   const rec = fields(value, ['key', 'name', 'description', 'source', 'from', 'skillet']);
   const source = oneOf(rec.source, KIT_MAP_SOURCES);
   const entry: KitMapSavedEntry = {
-    key: matching(rec.key, HASH_RE),
+    key: matching(rec.key, KIT_MAP_HASH_RE),
     name: displayName(rec.name),
     description: description(rec.description),
     source,
@@ -980,7 +1014,7 @@ function readSavedEntry(value: unknown): KitMapSavedEntry {
 
 function readDocument(value: unknown): KitMapDocument {
   const rec = fields(value, ['version', 'entries', 'assignments']);
-  const entries = list(rec.entries, MAX_ENTRIES).map(readSavedEntry);
+  const entries = list(rec.entries, KIT_MAP_MAX_ENTRIES).map(readSavedEntry);
   const keys = uniqueKeys(entries);
   if (!isObject(rec.assignments)) invalid();
   const assignments: Record<string, JobId | null> = {};
@@ -1007,13 +1041,13 @@ function readPendingBody(rec: Fields, record: KitMapPendingRecord): KitMapPendin
   switch (rec.kind) {
     case 'remove':
       fields(rec, [...RECORD_FIELDS, 'key']);
-      return { ...record, kind: 'remove', key: matching(rec.key, HASH_RE) };
+      return { ...record, kind: 'remove', key: matching(rec.key, KIT_MAP_HASH_RE) };
     case 'merge':
       fields(rec, [...RECORD_FIELDS, 'job', 'keys']);
       return { ...record, kind: 'merge', job: jobId(rec.job), keys: distinctHashes(rec.keys, 2) };
     case 'replace': {
       fields(rec, [...RECORD_FIELDS, 'merged', 'keys']);
-      const merged = matching(rec.merged, HASH_RE);
+      const merged = matching(rec.merged, KIT_MAP_HASH_RE);
       const keys = distinctHashes(rec.keys, 1);
       if (keys.includes(merged)) invalid();
       return { ...record, kind: 'replace', merged, keys };
@@ -1036,8 +1070,8 @@ export function parseKitMapPendingChange(value: unknown): KitMapPendingChange | 
     const kind = rec.kind;
     if (typeof kind !== 'string' || kind === '' || kind.length > 64) invalid();
     const record: KitMapPendingRecord = {
-      id: matching(rec.id, ID_RE),
-      device: rec.device === null ? null : matching(rec.device, ID_RE),
+      id: matching(rec.id, KIT_MAP_RECORD_ID_RE),
+      device: rec.device === null ? null : matching(rec.device, KIT_MAP_RECORD_ID_RE),
       version: count(rec.version),
     };
     return attempt(() => readPendingBody(rec, record)) ?? { ...record, kind: 'unknown', rawKind: kind };
@@ -1075,7 +1109,7 @@ function readRounds(value: unknown, keys: readonly string[]): KitMapMergeRound[]
   const rounds = list(value, KIT_MAP_MERGE_MAX_SOURCES).map((item) => {
     const rec = fields(item, ['key', 'merged', 'original']);
     return {
-      key: matching(rec.key, HASH_RE),
+      key: matching(rec.key, KIT_MAP_HASH_RE),
       merged: writtenText(rec.merged, KIT_MAP_MERGE_SAMPLE_MAX),
       original: writtenText(rec.original, KIT_MAP_MERGE_SAMPLE_MAX),
     };
@@ -1085,14 +1119,22 @@ function readRounds(value: unknown, keys: readonly string[]): KitMapMergeRound[]
 
 function readMergeSource(value: unknown): KitMapMergeSource {
   if (isObject(value) && value.private === true) {
-    return { key: matching(fields(value, ['key', 'private']).key, HASH_RE), private: true };
+    return { key: matching(fields(value, ['key', 'private']).key, KIT_MAP_HASH_RE), private: true };
   }
   const rec = fields(value, ['key', 'ref', 'name']);
-  return { key: matching(rec.key, HASH_RE), ref: wireRef(rec.ref), name: displayName(rec.name) };
+  return { key: matching(rec.key, KIT_MAP_HASH_RE), ref: wireRef(rec.ref), name: displayName(rec.name) };
+}
+
+/**
+ * One source a merged skill credits, or null: `{ key, ref, name }` for a
+ * public one, `{ key, private: true }` for a private one, with no other field.
+ */
+export function parseKitMapMergeSource(value: unknown): KitMapMergeSource | null {
+  return attempt(() => readMergeSource(value));
 }
 
 function mergedHash(value: unknown, keys: readonly string[]): string {
-  const merged = matching(value, HASH_RE);
+  const merged = matching(value, KIT_MAP_HASH_RE);
   if (keys.includes(merged)) invalid();
   return merged;
 }
@@ -1118,8 +1160,8 @@ function readMerge(value: unknown): KitMapMerge {
   const keys = mergeKeys(rec.keys);
   const status = oneOf(rec.status, KIT_MAP_MERGE_STATUSES);
   const merge: KitMapMerge = {
-    id: matching(rec.id, ID_RE),
-    device: rec.device === null ? null : matching(rec.device, ID_RE),
+    id: matching(rec.id, KIT_MAP_RECORD_ID_RE),
+    device: rec.device === null ? null : matching(rec.device, KIT_MAP_RECORD_ID_RE),
     job: jobId(rec.job),
     keys,
     status,
@@ -1127,7 +1169,7 @@ function readMerge(value: unknown): KitMapMerge {
   };
   // Why it failed, or why it's out of date; a failure always says.
   if (status === 'failed' || status === 'out-of-date') {
-    if (rec.reason !== undefined || status === 'failed') merge.reason = matching(rec.reason, CODE_RE);
+    if (rec.reason !== undefined || status === 'failed') merge.reason = matching(rec.reason, KIT_MAP_CODE_RE);
   } else if (rec.reason !== undefined) invalid();
   // A merged skill exists once written, and may outlive its originals' change.
   if (WRITTEN.has(status) || (status === 'out-of-date' && rec.merged !== undefined)) {
@@ -1153,7 +1195,7 @@ function readMerge(value: unknown): KitMapMerge {
 function readMergePick(value: unknown, keys: readonly string[]): KitMapMergePick {
   const rec = fields(value, ['use', 'won']);
   const use = oneOf(rec.use, ['merged', 'originals'] as const);
-  const won = list(rec.won, KIT_MAP_MERGE_MAX_SOURCES).map((key) => matching(key, HASH_RE));
+  const won = list(rec.won, KIT_MAP_MERGE_MAX_SOURCES).map((key) => matching(key, KIT_MAP_HASH_RE));
   if (new Set(won).size !== won.length || !won.every((key) => keys.includes(key))) invalid();
   return { use, won };
 }
@@ -1192,11 +1234,11 @@ function readMergeReport(value: unknown, keys: readonly string[]): KitMapMergeRe
     }
     case 'failed': {
       const rec = fields(value, ['status', 'reason']);
-      return { status: 'failed', reason: matching(rec.reason, CODE_RE) };
+      return { status: 'failed', reason: matching(rec.reason, KIT_MAP_CODE_RE) };
     }
     case 'out-of-date': {
       const rec = fields(value, ['status', 'reason']);
-      return rec.reason === undefined ? { status: 'out-of-date' } : { status: 'out-of-date', reason: matching(rec.reason, CODE_RE) };
+      return rec.reason === undefined ? { status: 'out-of-date' } : { status: 'out-of-date', reason: matching(rec.reason, KIT_MAP_CODE_RE) };
     }
     default:
       return invalid();
@@ -1217,6 +1259,11 @@ function readCounts(value: unknown): KitMapSaveCounts {
   return { backups: count(rec.backups), removals: count(rec.removals), fills: count(rec.fills), merges: count(rec.merges) };
 }
 
+/** Save's four counts, each a whole number from zero, with no other field; or null. */
+export function parseKitMapSaveCounts(value: unknown): KitMapSaveCounts | null {
+  return attempt(() => readCounts(value));
+}
+
 function readMessage(value: unknown, entries: readonly KitMapEntry[] | undefined): KitMapMessage {
   if (!isObject(value) || value.v !== KIT_MAP_VERSION) invalid();
   const v = KIT_MAP_VERSION;
@@ -1228,17 +1275,17 @@ function readMessage(value: unknown, entries: readonly KitMapEntry[] | undefined
       return {
         type: 'session',
         v,
-        session: matching(rec.session, ID_RE),
+        session: matching(rec.session, KIT_MAP_RECORD_ID_RE),
         expiresAt: count(rec.expiresAt),
-        proof: matching(rec.proof, PROOF_RE),
+        proof: matching(rec.proof, KIT_MAP_SECRET_RE),
       };
     }
     case 'status': {
       const rec = fields(value, ['type', 'v', 'state', 'reason', 'handle']);
       const status: KitMapStatusMessage = { type: 'status', v, state: oneOf(rec.state, STATUS_STATES) };
-      if (rec.reason !== undefined) status.reason = matching(rec.reason, CODE_RE);
+      if (rec.reason !== undefined) status.reason = matching(rec.reason, KIT_MAP_CODE_RE);
       // The account handle travels with `confirm` and with nothing else.
-      if (status.state === 'confirm') status.handle = matching(rec.handle, HANDLE_RE);
+      if (status.state === 'confirm') status.handle = matching(rec.handle, KIT_MAP_HANDLE_RE);
       else if (rec.handle !== undefined) invalid();
       return status;
     }
@@ -1256,14 +1303,14 @@ function readMessage(value: unknown, entries: readonly KitMapEntry[] | undefined
       return value.type === 'save' ? { type: 'save', v, drafts } : { type: 'drafts', v, drafts };
     }
     case 'proof-request':
-      return { type: 'proof-request', v, session: matching(fields(value, ['type', 'v', 'session']).session, ID_RE) };
+      return { type: 'proof-request', v, session: matching(fields(value, ['type', 'v', 'session']).session, KIT_MAP_RECORD_ID_RE) };
     case 'proof': {
       const rec = fields(value, ['type', 'v', 'session', 'proof', 'counts']);
       return {
         type: 'proof',
         v,
-        session: matching(rec.session, ID_RE),
-        proof: matching(rec.proof, PROOF_RE),
+        session: matching(rec.session, KIT_MAP_RECORD_ID_RE),
+        proof: matching(rec.proof, KIT_MAP_SECRET_RE),
         counts: readCounts(rec.counts),
       };
     }

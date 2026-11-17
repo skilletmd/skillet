@@ -14,18 +14,18 @@
 
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { NextResponse, type NextRequest } from 'next/server'
-import type { KitMapSaveCounts } from '@skillet/protocol/kit-map'
-import type { MapSaveResult, MapSaveSession, MapSaveStatus } from '@/components/map/save-flow'
+import {
+  KIT_MAP_CODE_RE,
+  KIT_MAP_SECRET_RE,
+  KIT_MAP_SESSION_ID_RE,
+  type KitMapSaveCounts,
+} from '@skillet/protocol/kit-map'
+import type { MapSaveResult, MapSaveSession, MapSaveStatus } from '@/components/map/save-types'
 import { REGISTRY_API } from '@/lib/registry-prefix'
 import { registryFetchOriginOrDefault } from '@/lib/registry-origin'
 import { isCrossOriginPost } from '@/lib/request-origin'
 import { SKILLET_SESSION_COOKIE, skilletSessionCookieOptions } from '@/lib/session-cookie'
 import { refreshRegistryWebSession, webSessionIdentity } from '@/lib/registry-session'
-
-/** The registry's session id: 128 bits of hex. Anything else is a 404 with no lookup. */
-export const MAP_SESSION_ID_RE = /^[0-9a-f]{32}$/
-/** The proof, the binding and the request token share the registry's secret shape. */
-const SECRET_RE = /^[A-Za-z0-9_-]{32,256}$/
 
 export const MAP_BINDING_COOKIE = 'skillet_map_binding'
 export const MAP_TOKEN_COOKIE = 'skillet_map_token'
@@ -41,12 +41,14 @@ const COUNT_KEYS = ['backups', 'removals', 'fills', 'merges'] as const
 
 const nowSec = () => Math.floor(Date.now() / 1000)
 
+/** The registry's session id: 128 bits of hex. Anything else is a 404 with no lookup. */
 export function isMapSessionId(id: string): boolean {
-  return MAP_SESSION_ID_RE.test(id)
+  return KIT_MAP_SESSION_ID_RE.test(id)
 }
 
+/** The proof, the binding and the request token share the registry's secret shape. */
 export function isSecret(value: unknown): value is string {
-  return typeof value === 'string' && SECRET_RE.test(value)
+  return typeof value === 'string' && KIT_MAP_SECRET_RE.test(value)
 }
 
 /** Scoped to this one session's API routes, so the page itself never carries it. */
@@ -225,7 +227,6 @@ export function keepSession(res: NextResponse, refreshed: string | null): void {
 // ---------------------------------------------------------------------------
 
 const STATES: readonly MapSaveSession['state'][] = ['pending', 'approved', 'connected', 'applied', 'partial', 'failed', 'expired']
-const CODE_RE = /^[a-z][a-z0-9-]{0,47}$/
 
 const num = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) ? value : null)
 
@@ -241,7 +242,7 @@ function readResult(value: unknown): MapSaveResult | null {
     notBackedUp: skipped.flatMap((item) => {
       if (typeof item !== 'object' || item === null) return []
       const { name, reason, file } = item as Record<string, unknown>
-      if (typeof name !== 'string' || typeof reason !== 'string' || !CODE_RE.test(reason)) return []
+      if (typeof name !== 'string' || typeof reason !== 'string' || !KIT_MAP_CODE_RE.test(reason)) return []
       return [{ name, reason, ...(typeof file === 'string' ? { file } : {}) }]
     }),
   }

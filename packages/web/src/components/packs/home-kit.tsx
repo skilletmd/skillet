@@ -6,6 +6,7 @@ import { Fragment, Suspense, lazy, useCallback, useEffect, useId, useRef, useSta
 import { folderFromDrop, folderFromFiles, readSkillsFolder, type FolderDir, type FolderRead } from '@/components/map/folder-drop'
 import { KitMapView, type SaveBarParts, type SaveState } from '@/components/map/kit-map-view'
 import { CommandBox, MAP_COMMAND, SaveDone, dropDoneLine, dropSaveSummary } from '@/components/map/save-flow'
+import { runsText } from '@/components/map/words'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar } from '@/components/ui/avatar'
 import { Check } from '@/components/ui/icons'
@@ -22,7 +23,8 @@ import {
   type DropSaveResult,
 } from '@/lib/map-drop-store'
 import { CATALOG_SIZE, HOME_PICKS, STACKS, type HomeSkill } from '@/lib/packs/home-picks'
-import { SECTION_HUES, TAYLOR_KIT, TAYLOR_TOOLS, type MapSkill } from '@/lib/packs/kit-map'
+import { TAYLOR_KIT, TAYLOR_TOOLS, type MapSkill } from '@/lib/packs/kit-map'
+import { SECTION_HUES } from '@/lib/packs/section-hues'
 import { loginHref } from '@/lib/urls'
 import { JOB_SECTIONS, TOOLS_SECTION, type JobId, type JobSection } from '@skillet/protocol/jobs'
 import { backsUp, deriveKitMapChanges, type KitMapDraft, type KitMapEntry } from '@skillet/protocol/kit-map'
@@ -84,7 +86,6 @@ const MAKERS = (() => {
   return [...by.values()].sort((a, b) => b.n - a.n)
 })()
 
-const runsText = (n: number) => (n === 0 ? 'never ran' : n === 1 ? '1 run' : `${n} runs`)
 const skillsText = (n: number) => `${n} ${n === 1 ? 'skill' : 'skills'}`
 
 /** A dropped folder's map, and the bytes each of its skills was keyed from, for Save. */

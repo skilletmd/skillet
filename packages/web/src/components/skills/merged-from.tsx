@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { kitMapPrivateLabel } from '@skillet/protocol/kit-map'
 import { Eyebrow } from '@/components/ui/eyebrow'
 import type { SkillMergedFrom } from '@/lib/types'
 
@@ -10,6 +11,7 @@ import type { SkillMergedFrom } from '@/lib/types'
 export function MergedFrom({ from }: { from: SkillMergedFrom }) {
   const { sources, privateCount } = from
   if (sources.length === 0 && privateCount === 0) return null
+  const privateLabel = kitMapPrivateLabel(privateCount)
   return (
     <div className="mt-8 max-w-[68ch]">
       <Eyebrow>Merged from</Eyebrow>
@@ -28,7 +30,7 @@ export function MergedFrom({ from }: { from: SkillMergedFrom }) {
             </li>
           )
         })}
-        {privateCount > 0 && <li>{`${privateCount} private skill${privateCount === 1 ? '' : 's'}`}</li>}
+        {privateLabel !== null && <li>{privateLabel}</li>}
       </ul>
     </div>
   )

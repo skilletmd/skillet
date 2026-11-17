@@ -1,31 +1,17 @@
 /**
  * The map scan's folder rules (plan: Folder rules table, KTD2). Pure name
- * logic, no filesystem: which folders count as skills, their source, what
- * Remove may do, and whether they back up.
+ * logic, no filesystem: which folders count as skills and their source. What
+ * each source lets Remove and Save do is the protocol's, pinned in
+ * packages/protocol/tests/kit-map.test.ts.
  */
 import { describe, it, expect } from "vitest";
 import {
-  MAP_SOURCE_RULES,
   UNIVERSAL_SKILLS_READERS,
   dominantSource,
   isSkippedName,
   ruleForContainer,
   ruleForSkillFolder,
 } from "../src/map/folder-rules.js";
-
-describe("MAP_SOURCE_RULES", () => {
-  it("matches the plan's table: only local skills back up, and Remove differs per source", () => {
-    expect(MAP_SOURCE_RULES).toEqual({
-      local: { remove: "trash", backsUp: true },
-      "skillet-imported": { remove: "leave-kit-store", backsUp: false },
-      "skillet-added": { remove: "kit-removal", backsUp: false },
-      "skillet-own": { remove: "name-skill-page", backsUp: false },
-      synced: { remove: "name-organization", backsUp: false },
-      app: { remove: "name-folder", backsUp: false },
-      plugin: { remove: "name-plugin", backsUp: false },
-    });
-  });
-});
 
 describe("isSkippedName", () => {
   it("skips dot-folders anywhere", () => {

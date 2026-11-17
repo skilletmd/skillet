@@ -33,6 +33,8 @@ import { delimiter, dirname, isAbsolute, join } from "node:path";
 import matter from "gray-matter";
 import { KIT_MAP_DESCRIPTION_MAX, KIT_MAP_MERGE_BRIEF_MAX, KIT_MAP_MERGE_SAMPLE_MAX, KIT_MAP_NAME_MAX } from "@skillet/protocol/kit-map";
 import type { Job } from "@skillet/protocol/jobs";
+import { TCC_PROTECTED_FOLDER_NAMES } from "../util/pathsafe.js";
+import { SAFE_MATTER } from "./safe-matter.js";
 
 // ---------------------------------------------------------------------------
 // The writer
@@ -133,13 +135,15 @@ const HOME_DIRS: ReadonlyArray<readonly string[]> = [
   [".claude", "local"],
 ];
 const SYSTEM_DIRS: readonly string[] = ["/opt/homebrew/bin", "/usr/local/bin"];
-/** The folders macOS asks the person about before an app may look inside (the desktop's `search_dirs` skips them too). */
-const PROTECTED_FOLDERS: readonly string[] = ["Documents", "Desktop", "Downloads"];
 
-/** Whether `dir` lies inside a protected folder of `home`, by its spelling alone: looking would bring up the prompt. */
+/**
+ * Whether `dir` lies inside a folder of `home` macOS asks the person about
+ * before an app may look inside (the desktop's `search_dirs` skips them too),
+ * by its spelling alone: looking would bring up the prompt.
+ */
 function inProtectedFolder(dir: string, home: string): boolean {
   const root = home.replace(/[\\/]+$/, "");
-  return PROTECTED_FOLDERS.some((name) => {
+  return TCC_PROTECTED_FOLDER_NAMES.some((name) => {
     const anchor = join(root, name);
     return dir === anchor || dir.startsWith(anchor + "/") || dir.startsWith(anchor + "\\");
   });
@@ -514,12 +518,6 @@ export function createToolMergeWriter(tool: MergeTool, opts: MergeToolRunOptions
 
 /** A merged SKILL.md's cap: well under a backup's, and plenty for one skill. */
 export const MERGED_SKILL_MAX_BYTES = 128 * 1024;
-
-// gray-matter runs `---js` front matter as code by default; nothing written by a model ever is.
-const refuseCode = (): never => {
-  throw new Error("front matter code is not allowed");
-};
-const SAFE_MATTER = { engines: { javascript: refuseCode, js: refuseCode } };
 
 /** Text with its line breaks kept, tabs kept, and every other control character a space. */
 function plainText(raw: string): string {

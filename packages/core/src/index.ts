@@ -71,10 +71,7 @@ export {
   type MapMergeBlock,
 } from "./map/scan.js";
 export {
-  MAP_SOURCE_RULES,
   type MapSource,
-  type MapRemove,
-  type MapSourceRule,
   type MapOwner,
   type MapPluginOwner,
   type MapOrganizationOwner,
@@ -104,12 +101,10 @@ export {
 // the lock that holds while it runs.
 export {
   runMapApply,
-  readMapSkillBundle,
+  emptyMapApplyResult,
   type MapApplyClient,
   type MapApplyOptions,
   type MapApplyResult,
-  type MapBackupBody,
-  type MapBackupPut,
   type MapChangeInput,
   type MapFillResult,
   type MapKitRemoval,
@@ -119,13 +114,13 @@ export {
   type MapReplaced,
   type MapUnremoved,
 } from "./map/apply.js";
+export { readMapSkillBundle, type MapBackupBody, type MapBackupPut } from "./map/skill-fs.js";
 // The merge step (plan U14): drafted merges written by the person's own AI
 // tool with no tools, stored privately with their blind rounds, and the record
 // of what this computer wrote.
 export {
   runMapMerges,
   isMergeableEntry,
-  mapMergeSources,
   readMapMergeRecord,
   readMapMergeRecords,
   mapMergeRecordsDir,
@@ -158,6 +153,7 @@ export {
   mapTrashRoot,
   MAP_REMOVE_RUN,
   MAP_REPLACE_RUN,
+  type MapRunKind,
   type MapTrashTarget,
   type MapTrashItem,
   type MapTrashResult,
@@ -167,8 +163,6 @@ export {
 } from "./map/remove-trash.js";
 export {
   acquireMapSaveLock,
-  readMapSaveLock,
-  isMapSaveLocked,
   mapSaveLockPath,
   MapSaveLockBusy,
   type AcquireMapSaveLockOptions,

@@ -713,13 +713,15 @@ fn spawn_skillet_detached(args: &[&str]) -> Result<(), String> {
     Ok(())
 }
 
-/// The map as this computer's scan sees it (`skillet map --json`): every skill
-/// with its job, and no path. The map watch rescans with it when a skill
-/// folder changed. Off the UI thread: a scan reads every skill.
+/// The map as this computer's scan sees it (`skillet map --json --no-usage`):
+/// every skill with its job, and no path. The map watch rescans with it when a
+/// skill folder changed, and keeps only each skill's key, name and job, so the
+/// scan skips the usage pass and the call to the account. Off the UI thread: a
+/// scan reads every skill.
 #[tauri::command]
 async fn map_scan() -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(|| {
-        let (stdout, stderr) = run_skillet_capture(&["map", "--json"]);
+        let (stdout, stderr) = run_skillet_capture(&["map", "--json", "--no-usage"]);
         if stdout.trim().is_empty() {
             Err(if stderr.trim().is_empty() {
                 "map scan failed".to_string()
@@ -738,7 +740,8 @@ async fn map_scan() -> Result<String, String> {
 /// holds for this computer (`skillet map --apply --json`). A live Save lock
 /// answers `locked` at once and the webview skips the whole tick. Stdout comes
 /// back on every exit code, since locked, partial and not-connected are all
-/// JSON the webview reads.
+/// JSON the webview reads. It writes no merge: it counts the waiting ones in
+/// `left.merges`, for `map_write_merges` once the sync is done.
 #[tauri::command]
 async fn map_apply() -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(|| {
@@ -765,28 +768,36 @@ fn open_map() -> Result<(), String> {
     spawn_skillet_detached(&["map"])
 }
 
+/// The last step of a sync tick whose apply step left merges waiting: start
+/// `skillet map --apply`, which writes them with the person's AI tool (KTD12).
+/// Detached, since a merge takes minutes; it holds the save lock while it
+/// writes, so the ticks meanwhile are skipped as during a Save (KTD10).
+#[tauri::command]
+fn map_write_merges() -> Result<(), String> {
+    spawn_skillet_detached(&["map", "--apply"])
+}
+
+/// Stamps of the two files that hold this computer's connection, in order:
+/// `device.json` and `session.json` in the Skillet home (SKILLET_DIR when set),
+/// None when one is missing. Onboarding stats them while the map is open and
+/// asks `auth status` again only when one changed.
+#[tauri::command]
+fn auth_file_stamps() -> Vec<Option<String>> {
+    let home = PathBuf::from(skillet_home());
+    ["device.json", "session.json"]
+        .iter()
+        .map(|name| watch_stamp(&home.join(name)))
+        .collect()
+}
+
 /// How many paths one `map_watch_stamps` call takes. The watch list is about a
 /// dozen, so anything far past it is not the app asking.
 const MAP_WATCH_MAX_PATHS: usize = 64;
 
-/// The roots a watched path may sit under: home, the Skillet dir and any
-/// `SKILLET_SKILL_ROOTS` entry, the roots `open_folder` allows. Compared by
-/// component and never canonicalized: a stat needs no more.
+/// The roots a watched path may sit under: the roots `open_folder` allows,
+/// compared by component and never canonicalized: a stat needs no more.
 fn map_watch_roots() -> Vec<PathBuf> {
-    let mut roots: Vec<PathBuf> = Vec::new();
-    if let Some(home) = home_dir() {
-        roots.push(home);
-    }
-    roots.push(PathBuf::from(skillet_home()));
-    if let Ok(extra) = std::env::var("SKILLET_SKILL_ROOTS") {
-        for part in extra
-            .split(|c| c == ':' || c == ';')
-            .filter(|s| !s.is_empty())
-        {
-            roots.push(PathBuf::from(part));
-        }
-    }
-    roots
+    skill_root_candidates()
 }
 
 /// A watched path from the webview, or None. `~/` is expanded against `home`;
@@ -1366,12 +1377,12 @@ fn home_dir() -> Option<std::path::PathBuf> {
         .map(std::path::PathBuf::from)
 }
 
-/// Canonicalized roots a skills folder may legitimately live under: the user's
-/// home, the Skillet data dir, and any advanced-setup roots in
+/// The roots a skills folder may legitimately live under, as spelled: the
+/// user's home, the Skillet data dir, and any advanced-setup roots in
 /// `SKILLET_SKILL_ROOTS` (colon/semicolon-separated, matching the CLI). Advanced
 /// users can point runtimes at skills dirs outside $HOME via that env, so a
 /// home-only confinement would silently refuse to open their real folders.
-fn allowed_skill_roots() -> Vec<std::path::PathBuf> {
+fn skill_root_candidates() -> Vec<std::path::PathBuf> {
     let mut roots: Vec<std::path::PathBuf> = Vec::new();
     if let Some(h) = home_dir() {
         roots.push(h);
@@ -1386,6 +1397,12 @@ fn allowed_skill_roots() -> Vec<std::path::PathBuf> {
         }
     }
     roots
+}
+
+/// [`skill_root_candidates`], canonicalized: the roots `open_folder` and the
+/// skill viewer confine their paths to. A root that doesn't resolve is dropped.
+fn allowed_skill_roots() -> Vec<std::path::PathBuf> {
+    skill_root_candidates()
         .into_iter()
         .filter_map(|r| std::fs::canonicalize(r).ok())
         .collect()
@@ -1787,7 +1804,9 @@ pub fn run() {
             map_scan,
             map_apply,
             open_map,
-            map_watch_stamps
+            map_write_merges,
+            map_watch_stamps,
+            auth_file_stamps
         ])
         .setup(|app| {
             // Pin the real app version before anything can shell out to the

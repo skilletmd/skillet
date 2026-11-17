@@ -29,8 +29,15 @@ import {
   type BundleFiles,
   type DecodedBundle,
 } from '@skillet/protocol'
-import { KIT_MAP_DESCRIPTION_MAX, KIT_MAP_NAME_MAX } from '@skillet/protocol/kit-map'
-import { tryToSkillId } from '@skillet/protocol/skill-id'
+import {
+  KIT_MAP_DESCRIPTION_MAX,
+  KIT_MAP_HASH_RE,
+  KIT_MAP_NAME_MAX,
+  KIT_MAP_TOOL_RE,
+  isKitMapDisplayName,
+  parseKitMapMergeSource,
+  type KitMapMergeSource,
+} from '@skillet/protocol/kit-map'
 import { requireUser } from '../auth/middleware.js'
 import { blobHash, newId } from '../db/index.js'
 import { runPrismaTransaction } from '../db/prisma-client.js'
@@ -38,9 +45,7 @@ import { loadBundleFromManifest, putFileBlobs } from '../blob-store/index.js'
 import type { BlobStore } from '../blob-store/types.js'
 import { secretsBlockingScan } from '../scanner/index.js'
 
-const HASH_RE = /^sha256:[0-9a-f]{64}$/
 const BARE_HASH_RE = /^[0-9a-f]{64}$/
-const TOOL_RE = /^[a-z][a-z0-9-]{0,31}$/
 const MAX_TOOLS = 64
 const MAX_SOURCES = 64
 const MAX_LOOKUP_KEYS = 200
@@ -55,15 +60,13 @@ const DEFAULT_MAX_BYTES = 250 * 1024 * 1024
 type Origin = 'scan' | 'drop' | 'merge'
 const ORIGINS: readonly Origin[] = ['scan', 'drop', 'merge']
 
-/** A merge's source: a public skill by its ref, or a private one counted by hash. */
-export type BackupSource = { key: string; ref: string; name: string } | { key: string; private: true }
-
 interface BackupMeta {
   name: string
   description: string
   tools: string[]
   origin: Origin
-  sources: BackupSource[] | null
+  /** A merge's sources: a public skill by its ref, or a private one counted by hash (the kit map's own shape). */
+  sources: KitMapMergeSource[] | null
 }
 
 interface BackupLimits {
@@ -101,39 +104,10 @@ function onlyFields(value: Record<string, unknown>, allowed: readonly string[]):
   return Object.entries(value).every(([key, field]) => field === undefined || allowed.includes(key))
 }
 
-function hasControl(value: string): boolean {
-  for (let i = 0; i < value.length; i++) {
-    const c = value.charCodeAt(i)
-    if (c < 0x20 || c === 0x7f) return true
-  }
-  return false
-}
-
-/** A name to show: one line, not blank, within the kit map's limit. */
-function isDisplayName(value: unknown): value is string {
-  return typeof value === 'string' && value.trim() !== '' && value.length <= KIT_MAP_NAME_MAX && !hasControl(value)
-}
-
-/** A ref in its canonical `@owner/slug` form, the kit map's own rule. */
-function isWireRef(value: unknown): value is string {
-  if (typeof value !== 'string' || !value.startsWith('@')) return false
-  const id = tryToSkillId(value)
-  return id !== null && `@${id.replace(':', '/')}` === value
-}
-
 /** `sha256:<hex>` from either the prefixed or the bare form, or null. */
 function normalizeHash(raw: string): string | null {
-  if (HASH_RE.test(raw)) return raw
+  if (KIT_MAP_HASH_RE.test(raw)) return raw
   return BARE_HASH_RE.test(raw) ? `sha256:${raw}` : null
-}
-
-function readSource(value: unknown): BackupSource | null {
-  if (!isRecord(value) || typeof value.key !== 'string' || !HASH_RE.test(value.key)) return null
-  if (value.private === true) {
-    return onlyFields(value, ['key', 'private']) ? { key: value.key, private: true } : null
-  }
-  if (!onlyFields(value, ['key', 'ref', 'name']) || !isWireRef(value.ref) || !isDisplayName(value.name)) return null
-  return { key: value.key, ref: value.ref, name: value.name }
 }
 
 /** The body around the bundle, or a reason it can't be stored. */
@@ -141,7 +115,7 @@ function readBackupMeta(body: Record<string, unknown>): BackupMeta | string {
   if (!onlyFields(body, ['files', 'name', 'description', 'tools', 'origin', 'sources'])) {
     return 'unknown field: a backup carries files, name, description, tools, origin and sources only'
   }
-  if (!isDisplayName(body.name)) return `name is required, one line, at most ${KIT_MAP_NAME_MAX} characters`
+  if (!isKitMapDisplayName(body.name)) return `name is required, one line, at most ${KIT_MAP_NAME_MAX} characters`
   const description = body.description ?? ''
   if (typeof description !== 'string' || description.length > KIT_MAP_DESCRIPTION_MAX) {
     return `description is at most ${KIT_MAP_DESCRIPTION_MAX} characters`
@@ -150,20 +124,20 @@ function readBackupMeta(body: Record<string, unknown>): BackupMeta | string {
   if (
     !Array.isArray(tools) ||
     tools.length > MAX_TOOLS ||
-    !tools.every((tool) => typeof tool === 'string' && TOOL_RE.test(tool)) ||
+    !tools.every((tool) => typeof tool === 'string' && KIT_MAP_TOOL_RE.test(tool)) ||
     new Set(tools).size !== tools.length
   ) {
     return 'tools is a list of distinct tool ids'
   }
   if (!ORIGINS.includes(body.origin as Origin)) return 'origin is scan, drop or merge'
   const origin = body.origin as Origin
-  let sources: BackupSource[] | null = null
+  let sources: KitMapMergeSource[] | null = null
   if (body.sources !== undefined) {
     if (origin !== 'merge') return 'only a merge has sources'
     if (!Array.isArray(body.sources) || body.sources.length > MAX_SOURCES) return 'sources is a list'
-    const read = body.sources.map(readSource)
+    const read = body.sources.map((source) => parseKitMapMergeSource(source))
     if (read.some((source) => source === null)) return 'each source is { key, ref, name } or { key, private: true }'
-    sources = read as BackupSource[]
+    sources = read as KitMapMergeSource[]
     if (new Set(sources.map((source) => source.key)).size !== sources.length) return 'a source appears once'
   }
   return { name: body.name, description, tools: tools as string[], origin, sources }
@@ -447,7 +421,7 @@ export function registerBackupRoutes(
         !Array.isArray(keys) ||
         keys.length === 0 ||
         keys.length > MAX_LOOKUP_KEYS ||
-        !keys.every((key) => typeof key === 'string' && HASH_RE.test(key)) ||
+        !keys.every((key) => typeof key === 'string' && KIT_MAP_HASH_RE.test(key)) ||
         new Set(keys).size !== keys.length
       ) {
         return reply.code(422).send({

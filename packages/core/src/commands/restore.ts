@@ -16,7 +16,7 @@ import { isSkilletSlugDirName } from '../bundle/write.js';
 import { MATERIALIZATION_ROOT_ALLOWLIST } from '../util/pathsafe.js';
 import { ledgerStamp, LEDGER_STAMP, writeRunManifest, moveDir } from './edits-store.js';
 import { importSkill } from './import.js';
-import { listMapTrash, restoreMapTrash } from '../map/remove-trash.js';
+import { MAP_REMOVE_RUN, MAP_REPLACE_RUN, listMapTrash, restoreMapTrash, type MapRunKind } from '../map/remove-trash.js';
 
 /** True iff `child` resolves to `root` or a path beneath it (symlink-safe). */
 function withinRoot(child: string, root: string): boolean {
@@ -81,7 +81,7 @@ export interface TrashRun {
    * `map-remove` for a run the kit map's Remove made, `map-replace` for one a
    * picked merge made in place of its originals; absent for sync's own trash.
    */
-  kind?: 'map-remove' | 'map-replace';
+  kind?: MapRunKind;
 }
 
 export interface RestoreResult {
@@ -166,7 +166,7 @@ export async function restoreTrash(runId?: string): Promise<RestoreResult | null
   if (!target) return null;
   // A map run goes back by its own rules, and never re-imports. A replace run
   // first moves the merged folders it wrote to the map trash.
-  if (target.kind === 'map-remove' || target.kind === 'map-replace') return restoreMapTrash(target.id);
+  if (target.kind === MAP_REMOVE_RUN || target.kind === MAP_REPLACE_RUN) return restoreMapTrash(target.id);
   const ledger = await readLedger(join(trashRoot(), target.id));
   if (!ledger) return null;
 

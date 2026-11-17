@@ -12,14 +12,22 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  KIT_MAP_HASH_RE,
   KIT_MAP_MERGE_BRIEF_MAX,
   KIT_MAP_MERGE_MAX_SOURCES,
   KIT_MAP_MERGE_SAMPLE_MAX,
   KIT_MAP_MERGE_STATUSES,
   KIT_MAP_VERSION,
+  KIT_MAP_NAME_MAX,
+  KIT_MAP_SOURCES,
   backsUp,
   deriveKitMapChanges,
+  isKitMapDisplayName,
+  isMergeableSource,
+  isRemovableSource,
+  isSkilletSource,
   kitMapMergeCredits,
+  kitMapPrivateLabel,
   kitMapMergeWins,
   kitMapMessageVersion,
   parseKitMapDocument,
@@ -27,8 +35,10 @@ import {
   parseKitMapMerge,
   parseKitMapMergePick,
   parseKitMapMergeReport,
+  parseKitMapMergeSource,
   parseKitMapMessage,
   parseKitMapPendingChange,
+  parseKitMapSaveCounts,
   parseKitMapScan,
   toSavedEntry,
   type KitMapDocument,
@@ -705,6 +715,76 @@ describe('merges', () => {
     assert.equal(parseKitMapMergePick({ use: 'merged', won: [A, B, E] }, keys), null, 'only its own originals');
     assert.equal(parseKitMapMergePick({ use: 'merged', won: [A, B, C], status: 'picked' }, keys), null, 'nothing else');
     assert.equal(parseKitMapMergePick('merged', keys), null);
+  });
+});
+
+describe('the rules other packages read', () => {
+  it('one merge source at a time: { key, ref, name } or { key, private: true }, nothing else', () => {
+    assert.deepEqual(parseKitMapMergeSource({ key: A, ref: '@every/house-style', name: 'House Style' }), {
+      key: A,
+      ref: '@every/house-style',
+      name: 'House Style',
+    });
+    assert.deepEqual(parseKitMapMergeSource({ key: A, private: true }), { key: A, private: true });
+    assert.deepEqual(parseKitMapMergeSource({ key: A, private: true, name: undefined }), { key: A, private: true }, 'a field set to undefined holds nothing');
+    for (const bad of [
+      { key: A, ref: 'every/house-style', name: 'House Style' },
+      { key: A, ref: '@every/house-style', name: ' ' },
+      { key: A, ref: '@every/house-style', name: 'House\nStyle' },
+      { key: A, ref: '@every/house-style', name: 'House Style', page: 'https://skillet.md/every/house-style' },
+      { key: A, private: true, name: 'Hidden' },
+      { key: A, private: 'yes' },
+      { key: 'sha256:abc', private: true },
+      [{ key: A, private: true }],
+      null,
+      'House Style',
+    ]) {
+      assert.equal(parseKitMapMergeSource(bad), null, JSON.stringify(bad));
+    }
+  });
+
+  it('a display name is one line, not blank, within the cap', () => {
+    assert.equal(isKitMapDisplayName('House Style'), true);
+    assert.equal(isKitMapDisplayName('x'.repeat(KIT_MAP_NAME_MAX)), true);
+    for (const bad of ['', '   ', 'x'.repeat(KIT_MAP_NAME_MAX + 1), 'two\nlines', 'tab\there', 'del\u007f', 42, null]) {
+      assert.equal(isKitMapDisplayName(bad), false, JSON.stringify(bad));
+    }
+  });
+
+  it("Save's counts: four whole numbers from zero, and no other field", () => {
+    const counts = { backups: 3, removals: 0, fills: 1, merges: 2 };
+    assert.deepEqual(parseKitMapSaveCounts(counts), counts);
+    assert.deepEqual(parseKitMapSaveCounts({ ...counts, extra: undefined }), counts);
+    for (const bad of [
+      { ...counts, backups: -1 },
+      { ...counts, fills: 1.5 },
+      { ...counts, merges: '2' },
+      { backups: 1, removals: 0, fills: 0 },
+      { ...counts, names: ['House Style'] },
+      [1, 0, 0, 0],
+      null,
+    ]) {
+      assert.equal(parseKitMapSaveCounts(bad), null, JSON.stringify(bad));
+    }
+  });
+
+  it('which sources Remove acts on, a merge is written from, and Skillet manages', () => {
+    const where = (test: (source: (typeof KIT_MAP_SOURCES)[number]) => boolean) => KIT_MAP_SOURCES.filter(test);
+    assert.deepEqual(where(isRemovableSource), ['local', 'skillet-imported', 'skillet-added']);
+    assert.deepEqual(where(isMergeableSource), ['local', 'skillet-imported', 'skillet-added']);
+    assert.deepEqual(where(isSkilletSource), ['skillet-imported', 'skillet-added', 'skillet-own']);
+  });
+
+  it('counts the private sources in one label', () => {
+    assert.equal(kitMapPrivateLabel(0), null);
+    assert.equal(kitMapPrivateLabel(1), '1 private skill');
+    assert.equal(kitMapPrivateLabel(4), '4 private skills');
+  });
+
+  it("keys entries by the content hash's one spelling", () => {
+    assert.equal(KIT_MAP_HASH_RE.test(A), true);
+    assert.equal(KIT_MAP_HASH_RE.test(A.slice('sha256:'.length)), false);
+    assert.equal(KIT_MAP_HASH_RE.test(A.toUpperCase()), false);
   });
 });
 

@@ -15,7 +15,9 @@
  * machine holds a device token its account still takes, and then `pending`
  * lists the changes the account holds for it: one read of this machine's own
  * waiting changes, sending nothing about its skills. A machine with no device
- * token calls no one.
+ * token calls no one. The app's light check runs `skillet map --json
+ * --no-usage`: the same scan, with no usage pass and no call to the account,
+ * since it keeps only each skill's key, name and job.
  *
  * Save is ../map/save-flow.ts (U11): it connects the machine if it needs to,
  * then backs up, makes the drafted fixes and saves the map. Ctrl+C, or 30
@@ -23,14 +25,12 @@
  * server and says whether anything changed. `--apply` makes this machine's
  * waiting changes with no map at all: what the app's sync runs.
  */
-import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { sep } from "node:path";
-import type { Command } from "commander";
+import { Option, type Command } from "commander";
 import {
   MAP_USAGE_WINDOW_DAYS,
   REGISTRY_API,
-  deviceFilePath,
   readDeviceFile,
   readMapUsage,
   readSessionFileToken,
@@ -44,7 +44,12 @@ import {
 import { JOBS, TOOLS_SECTION, type JobId } from "@skillet/protocol/jobs";
 import {
   KIT_MAP_DESCRIPTION_MAX,
+  KIT_MAP_MAX_COPIES,
+  KIT_MAP_MAX_ENTRIES,
   KIT_MAP_NAME_MAX,
+  KIT_MAP_TOOL_RE,
+  isMergeableSource,
+  isSkilletSource,
   parseKitMapPendingChange,
   parseKitMapScan,
   type KitMapEntry,
@@ -54,16 +59,16 @@ import {
   type KitMapPendingChange,
   type KitMapScan,
   type KitMapSkillet,
-  type KitMapSource,
   type KitMapToolCopies,
   type KitMapUnchecked,
 } from "@skillet/protocol/kit-map";
-import { tryToSkillId } from "@skillet/protocol/skill-id";
+import { isWireRef } from "@skillet/protocol/skill-id";
 import { ALL_ADAPTERS, BASELINE_READER_ADAPTERS, REGISTRY_DEFAULT } from "../cli-context.js";
 import { webBaseUrl } from "../cli-command-tier.js";
 import { dim, fail, ok } from "../cli-colors.js";
 import { failAuthRequired } from "../auth-required.js";
 import { ExitCode } from "../exit-codes.js";
+import { writeJson } from "../json-output.js";
 import { openBrowserUrl } from "../open-browser-url.js";
 import { startMapServer, type MapSaveHandler } from "../map/loopback-server.js";
 import {
@@ -80,17 +85,6 @@ export type { MapFrameLink, MapSaveHandler } from "../map/loopback-server.js";
 /** How long the map stays open with nothing done in it. */
 export const MAP_IDLE_MS = 30 * 60_000;
 
-// The protocol's own limits (kit-map.ts): a payload past them is rejected whole.
-const MAX_ENTRIES = 10_000;
-const MAX_COPIES = 1_000;
-const TOOL_RE = /^[a-z][a-z0-9-]{0,31}$/;
-/** The sources a merge is written from (KTD12); the rest never carry a merge flag. */
-const MERGE_SOURCES: ReadonlySet<KitMapSource> = new Set<KitMapSource>(["local", "skillet-imported", "skillet-added"]);
-const SKILLET_SOURCES: ReadonlySet<KitMapSource> = new Set<KitMapSource>([
-  "skillet-imported",
-  "skillet-added",
-  "skillet-own",
-]);
 /** Names and places the text summary lists before it says how many more. */
 const LIST_MAX = 5;
 /** How long opening the map waits on the account for this machine's waiting changes. */
@@ -176,12 +170,11 @@ function fromOf(entry: MapScanEntry): KitMapFrom | undefined {
 function refOf(maker: string | null, slug: string): string | null {
   if (maker === null) return null;
   const ref = `@${maker}/${slug}`;
-  const id = tryToSkillId(ref);
-  return id !== null && `@${id.replace(":", "/")}` === ref ? ref : null;
+  return isWireRef(ref) ? ref : null;
 }
 
 function skilletOf(entry: MapScanEntry, name: string): KitMapSkillet | undefined {
-  if (!SKILLET_SOURCES.has(entry.source)) return undefined;
+  if (!isSkilletSource(entry.source)) return undefined;
   const copy =
     entry.locations.find((l) => l.source === entry.source && l.skillet !== null) ??
     entry.locations.find((l) => l.skillet !== null);
@@ -192,8 +185,8 @@ function skilletOf(entry: MapScanEntry, name: string): KitMapSkillet | undefined
 function toolsOf(entry: MapScanEntry): KitMapToolCopies[] {
   const tools: KitMapToolCopies[] = [];
   for (const tool of entry.tools) {
-    if (!TOOL_RE.test(tool) || tools.some((t) => t.tool === tool)) continue;
-    const copies = Math.min(Math.max(entry.copies[tool] ?? 1, 1), MAX_COPIES);
+    if (!KIT_MAP_TOOL_RE.test(tool) || tools.some((t) => t.tool === tool)) continue;
+    const copies = Math.min(Math.max(entry.copies[tool] ?? 1, 1), KIT_MAP_MAX_COPIES);
     tools.push({ tool, copies });
   }
   return tools;
@@ -217,7 +210,8 @@ function toWireEntry(entry: MapScanEntry, usage: MapUsageResult): KitMapEntry {
   const noBackup = entry.flags.cantBackUp[0];
   if (entry.source === "local" && noBackup !== undefined) wire.noBackup = { reason: noBackup } satisfies KitMapFlag;
   const noMerge = entry.flags.cantMerge[0];
-  if (MERGE_SOURCES.has(entry.source) && noMerge !== undefined) wire.noMerge = { reason: noMerge } satisfies KitMapFlag;
+  // Only the sources a merge is written from (KTD12) say why one can't be.
+  if (isMergeableSource(entry.source) && noMerge !== undefined) wire.noMerge = { reason: noMerge } satisfies KitMapFlag;
   const skillet = skilletOf(entry, name);
   if (skillet) wire.skillet = skillet;
   return wire;
@@ -226,7 +220,7 @@ function toWireEntry(entry: MapScanEntry, usage: MapUsageResult): KitMapEntry {
 function lookedOf(usage: MapUsageResult): KitMapLooked[] {
   const looked: KitMapLooked[] = [];
   for (const tool of usage.tools) {
-    if (!TOOL_RE.test(tool.tool) || looked.some((l) => l.tool === tool.tool)) continue;
+    if (!KIT_MAP_TOOL_RE.test(tool.tool) || looked.some((l) => l.tool === tool.tool)) continue;
     looked.push({ tool: tool.tool, history: tool.history });
   }
   return looked;
@@ -235,7 +229,7 @@ function lookedOf(usage: MapUsageResult): KitMapLooked[] {
 function uncheckedOf(row: MapUnreadable): KitMapUnchecked {
   const place: KitMapUnchecked = {
     reason: row.reason,
-    tools: [...new Set(row.tools)].filter((tool) => TOOL_RE.test(tool)),
+    tools: [...new Set(row.tools)].filter((tool) => KIT_MAP_TOOL_RE.test(tool)),
   };
   if (row.plugin !== undefined) place.plugin = wireSingleName(row.plugin, "plugin");
   return place;
@@ -258,11 +252,11 @@ export function toKitMapScan(
 ): KitMapScan {
   const payload: KitMapScan = {
     entries: scan.entries
-      .slice(0, MAX_ENTRIES)
+      .slice(0, KIT_MAP_MAX_ENTRIES)
       .map((entry) => toWireEntry(entry, usage))
       .filter(oneEntry),
     looked: lookedOf(usage),
-    unchecked: scan.unreadable.slice(0, MAX_ENTRIES).map(uncheckedOf),
+    unchecked: scan.unreadable.slice(0, KIT_MAP_MAX_ENTRIES).map(uncheckedOf),
   };
   if (connected) {
     payload.connected = true;
@@ -297,17 +291,9 @@ function usageNotes(usage: MapUsageResult, entries: readonly MapScanEntry[]): st
  * anonymous device file is not used here.
  */
 export async function hasLocalConnection(): Promise<boolean> {
-  try {
-    const raw = JSON.parse(await readFile(deviceFilePath(), "utf8")) as unknown;
-    if (typeof raw === "object" && raw !== null) {
-      const file = raw as { device_token?: unknown; label?: unknown };
-      if (typeof file.device_token === "string" && file.device_token.length > 0 && file.label !== "anonymous") {
-        return true;
-      }
-    }
-  } catch {
-    // No device file, or not one Skillet wrote: not paired by device.
-  }
+  // Null when there's no device file, or not one Skillet wrote: not paired by device.
+  const device = await readDeviceFile();
+  if (device !== null && device.device_token.length > 0 && device.label !== "anonymous") return true;
   return (await readSessionFileToken()).length > 0;
 }
 
@@ -355,12 +341,28 @@ export async function readConnection(
   }
 }
 
+export interface ReadMapOptions {
+  registryUrl?: string;
+  fetchImpl?: typeof fetch;
+  /**
+   * False skips the usage pass and the call to the account: the scan alone,
+   * every entry's usage unknown, as the app's light check takes it.
+   */
+  usage?: boolean;
+}
+
 /** Scan this machine and read its usage records, both local and read-only, and ask the account about it if it's connected. */
-export async function readMap(opts: { registryUrl?: string; fetchImpl?: typeof fetch } = {}): Promise<MapReading> {
+export async function readMap(opts: ReadMapOptions = {}): Promise<MapReading> {
   const home = homedir();
+  if (opts.usage === false) {
+    const scan = await scanThisMachine();
+    return { payload: toKitMapScan(scan, NO_USAGE, false), usageNotes: [], unreadable: scan.unreadable, home };
+  }
+  // Asked while the scan runs: it sends nothing about the skills, and never throws.
+  const asking = readConnection(opts);
   const scan = await scanThisMachine();
   const usage = await readMapUsage({ scan, home });
-  const account = await readConnection(opts);
+  const account = await asking;
   return {
     payload: toKitMapScan(scan, usage, account.connected, account.pending),
     usageNotes: usageNotes(usage, scan.entries),
@@ -596,7 +598,9 @@ export async function startMap(opts: StartMapOptions = {}): Promise<MapRun> {
  * everything waiting is done. `--json` is how the app's sync tick runs it
  * (U13): a live Save lock answers `locked` at once, so the app skips that
  * tick and tries again instead of waiting the Save out (KTD10). A person at
- * the terminal waits for the Save.
+ * the terminal waits for the Save. `--json` also stops short of the merges:
+ * it counts the ones waiting in `left.merges`, and once its sync is done the
+ * app starts `skillet map --apply`, which writes them under the same lock.
  */
 async function applyCommand(json: boolean): Promise<void> {
   const print = (line: string) => console.log(line);
@@ -604,12 +608,12 @@ async function applyCommand(json: boolean): Promise<void> {
     registryUrl: REGISTRY_DEFAULT,
     rescan: scanThisMachine,
     wire: wireEntries,
-    ...(json ? { lockWaitMs: 0 } : { print }),
+    ...(json ? { lockWaitMs: 0, writeMerges: false } : { print }),
   });
   if (result.result === "not-connected") failAuthRequired({ json });
   if (result.result === "locked") {
     const message = "Another Save is still running on this machine.";
-    if (json) process.stdout.write(JSON.stringify({ ok: false, error: message, code: "locked" }, null, 2) + "\n");
+    if (json) writeJson({ ok: false, error: message, code: "locked" });
     else console.error(fail(message));
     process.exitCode = ExitCode.ERROR;
     return;
@@ -629,7 +633,7 @@ async function applyCommand(json: boolean): Promise<void> {
       // Whether this computer or the account changed: the app rescans its map when it did.
       changed: result.changed,
     };
-    process.stdout.write(JSON.stringify({ ok: done, data }, null, 2) + "\n");
+    writeJson({ ok: done, data });
   } else {
     for (const line of saveSummary(result)) print(line);
     const left = mapLeftText(result.left);
@@ -646,13 +650,15 @@ export function registerMapCommand(program: Command): void {
     .option("--no-open", "Print the map's address without opening a browser")
     .option("--json", "Emit the scan as machine-readable JSON and exit")
     .option("--apply", "Make the changes waiting for this machine and exit (connected machines)")
-    .action(async (opts: { open: boolean; json?: boolean; apply?: boolean }) => {
+    // The app's light check (`skillet map --json --no-usage`) keeps only each skill's key, name and job.
+    .addOption(new Option("--no-usage", "With --json, skip the usage pass and the account call").hideHelp())
+    .action(async (opts: { open: boolean; json?: boolean; apply?: boolean; usage: boolean }) => {
       if (opts.apply === true) {
         await applyCommand(opts.json === true);
         return;
       }
       if (opts.json === true) {
-        const reading = await readMap();
+        const reading = await readMap({ usage: opts.usage });
         process.stdout.write(JSON.stringify({ ok: true, scan: reading.payload }, null, 2) + "\n");
         return;
       }

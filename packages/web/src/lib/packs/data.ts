@@ -4,6 +4,7 @@
 // brief, kept verbatim. The other packs list the jobs they will hold and have
 // no skills yet.
 
+import { SECTION_HUES } from './section-hues'
 import type { Pack, PackSkill } from './types'
 
 export const SAMPLE_BRAND = {
@@ -27,7 +28,7 @@ export const PACKS: Pack[] = [
     id: 'marketing',
     number: '01',
     name: 'Marketing',
-    color: '#d43d17',
+    color: SECTION_HUES.marketing.color,
     ink: '#ffffff',
     jobs: ['Short posts', 'Newsletter', 'Cold email', 'Landing page', 'Ads'],
     slots: [

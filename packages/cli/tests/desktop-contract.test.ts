@@ -330,18 +330,20 @@ test("update-approval commands stay device-tier (tray/web reconcile contract)", 
 // ── U13: the app takes over the kit map ─────────────────────────────────────
 //
 // The tray opens the same map the pasted line does (`skillet map`, detached),
-// starts every sync tick with `skillet map --apply --json`, and rescans with
-// `skillet map --json` when a skill folder changed. Each argv must exist at
-// the device tier with the flags the tray passes.
+// starts every sync tick with `skillet map --apply --json`, writes the merges
+// that step left waiting with a detached `skillet map --apply` once the sync is
+// done, and rescans with `skillet map --json --no-usage` when a skill folder
+// changed. Each argv must exist at the device tier with the flags the tray
+// passes.
 
 function deepEqualArgv(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((token, i) => token === b[i]);
 }
 
-test("the tray runs `map --json`, `map --apply --json` and a detached `map` (U13)", () => {
+test("the tray runs `map --json --no-usage`, `map --apply --json`, and a detached `map` and `map --apply` (U13)", () => {
   const source = readFileSync(LIB_RS, "utf8");
   const invoked = desktopInvocations(source);
-  for (const want of [["map", "--json"], ["map", "--apply", "--json"], ["map"]]) {
+  for (const want of [["map", "--json", "--no-usage"], ["map", "--apply", "--json"], ["map"], ["map", "--apply"]]) {
     assert.ok(
       invoked.some((argv) => deepEqualArgv(argv, want)),
       `lib.rs must invoke \`skillet ${want.join(" ")}\`; parsed:\n${invoked.map((a) => `  ${a.join(" ")}`).join("\n")}`,
@@ -356,6 +358,11 @@ test("the tray runs `map --json`, `map --apply --json` and a detached `map` (U13
     source,
     /run_skillet_capture\(&\["map", "--apply", "--json"\]\)/,
     "the apply step must read stdout on every exit code: locked, partial and not-connected are JSON too",
+  );
+  assert.match(
+    source,
+    /spawn_skillet_detached\(&\["map", "--apply"\]\)/,
+    "the merges the apply step left waiting are written by a detached run: the AI tool takes minutes, and the sync never waits on it",
   );
 
   const program = deviceTierProgram();

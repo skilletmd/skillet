@@ -12,7 +12,7 @@ import {
 } from '@skillet/protocol/kit-map'
 import { HOME_PICKS } from '@/lib/packs/home-picks'
 import { KitMapView, type SaveState } from '@/components/map/kit-map-view'
-import { DEMO_SCAN } from '@/app/map/embed/map-embed'
+import { DEMO_SCAN } from '@/app/map/embed/map-demo'
 
 // The framed map draws a scan it was handed and drafts fixes on it. Nothing
 // here touches the network: the view is pure over (scan, drafts), and every

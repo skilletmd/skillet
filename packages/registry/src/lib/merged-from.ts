@@ -11,8 +11,8 @@
 // again whenever the page reads it; one made private since is only counted.
 
 import type { PrismaClient } from '@prisma/client'
-import { KIT_MAP_NAME_MAX } from '@skillet/protocol/kit-map'
-import { tryToSkillId } from '@skillet/protocol/skill-id'
+import { isKitMapDisplayName } from '@skillet/protocol/kit-map'
+import { isWireRef } from '@skillet/protocol/skill-id'
 
 /** What a published merged skill credits. */
 export interface MergedFrom {
@@ -31,20 +31,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** `@owner/slug` in its canonical form, as owner and slug, or null. */
 function refParts(value: unknown): { owner: string; slug: string } | null {
-  if (typeof value !== 'string' || !value.startsWith('@')) return null
-  const id = tryToSkillId(value)
-  if (id === null || `@${id.replace(':', '/')}` !== value) return null
-  const [owner, slug] = id.split(':') as [string, string]
+  if (!isWireRef(value)) return null
+  const [owner, slug] = value.slice(1).split('/') as [string, string]
   return { owner, slug }
-}
-
-function isName(value: unknown): value is string {
-  if (typeof value !== 'string' || value.trim() === '' || value.length > KIT_MAP_NAME_MAX) return false
-  for (let i = 0; i < value.length; i++) {
-    const c = value.charCodeAt(i)
-    if (c < 0x20 || c === 0x7f) return false
-  }
-  return true
 }
 
 /** Of these refs, the ones that are public skills right now. */
@@ -97,32 +86,26 @@ export async function mergedFromBackup(db: Db, userId: string, hash: string): Pr
   const named: Array<{ ref: string; name: string }> = []
   let privateCount = 0
   for (const source of raw.slice(0, MAX_SOURCES)) {
-    if (isRecord(source) && refParts(source.ref) && isName(source.name) && source.private !== true) {
-      named.push({ ref: source.ref as string, name: source.name })
+    if (isRecord(source) && isWireRef(source.ref) && isKitMapDisplayName(source.name) && source.private !== true) {
+      named.push({ ref: source.ref, name: source.name })
     } else privateCount++
   }
   return credit(db, named, privateCount)
 }
 
 /**
- * What a version's metadata says it was merged from, re-checked: a source no
- * longer public is only counted. Null when the version isn't a merge.
+ * What a version's metadata (already parsed, undefined when it wouldn't
+ * parse) says it was merged from, re-checked: a source no longer public is
+ * only counted. Null when the version isn't a merge.
  */
-export async function readMergedFrom(db: Db, metadataJson: string | null): Promise<MergedFrom | null> {
-  if (!metadataJson) return null
-  let meta: unknown
-  try {
-    meta = JSON.parse(metadataJson) as unknown
-  } catch {
-    return null
-  }
+export async function readMergedFrom(db: Db, meta: unknown): Promise<MergedFrom | null> {
   const from = isRecord(meta) ? meta.merged_from : undefined
   if (!isRecord(from) || !Array.isArray(from.sources)) return null
   const stored = typeof from.private === 'number' && Number.isSafeInteger(from.private) && from.private >= 0 ? from.private : 0
   const named: Array<{ ref: string; name: string }> = []
   let privateCount = stored
   for (const source of from.sources.slice(0, MAX_SOURCES)) {
-    if (isRecord(source) && refParts(source.ref) && isName(source.name)) named.push({ ref: source.ref as string, name: source.name })
+    if (isRecord(source) && isWireRef(source.ref) && isKitMapDisplayName(source.name)) named.push({ ref: source.ref, name: source.name })
     else privateCount++
   }
   if (named.length === 0 && privateCount === 0) return null

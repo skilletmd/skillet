@@ -24,15 +24,16 @@
  * originals back. Any other folder at an original's path blocks that original,
  * as it would any restore.
  */
-import { lstat, readdir, readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { canonicalContentHash } from "@skillet/protocol";
+import { KIT_MAP_HASH_RE } from "@skillet/protocol/kit-map";
 import { skilletDir } from "../session-token.js";
 import { atomicWrite } from "../util/atomic.js";
 import { isMapFolderRoot, mapFolderRootOf } from "../util/pathsafe.js";
 import { LEDGER_STAMP, ledgerStamp, moveDir } from "../commands/edits-store.js";
-import { readMapSkillBundle } from "./apply.js";
 import { readMapMergeRecord } from "./merge-run.js";
+import { present, readMapSkillBundle } from "./skill-fs.js";
 
 /** The folder under `~/.skillet` that holds map-remove runs. */
 export const MAP_TRASH_DIRNAME = "map-trash";
@@ -41,9 +42,8 @@ export const MAP_REMOVE_RUN = "map-remove";
 /** The run kind a replace writes: the originals it moved and the merged folders it put in their place. */
 export const MAP_REPLACE_RUN = "map-replace";
 
-type MapRunKind = typeof MAP_REMOVE_RUN | typeof MAP_REPLACE_RUN;
-
-const HASH_RE = /^sha256:[0-9a-f]{64}$/;
+/** The two kinds of map-trash run, as `skillet restore` lists them. */
+export type MapRunKind = typeof MAP_REMOVE_RUN | typeof MAP_REPLACE_RUN;
 
 const MANIFEST = "manifest.json";
 
@@ -149,16 +149,6 @@ export interface MapTrashRestore {
   /** Always empty: a map-remove restore never re-imports. */
   reimported: string[];
   skipped: Array<{ slug: string; reason: string }>;
-}
-
-/** Present without following links: a link counts, so nothing is ever moved onto or through one. */
-async function present(path: string): Promise<boolean> {
-  try {
-    await lstat(path);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function writeLedger(runDir: string, ledger: MapTrashLedger): Promise<void> {
@@ -276,7 +266,12 @@ export async function listMapTrash(): Promise<MapTrashRun[]> {
 
 const isText = (value: unknown): value is string => typeof value === "string" && value.length > 0;
 
-/** A placed folder a ledger names, or null when it points anywhere a merged folder can't be. */
+/**
+ * A folder a ledger names, `<root>/<folder>`, or null when it points anywhere
+ * a map folder can't be: `root` exactly one of the compile-time allowed roots,
+ * `folder` one plain name, and `from` spelled as the two joined. A merged
+ * folder a replace placed, and where a moved original goes back to.
+ */
 function placedOf(value: unknown): MapPlacedFolder | null {
   if (typeof value !== "object" || value === null) return null;
   const { root, folder, from } = value as Record<string, unknown>;
@@ -289,14 +284,14 @@ function placedOf(value: unknown): MapPlacedFolder | null {
 /** The replace record a ledger holds, or null for a remove run or one that doesn't read. */
 function replaceOf(ledger: MapTrashLedger): MapReplaceRecord | null {
   if (ledger.kind !== MAP_REPLACE_RUN) return null;
-  if (!isText(ledger.change) || !isText(ledger.merge) || typeof ledger.merged !== "string" || !HASH_RE.test(ledger.merged)) {
+  if (!isText(ledger.change) || !isText(ledger.merge) || typeof ledger.merged !== "string" || !KIT_MAP_HASH_RE.test(ledger.merged)) {
     return null;
   }
   const placed = Array.isArray(ledger.placed) ? ledger.placed.map(placedOf).filter((p): p is MapPlacedFolder => p !== null) : [];
   const kit = Array.isArray(ledger.kit)
     ? ledger.kit.flatMap((k) => {
         const { key, owner, slug } = (k ?? {}) as Record<string, unknown>;
-        return typeof key === "string" && HASH_RE.test(key) && isText(owner) && isText(slug) ? [{ key, owner, slug }] : [];
+        return typeof key === "string" && KIT_MAP_HASH_RE.test(key) && isText(owner) && isText(slug) ? [{ key, owner, slug }] : [];
       })
     : [];
   return { change: ledger.change, merge: ledger.merge, merged: ledger.merged, placed, kit };
@@ -330,15 +325,6 @@ function isPlainName(name: unknown): name is string {
   );
 }
 
-/** Where an item may go back to, or null when its ledger entry can't be trusted. */
-function destinationOf(item: Record<string, unknown>): string | null {
-  const { root, folder, from } = item;
-  if (typeof root !== "string" || !isMapFolderRoot(root) || !isPlainName(folder)) return null;
-  const dest = join(root, folder);
-  if (from !== dest || mapFolderRootOf(dest) !== root) return null;
-  return dest;
-}
-
 /** The trashed copy, or null unless it sits inside this run. */
 function sourceOf(item: Record<string, unknown>, runDir: string): string | null {
   const { to } = item;
@@ -367,7 +353,7 @@ export async function restoreMapTrash(runId: string): Promise<MapTrashRestore | 
   for (const raw of ledger.items) {
     const name = itemName(raw);
     const item = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
-    const dest = destinationOf(item);
+    const dest = placedOf(item)?.from ?? null;
     if (dest === null) {
       skipped.push({ slug: name, reason: "unsafe_destination" });
       continue;

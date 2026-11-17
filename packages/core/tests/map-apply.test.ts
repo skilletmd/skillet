@@ -25,16 +25,9 @@ const HOME = vi.hoisted(() => {
 vi.mock("../src/machine-identity.js", () => ({ stableMachineId: () => "m-test" }));
 
 import { authConnectFreshPair } from "../src/commands/auth-connect-pair.js";
-import {
-  readMapSkillBundle,
-  runMapApply,
-  type MapApplyClient,
-  type MapBackupBody,
-  type MapBackupPut,
-  type MapChangeInput,
-  type MapFillResult,
-} from "../src/map/apply.js";
-import { acquireMapSaveLock, mapSaveLockPath, readMapSaveLock } from "../src/map/save-lock.js";
+import { runMapApply, type MapApplyClient, type MapChangeInput, type MapFillResult } from "../src/map/apply.js";
+import { readMapSkillBundle, type MapBackupBody, type MapBackupPut } from "../src/map/skill-fs.js";
+import { acquireMapSaveLock, mapSaveLockPath } from "../src/map/save-lock.js";
 import { scanMap, type MapScanResult } from "../src/map/scan.js";
 import { mapTrashRoot } from "../src/map/remove-trash.js";
 import { readState, writeState } from "../src/kit/store.js";
@@ -436,6 +429,38 @@ describe("backups", () => {
     expect(res.left.backups).toBe(0);
   });
 
+  it("puts up to three backups at once and tells each outcome in map order, however they land", async () => {
+    const names = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot"];
+    for (const name of names) await writeSkill(join(CLAUDE, name), name);
+    const fake = account();
+    const put = fake.client.putBackup.bind(fake.client);
+    let inFlight = 0;
+    let most = 0;
+    const answered: string[] = [];
+    fake.client.putBackup = async (hash, body) => {
+      inFlight++;
+      most = Math.max(most, inFlight);
+      // The later a skill comes in the map, the sooner its upload answers.
+      await new Promise((resolve) => setTimeout(resolve, 15 * (names.length - names.indexOf(body.name))));
+      inFlight--;
+      answered.push(body.name);
+      if (body.name === "bravo" || body.name === "echo") return { ok: false, reason: "secret", file: `${body.name}.md`, final: true };
+      return put(hash, body);
+    };
+
+    const res = await saveWith(fake, []);
+
+    expect(most).toBe(3);
+    expect(answered).not.toEqual(names);
+    expect(res.notBackedUp).toEqual([
+      { name: "bravo", reason: "secret", file: "bravo.md" },
+      { name: "echo", reason: "secret", file: "echo.md" },
+    ]);
+    expect(res.counts.backups).toBe(4);
+    expect(res.left.backups).toBe(0);
+    expect(fake.backups.size).toBe(4);
+  });
+
   it("skips hashes the account already holds", async () => {
     await writeSkill(join(CLAUDE, "kept"), "kept");
     const before = await scan();
@@ -702,7 +727,7 @@ describe("the save lock", () => {
   it("a second Save waits while the first holds the lock, says why, and goes once it's released", async () => {
     const first = await acquireMapSaveLock();
     expect(mapSaveLockPath()).toBe(join(SKILLET, "map-save.lock"));
-    expect(await readMapSaveLock()).toMatchObject({ pid: process.pid });
+    expect(JSON.parse(readFileSync(mapSaveLockPath(), "utf8")).pid).toBe(process.pid);
 
     const waits: number[] = [];
     const second = acquireMapSaveLock({ waitMs: 5_000, pollMs: 20, onWait: (holder) => waits.push(holder.pid) });
@@ -711,7 +736,7 @@ describe("the save lock", () => {
     await first.release();
 
     const lock = await second;
-    expect(await readMapSaveLock()).toMatchObject({ pid: process.pid });
+    expect(JSON.parse(readFileSync(mapSaveLockPath(), "utf8")).pid).toBe(process.pid);
     await lock.release();
     expect(existsSync(mapSaveLockPath())).toBe(false);
   });
@@ -720,7 +745,6 @@ describe("the save lock", () => {
     const gone = spawnSync(process.execPath, ["-e", "process.exit(0)"]).pid;
     await mkdir(SKILLET, { recursive: true });
     await writeFile(mapSaveLockPath(), JSON.stringify({ pid: gone, startedAt: new Date().toISOString(), token: "x" }));
-    expect(await readMapSaveLock()).toBeNull();
 
     const waits: number[] = [];
     const lock = await acquireMapSaveLock({ waitMs: 1_000, pollMs: 20, onWait: (holder) => waits.push(holder.pid) });

@@ -21,13 +21,14 @@
  * merges waiting for this computer with the person's own AI tool (U14, KTD12),
  * and the CLI says so first, because they take minutes. A merge that can't be
  * written waits with its reason; one the CLI exits before writing is written
- * by the app's `skillet map --apply` or the next Save.
+ * by the next `skillet map --apply`, which the app starts after a sync whose
+ * apply step left merges waiting, or by the next Save.
  *
  * The registry only ever sees hashes, names and jobs, plus a merge's own text
  * and samples: no path leaves this computer, and the proof never goes to the
  * registry.
  */
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { Writable } from "node:stream";
 import {
   REGISTRY_API,
@@ -36,6 +37,7 @@ import {
   add,
   authConnectFreshPair,
   defaultMachineLabel,
+  emptyMapApplyResult,
   findMergeWriter,
   loadSessionToken,
   materializeSkills,
@@ -43,6 +45,7 @@ import {
   readState,
   runMapApply,
   runMapMerges,
+  sha256,
   SignatureError,
   type Adapter,
   type MapApplyClient,
@@ -60,6 +63,11 @@ import {
 } from "@skillet/core";
 import { jobById } from "@skillet/protocol/jobs";
 import {
+  KIT_MAP_FILE_NAME_MAX,
+  KIT_MAP_HANDLE_RE,
+  KIT_MAP_NAME_MAX,
+  KIT_MAP_SECRET_RE,
+  KIT_MAP_SESSION_ID_RE,
   parseKitMapDocument,
   parseKitMapMerge,
   parseKitMapPendingChange,
@@ -70,7 +78,7 @@ import {
   type KitMapPendingChange,
   type KitMapSaveCounts,
 } from "@skillet/protocol/kit-map";
-import { tryToSkillId } from "@skillet/protocol/skill-id";
+import { isWireRef } from "@skillet/protocol/skill-id";
 import { ADDITIONAL_ADAPTERS, BASELINE_GLOBAL_ADAPTERS } from "../cli-context.js";
 import { fail, ok } from "../cli-colors.js";
 import type { MapFrameLink, MapSaveHandler } from "./loopback-server.js";
@@ -91,9 +99,6 @@ const REQUEST_TIMEOUT_MS = 120_000;
 const EXPIRY_GRACE_MS = 60_000;
 /** How long the map stays up after Save ends it, so the page's next read carries the last status. */
 const FINISH_GRACE_MS = 1_500;
-const SESSION_ID_RE = /^[0-9a-f]{32}$/;
-const SECRET_RE = /^[A-Za-z0-9_-]{32,256}$/;
-const HANDLE_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,38}$/;
 
 // ---------------------------------------------------------------------------
 // Talking to the registry
@@ -158,24 +163,43 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** One credential's calls: writes spaced by `paceMs`, and a 429 waited out per its Retry-After. */
+/**
+ * One credential's calls: writes spaced by `paceMs`, and a 429 waited out per
+ * its Retry-After. Writes can be sent several at once (Save's backups): each
+ * takes its turn when it is sent, before it waits, so their starts stay
+ * spaced, and a 429 holds every write until its Retry-After has passed.
+ */
 class Registry {
-  private lastWrite = 0;
+  /** The turn the next write takes: one `paceMs` after the last one taken. */
+  private nextWrite = 0;
+  /** When the last write started. */
+  private lastStart = 0;
+  /** No write starts before this: a 429's Retry-After. */
+  private holdUntil = 0;
 
   constructor(
     private readonly wire: Wire,
     private readonly token: string | null,
   ) {}
 
+  /** Wait for this write's turn. */
+  private async writeTurn(): Promise<void> {
+    const pace = this.wire.paceMs;
+    const turn = Math.max(Date.now(), this.nextWrite);
+    this.nextWrite = turn + pace;
+    for (;;) {
+      const wait = Math.max(turn, this.lastStart + pace, this.holdUntil) - Date.now();
+      if (wait <= 0 || this.wire.signal?.aborted) break;
+      await sleep(wait, this.wire.signal);
+    }
+    this.lastStart = Date.now();
+  }
+
   async send(method: string, path: string, body?: unknown, opts: { followRateLimit?: boolean } = {}): Promise<Answer> {
     const follow = opts.followRateLimit ?? true;
     for (let attempt = 0; ; attempt++) {
       if (this.wire.signal?.aborted) throw new Stopped();
-      if (method !== "GET" && this.wire.paceMs > 0) {
-        const wait = this.lastWrite + this.wire.paceMs - Date.now();
-        if (wait > 0) await sleep(wait, this.wire.signal);
-        this.lastWrite = Date.now();
-      }
+      if (method !== "GET" && this.wire.paceMs > 0) await this.writeTurn();
       const request = requestSignal(this.wire.signal, REQUEST_TIMEOUT_MS);
       let status: number;
       let parsed: unknown;
@@ -198,7 +222,9 @@ class Registry {
         request.done();
       }
       if (status === 429 && follow && attempt < MAX_RATE_RETRIES) {
-        await sleep(retryAfterMs(retryAfter), this.wire.signal);
+        const wait = retryAfterMs(retryAfter);
+        this.holdUntil = Math.max(this.holdUntil, Date.now() + wait);
+        await sleep(wait, this.wire.signal);
         continue;
       }
       return { status, body: parsed };
@@ -305,19 +331,11 @@ interface ClientDeps {
 
 /** The source-maker lookup takes this many hashes a call. */
 const LOOKUP_BATCH = 200;
-const NAME_MAX = 200;
-
-/** A ref in its canonical `@owner/slug` form, as a backup's sources must carry it. */
-function canonicalRef(value: unknown): string | null {
-  if (typeof value !== "string" || !value.startsWith("@")) return null;
-  const id = tryToSkillId(value);
-  return id !== null && `@${id.replace(":", "/")}` === value ? value : null;
-}
 
 /** A name a source is credited by: one line, never blank. */
 function creditName(value: unknown): string | null {
   if (typeof value !== "string") return null;
-  const name = safeText(value, NAME_MAX);
+  const name = safeText(value, KIT_MAP_NAME_MAX);
   return name === "" ? null : name;
 }
 
@@ -346,9 +364,9 @@ function applyClient({ wire, token, fill }: ClientDeps): MapApplyClient & MapMer
         }
         for (const row of answer.body.sources as unknown[]) {
           if (!isRecord(row) || typeof row.key !== "string" || !asked.includes(row.key)) continue;
-          const ref = canonicalRef(row.ref);
           const name = creditName(row.name);
-          if (ref !== null && name !== null) found.set(row.key, { ref, name });
+          // Only a ref in its canonical `@owner/slug` form, as a backup's sources must carry it.
+          if (isWireRef(row.ref) && name !== null) found.set(row.key, { ref: row.ref, name });
         }
       }
       return found;
@@ -581,29 +599,15 @@ function safeText(value: string, max: number): string {
   return out.length > max ? out.slice(0, max).trim() : out;
 }
 
-function emptyResult(): MapApplyResult {
-  return {
-    result: "applied",
-    counts: { backups: 0, removals: 0, fills: 0, merges: 0 },
-    left: { backups: 0, removals: 0, fills: 0, merges: 0 },
-    notBackedUp: [],
-    kept: [],
-    unremoved: [],
-    refused: [],
-    trashRun: null,
-    changed: false,
-  };
-}
-
 function hasAny(counts: KitMapSaveCounts): boolean {
   return Object.values(counts).some((n) => n > 0);
 }
 
 function reportOf(result: MapApplyResult): Record<string, unknown> {
   const notBackedUp = result.notBackedUp.slice(0, 1_000).map((skipped) => {
-    const file = skipped.file !== undefined ? safeText(fileName(skipped.file) ?? "", 255) : "";
+    const file = skipped.file !== undefined ? safeText(fileName(skipped.file) ?? "", KIT_MAP_FILE_NAME_MAX) : "";
     return {
-      name: safeText(skipped.name, 200) || "a skill",
+      name: safeText(skipped.name, KIT_MAP_NAME_MAX) || "a skill",
       reason: skipped.reason,
       ...(file !== "" ? { file } : {}),
     };
@@ -714,7 +718,7 @@ export function createMapSaveFlow(opts: MapSaveFlowOptions): MapSaveFlow {
     if (answer.status !== 200) {
       return stopBeforeAnything(link, "registry-unreachable", "Couldn't reach Skillet. Press Save to try again.");
     }
-    if (!HANDLE_RE.test(handle)) {
+    if (!KIT_MAP_HANDLE_RE.test(handle)) {
       return stopBeforeAnything(link, "username-required", "Pick a username on skillet.md, then press Save again.");
     }
     link.status("confirm", { handle });
@@ -727,7 +731,7 @@ export function createMapSaveFlow(opts: MapSaveFlowOptions): MapSaveFlow {
     const wire = { ...wireFor(link), paceMs: 0 };
     const anonymous = new Registry(wire, null);
     const proof = randomBytes(32).toString("base64url");
-    const proofHash = createHash("sha256").update(proof, "utf8").digest("hex");
+    const proofHash = sha256(proof);
     let created: Answer;
     try {
       created = await anonymous.send("POST", "/map-sessions", { label, proof_hash: proofHash }, { followRateLimit: false });
@@ -742,7 +746,7 @@ export function createMapSaveFlow(opts: MapSaveFlowOptions): MapSaveFlow {
     const id = typeof session.id === "string" ? session.id : "";
     const secret = typeof session.poll_secret === "string" ? session.poll_secret : "";
     const expiresAt = typeof session.expires_at === "number" ? session.expires_at * 1000 : 0;
-    if (created.status !== 201 || !SESSION_ID_RE.test(id) || !SECRET_RE.test(secret) || !Number.isSafeInteger(expiresAt)) {
+    if (created.status !== 201 || !KIT_MAP_SESSION_ID_RE.test(id) || !KIT_MAP_SECRET_RE.test(secret) || !Number.isSafeInteger(expiresAt)) {
       return stopBeforeAnything(link, "registry-error", "Skillet couldn't start this save. Press Save to try again.");
     }
 
@@ -824,7 +828,7 @@ export function createMapSaveFlow(opts: MapSaveFlowOptions): MapSaveFlow {
     } catch {
       if (link.signal.aborted) return;
       print(fail("Another Save is still running on this machine."));
-      await stoppedPartway(link, connection, { ...emptyResult(), result: "failed", reason: "locked" });
+      await stoppedPartway(link, connection, { ...emptyMapApplyResult(), result: "failed", reason: "locked" });
       return;
     }
 
@@ -848,7 +852,7 @@ export function createMapSaveFlow(opts: MapSaveFlowOptions): MapSaveFlow {
         signal: link.signal,
       });
     } catch {
-      result = { ...emptyResult(), result: "failed", reason: "error" };
+      result = { ...emptyMapApplyResult(), result: "failed", reason: "error" };
     }
     if (result.changed) changed = true;
     for (const line of saveSummary(result)) print(line);
@@ -936,6 +940,13 @@ export interface MapApplyOnlyOptions {
   lockWaitMs?: number;
   /** Finds the AI tool that writes waiting merges. Defaults to this computer's Claude Code, then Codex. */
   mergeWriter?: () => Promise<MergeWriter | null>;
+  /**
+   * False stops once the changes are made, writing no merge: the merges
+   * waiting for this computer are only counted, in `left.merges`. The app's
+   * sync tick runs it so, and starts `skillet map --apply` on its own once
+   * the sync is done when one waits, since a merge runs the AI tool for minutes.
+   */
+  writeMerges?: boolean;
 }
 
 export type MapApplyOnlyResult = MapSaveResult | { result: "not-connected" } | { result: "locked" };
@@ -944,9 +955,10 @@ export type MapApplyOnlyResult = MapSaveResult | { result: "not-connected" } | {
  * Make this computer's waiting changes, with no frame and no new drafts: what
  * the app's sync runs, and what finishes a Save that stopped partway. Only a
  * connected computer has waiting changes. Once they're made, the merges
- * waiting for this computer are written, and the result counts them: `counts`
- * the ones written, `left` the ones still waiting. A merge that waits doesn't
- * fail the run, since the next one tries again.
+ * waiting for this computer are written (unless `writeMerges` is false), and
+ * the result counts them: `counts` the ones written, `left` the ones still
+ * waiting. A merge that waits doesn't fail the run, since the next one tries
+ * again.
  */
 export async function runMapApplyOnly(opts: MapApplyOnlyOptions): Promise<MapApplyOnlyResult> {
   const device = await readDeviceFile();
@@ -972,10 +984,13 @@ export async function runMapApplyOnly(opts: MapApplyOnlyOptions): Promise<MapApp
     try {
       scan = await opts.rescan();
     } catch {
-      return { ...emptyResult(), result: "failed", reason: "scan-failed" };
+      return { ...emptyMapApplyResult(), result: "failed", reason: "scan-failed" };
     }
     const applied = await runMapApply({ mode: "apply", scan, wire: opts.wire, client });
     if (applied.result !== "applied") return applied;
+    if (opts.writeMerges === false) {
+      return { ...applied, left: { ...applied.left, merges: await waitingMerges(client) } };
+    }
     // Removes and picks change what's on this computer; otherwise the scan still holds.
     const moved = applied.counts.removals > 0 || applied.counts.fills > 0;
     const merges = await runMapMerges({
@@ -995,6 +1010,15 @@ export async function runMapApplyOnly(opts: MapApplyOnlyOptions): Promise<MapApp
     };
   } finally {
     await lock.release();
+  }
+}
+
+/** How many merges wait for this computer; none when the account can't say, so the next run asks again. */
+async function waitingMerges(client: MapMergeClient): Promise<number> {
+  try {
+    return (await client.listChanges()).filter((change) => change.kind === "merge").length;
+  } catch {
+    return 0;
   }
 }
 

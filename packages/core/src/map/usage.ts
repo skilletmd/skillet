@@ -38,6 +38,7 @@ import { open, readFile, readdir, stat, type FileHandle } from "node:fs/promises
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { SKILL_ENTRYPOINT } from "@skillet/protocol";
+import type { KitMapHistory, KitMapUsageState } from "@skillet/protocol/kit-map";
 import { readRouteHistory, type RouteHistory } from "../kit/route-history.js";
 import { CLAUDE_ENV_ROOT } from "../util/pathsafe.js";
 import { isMissingError } from "./plugin-sources.js";
@@ -50,7 +51,7 @@ export const CODEX_READ_BUDGET_MS = 3_000;
 /** Claude Code's `skillUsage` seems to keep this many skills at most. */
 export const CLAUDE_SKILL_USAGE_CAP = 100;
 
-export type MapUsageState = "used" | "unused" | "unknown";
+export type MapUsageState = KitMapUsageState;
 
 /** Why a tool that loads a skill can't tell whether it ran, as a short code. */
 export type MapUsageGapReason =
@@ -71,7 +72,7 @@ export type MapUsageGapReason =
 export type MapUsageReason = "no-recent-run" | MapUsageGapReason;
 
 /** How much of a tool's history Skillet read, as the kit map's `looked` list says it. */
-export type MapUsageHistory = "read" | "short" | "none";
+export type MapUsageHistory = KitMapHistory;
 
 export interface MapUsageGap {
   tool: string;

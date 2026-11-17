@@ -198,7 +198,7 @@ Read/status commands accept `--json`. Shapes are stable per command.
 }
 ```
 
-**`skillet map --apply --json`** makes the changes your account holds for this machine (the ones Save recorded, or ones you picked on skillet.md) and exits, with no map and no browser: what the app's sync runs. It returns `{ ok, data: { result, counts, left, … } }`, and exits **1** when something is left for the next run. On a machine that isn't connected it emits the auth envelope above and exits **3**.
+**`skillet map --apply --json`** makes the changes your account holds for this machine (the ones Save recorded, or ones you picked on skillet.md) and exits, with no map and no browser: what the app's sync runs. It writes no merge, since your AI tool takes minutes to write one: merges waiting for this machine are counted in `left.merges`, and `skillet map --apply` writes them. It returns `{ ok, data: { result, counts, left, … } }`, and exits **1** when anything but a merge is left for the next run. On a machine that isn't connected it emits the auth envelope above and exits **3**.
 
 **`skillet sync --check --json`** uses the same auth envelope when unpaired. **`skillet scan --json`** and **`skillet status --json`** share the same scan-report shape; exit 1 when `hasQuarantined` is true.
 

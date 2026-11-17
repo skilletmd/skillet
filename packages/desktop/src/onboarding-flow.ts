@@ -8,8 +8,11 @@
  * "Open my map", the same `skillet map` the line runs (R28). Its Save
  * connects the computer through the browser, which after a dropped-folder
  * Save is already signed in, so that's one confirm. While the map is open,
- * onboarding looks at `auth status` every few seconds and moves to sync the
- * moment the Save lands. The pair code stays as the fallback.
+ * onboarding moves to sync the moment the Save lands: every few seconds it
+ * stats the files that hold this computer's connection, and asks `auth
+ * status` again only when one changed, or while the last answer held a
+ * credential the account didn't confirm, which no file change may follow.
+ * The pair code stays as the fallback.
  */
 import { parseCliJson } from './cli-json'
 import { escapeHtml } from './escape-html'
@@ -25,17 +28,26 @@ export interface OnboardingAuth {
 
 const NOT_CONNECTED: OnboardingAuth = { connected: false, handle: null }
 
-/** `auth status --json`, read with the tray's own rule for a connected computer. Anything unreadable is not connected. */
-export function readOnboardingAuth(raw: string): OnboardingAuth {
+/** `auth status --json` as onboarding reads it, and whether the computer holds a credential at all. */
+function readAuthStatus(raw: string): { auth: OnboardingAuth; credential: boolean } {
   let auth: unknown
   try {
     auth = parseCliJson<unknown>(raw, 'auth status')
   } catch {
-    return NOT_CONNECTED
+    return { auth: NOT_CONNECTED, credential: false }
   }
-  if (typeof auth !== 'object' || auth === null || !('bearer' in auth)) return NOT_CONNECTED
-  const shown = resolveTrayAuthPresentation(auth as TrayAuthInput)
-  return shown.tier === 'linked' ? { connected: true, handle: shown.displayHandle } : NOT_CONNECTED
+  if (typeof auth !== 'object' || auth === null || !('bearer' in auth)) return { auth: NOT_CONNECTED, credential: false }
+  const input = auth as TrayAuthInput
+  const shown = resolveTrayAuthPresentation(input)
+  return {
+    auth: shown.tier === 'linked' ? { connected: true, handle: shown.displayHandle } : NOT_CONNECTED,
+    credential: (input.bearer?.kind ?? 'none') !== 'none',
+  }
+}
+
+/** `auth status --json`, read with the tray's own rule for a connected computer. Anything unreadable is not connected. */
+export function readOnboardingAuth(raw: string): OnboardingAuth {
+  return readAuthStatus(raw).auth
 }
 
 // ── The welcome step ────────────────────────────────────────────────────────
@@ -88,13 +100,18 @@ export function welcomeActionsHtml(noun = 'this computer', opts: { reopen?: bool
 export interface OnboardingFlowDeps {
   /** `auth status --json` (Tauri `auth_status`). */
   authStatus(): Promise<string>
+  /**
+   * Stamps of the files that hold this computer's connection, `device.json`
+   * and `session.json` in the Skillet home (Tauri `auth_file_stamps`).
+   */
+  authStamps(): Promise<readonly (string | null)[]>
   /** Start `skillet map` (Tauri `open_map`). */
   openMap(): Promise<unknown>
   /** Every step change, to repaint. */
   onStep(step: OnboardingStep): void
   /** Connected with no pair code: it already was, or the map's Save just did it. Called before the step moves to sync. */
   onConnected(auth: OnboardingAuth, how: 'already' | 'map'): void
-  /** How often to look at `auth status` while the map is open. */
+  /** How often to look for the connection while the map is open. */
   pollMs?: number
   /** How long the first `auth status` may take before welcome shows anyway. */
   startWaitMs?: number
@@ -121,6 +138,13 @@ export function createOnboardingFlow(deps: OnboardingFlowDeps): OnboardingFlow {
   let step: OnboardingStep = 'start'
   let timer: ReturnType<typeof setTimeout> | null = null
   let waitingSince = 0
+  /** The connection files' stamps when `auth status` last ran; null when they couldn't be read. */
+  let askedAt: string | null = null
+  /**
+   * Ask `auth status` at the next look whatever the stamps say: its last answer
+   * held a credential the account didn't confirm, or it couldn't be read.
+   */
+  let askAgain = false
 
   const stopWaiting = (): void => {
     if (timer !== null) clearTimeout(timer)
@@ -137,10 +161,22 @@ export function createOnboardingFlow(deps: OnboardingFlowDeps): OnboardingFlow {
     deps.onConnected(auth, how)
     go('sync')
   }
-  const read = async (): Promise<OnboardingAuth> => {
+  const stamps = async (): Promise<string | null> => {
     try {
-      return readOnboardingAuth(await deps.authStatus())
+      return JSON.stringify(await deps.authStamps())
     } catch {
+      return null
+    }
+  }
+  /** `auth status`, given the stamps taken just before it, so a write in between still counts as a change. */
+  const ask = async (stamped: string | null): Promise<OnboardingAuth> => {
+    askedAt = stamped
+    try {
+      const answer = readAuthStatus(await deps.authStatus())
+      askAgain = answer.credential && !answer.auth.connected
+      return answer.auth
+    } catch {
+      askAgain = true
       return NOT_CONNECTED
     }
   }
@@ -148,7 +184,11 @@ export function createOnboardingFlow(deps: OnboardingFlowDeps): OnboardingFlow {
   const look = async (): Promise<void> => {
     timer = null
     if (step !== 'map') return
-    const auth = await read()
+    // Connecting writes those files, so while they hold what they held at the
+    // last ask, nothing connected the computer since.
+    const now = await stamps()
+    if (step !== 'map') return
+    const auth = askAgain || now === null || now !== askedAt ? await ask(now) : NOT_CONNECTED
     // The person moved on while the CLI answered.
     if (step !== 'map') return
     if (auth.connected) {
@@ -163,7 +203,7 @@ export function createOnboardingFlow(deps: OnboardingFlowDeps): OnboardingFlow {
       return step
     },
     async start() {
-      const answer = read()
+      const answer = stamps().then(ask)
       let fallback: ReturnType<typeof setTimeout> | undefined
       const slow = new Promise<null>((done) => {
         fallback = setTimeout(() => done(null), startWaitMs)
