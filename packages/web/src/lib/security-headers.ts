@@ -21,8 +21,35 @@ export function resolveCspMode(raw: string | undefined): CspMode {
   return 'report-only'
 }
 
-/** Build the CSP value string for the given environment. */
-export function buildCspValue({ isDev }: { isDev: boolean }): string {
+/**
+ * The one page another origin may frame: `skillet map` serves a page on the
+ * person's computer that frames this one and hands it the scan by postMessage.
+ */
+export const MAP_EMBED_PATH = '/map/embed'
+
+/**
+ * The three rules /map/embed swaps into the site policy. Framing from the
+ * loopback page only, and no connection and no image that isn't inline, so
+ * nothing about the person's skills can leave the frame before Save: no fetch,
+ * no beacon, no avatar URL that would tell an image host which jobs are empty.
+ * Dev keeps the HMR websocket, as the site policy does.
+ */
+function mapEmbedRules(isDev: boolean): [string, string][] {
+  return [
+    ['frame-ancestors', 'http://127.0.0.1:* http://localhost:*'],
+    ['connect-src', isDev ? 'ws: wss:' : "'none'"],
+    ['img-src', 'data: blob:'],
+  ]
+}
+
+const joinRules = (rules: [string, string][]) => rules.map(([name, value]) => `${name} ${value}`).join('; ')
+
+/**
+ * Build the CSP value string for the given environment. `embed` is the
+ * /map/embed variant: the same policy with {@link mapEmbedRules} in place of
+ * its framing, connection and image rules.
+ */
+export function buildCspValue({ isDev, embed = false }: { isDev: boolean; embed?: boolean }): string {
   const scriptSrc = [
     "'self'",
     "'unsafe-inline'",
@@ -49,19 +76,21 @@ export function buildCspValue({ isDev }: { isDev: boolean }): string {
     ...(isDev ? ['ws:', 'wss:'] : []),
   ]
 
-  const directives: string[] = [
-    `default-src 'self'`,
-    `script-src ${scriptSrc.join(' ')}`,
-    `style-src ${styleSrc.join(' ')}`,
-    `img-src ${imgSrc.join(' ')}`,
-    `font-src 'self'`,
-    `connect-src ${connectSrc.join(' ')}`,
-    `form-action 'self'`,
-    `frame-ancestors 'none'`,
-    `frame-src 'none'`,
-    `object-src 'none'`,
-    `base-uri 'self'`,
+  const site: [string, string][] = [
+    ['default-src', "'self'"],
+    ['script-src', scriptSrc.join(' ')],
+    ['style-src', styleSrc.join(' ')],
+    ['img-src', imgSrc.join(' ')],
+    ['font-src', "'self'"],
+    ['connect-src', connectSrc.join(' ')],
+    ['form-action', "'self'"],
+    ['frame-ancestors', "'none'"],
+    ['frame-src', "'none'"],
+    ['object-src', "'none'"],
+    ['base-uri', "'self'"],
   ]
+  const swapped = embed ? new Map(mapEmbedRules(isDev)) : null
+  const directives = [joinRules(site.map(([name, value]): [string, string] => [name, swapped?.get(name) ?? value]))]
   // Only in production — in dev it would try to upgrade loopback http/ws to TLS
   // that isn't listening, breaking the registry call + HMR.
   if (!isDev) directives.push('upgrade-insecure-requests')
@@ -77,23 +106,38 @@ export interface SecurityHeader {
 /**
  * The full header list to attach. CSP header name depends on mode
  * (`off` omits CSP entirely); companion headers are always present.
+ *
+ * Route-aware for exactly one path: /map/embed carries the embed variant of the
+ * site policy and no `X-Frame-Options`, so the loopback page can frame it. A
+ * second header could not loosen the site policy (browsers apply every enforced
+ * policy), which is why the variant replaces it rather than adding to it. And
+ * because report-only and off enforce nothing, the embed then also gets its
+ * three rules as an enforced header of their own: the framing rule and the
+ * privacy boundary hold in every mode, the rollback switch included.
  */
 export function buildSecurityHeaders({
   mode,
   isDev,
+  pathname,
 }: {
   mode: CspMode
   isDev: boolean
+  /** The request path. Only {@link MAP_EMBED_PATH} changes anything. */
+  pathname?: string
 }): SecurityHeader[] {
+  const embed = pathname === MAP_EMBED_PATH
   const headers: SecurityHeader[] = [
     { key: 'X-Content-Type-Options', value: 'nosniff' },
     { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-    { key: 'X-Frame-Options', value: 'DENY' },
   ]
+  if (!embed) headers.push({ key: 'X-Frame-Options', value: 'DENY' })
   if (mode !== 'off') {
     const key =
       mode === 'enforce' ? 'Content-Security-Policy' : 'Content-Security-Policy-Report-Only'
-    headers.push({ key, value: buildCspValue({ isDev }) })
+    headers.push({ key, value: buildCspValue({ isDev, embed }) })
+  }
+  if (embed && mode !== 'enforce') {
+    headers.push({ key: 'Content-Security-Policy', value: joinRules(mapEmbedRules(isDev)) })
   }
   return headers
 }

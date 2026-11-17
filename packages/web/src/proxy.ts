@@ -19,8 +19,12 @@ import { buildSecurityHeaders, resolveCspMode } from '@/lib/security-headers'
 
 let warnedNonEnforcing = false
 
-/** Attach the static CSP + companion security headers (defense-in-depth). */
-function withSecurityHeaders(res: NextResponse): NextResponse {
+/**
+ * Attach the static CSP + companion security headers (defense-in-depth).
+ * `pathname` is passed only where a document renders: the headers are
+ * route-aware for /map/embed, the one page another origin may frame.
+ */
+function withSecurityHeaders(res: NextResponse, pathname?: string): NextResponse {
   const isDev = process.env.NODE_ENV !== 'production'
   const mode = resolveCspMode(process.env.WEB_CSP_MODE)
 
@@ -33,7 +37,7 @@ function withSecurityHeaders(res: NextResponse): NextResponse {
     )
   }
 
-  for (const { key, value } of buildSecurityHeaders({ mode, isDev })) {
+  for (const { key, value } of buildSecurityHeaders({ mode, isDev, pathname })) {
     res.headers.set(key, value)
   }
   return res
@@ -67,6 +71,7 @@ function nextWithPathname(req: {
     NextResponse.next({
       request: { headers: requestHeaders },
     }),
+    pathname,
   )
   // This URL has (or may have) a Markdown twin at the same address, so a shared
   // cache must key on Accept. Appended, never assigned: Next's own RSC routing

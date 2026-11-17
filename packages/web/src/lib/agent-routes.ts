@@ -81,6 +81,8 @@ export const KNOWN_TOP_LEVEL_SEGMENTS: ReadonlySet<string> = new Set([
   'lab',
   'legal',
   'login',
+  // The kit map: the saved map, the frame `skillet map` loads, the save tab.
+  'map',
   'moderation',
   'news',
   'notifications',
@@ -190,6 +192,9 @@ export type RegistryLookup =
 
 const SKILL_SUBPAGES = new Set(['edit', 'propose', 'review'])
 
+/** The pages under /map. */
+const MAP_PAGES: ReadonlySet<string> = new Set(['embed', 'save'])
+
 /**
  * Classify a pathname. Callers pass an already-normalized pathname (leading
  * slash, no query, no trailing slash except for the root).
@@ -258,6 +263,15 @@ export function classifyRoute(pathname: string): RouteVerdict {
     if (!ARENA_ROUND_SLUGS.has(second!)) return { kind: 'unknown' }
     if (segments.length === 2) return { kind: 'known' }
     if (segments.length === 3 && third === 'vote') return { kind: 'known' }
+    return { kind: 'unknown' }
+  }
+
+  // /map is the saved kit map, /map/embed the frame the page `skillet map`
+  // serves loads, and /map/save the tab Save opens. Enumerated like /tour so a
+  // guessed /map/anything is a real 404.
+  if (first === 'map') {
+    if (segments.length === 1) return { kind: 'known' }
+    if (segments.length === 2 && MAP_PAGES.has(second!)) return { kind: 'known' }
     return { kind: 'unknown' }
   }
 

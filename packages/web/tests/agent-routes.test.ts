@@ -208,6 +208,20 @@ describe('classifyRoute', () => {
   it('always treats /404 as a real route', () => {
     expect(classifyRoute('/404')).toEqual({ kind: 'known' })
   })
+
+  // The kit map: the saved map, the frame `skillet map` loads, and the save
+  // tab. Enumerated, so a guessed /map/anything is a real 404 and never a
+  // registry lookup for a handle called "map".
+  it('serves the three kit map pages and 404s anything else under /map', () => {
+    for (const path of ['/map', '/map/embed', '/map/save']) {
+      expect(classifyRoute(path), path).toEqual({ kind: 'known' })
+    }
+    for (const path of ['/map/nope', '/map/embed/extra', '/map/save/x', '/map/embed/save']) {
+      expect(classifyRoute(path), path).toEqual({ kind: 'unknown' })
+    }
+    expect(KNOWN_TOP_LEVEL_SEGMENTS.has('map')).toBe(true)
+    expect(hasMarkdownVariant('/map/embed')).toBe(false)
+  })
 })
 
 describe('hasMarkdownVariant', () => {

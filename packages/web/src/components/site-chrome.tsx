@@ -7,8 +7,10 @@ import { SiteNav } from '@/components/site-nav'
 // Routes that own their full chrome (custom nav + footer) and must not render
 // the shared SiteNav/SiteFooter.
 // Routes that draw their own page, with no site header or footer. /packs is the
-// packs preview, a fresh surface of its own.
-const BARE_PREFIXES: string[] = ['/packs']
+// packs preview, a fresh surface of its own. /map/embed is the kit map framed by
+// the page `skillet map` serves: a site nav inside that frame would navigate the
+// frame away from the map.
+const BARE_PREFIXES: string[] = ['/packs', '/map/embed']
 
 // `footer` is rendered on the server and passed in as a slot: SiteFooter pulls in
 // the async GithubStarBadge (a server component), which can't live in this client
