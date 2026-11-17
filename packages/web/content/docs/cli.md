@@ -44,7 +44,7 @@ The full device surface, generated from the CLI's own command registration. The 
 | `skillet activity choose` | Answer the skill-stats question: `sync` stats to your account, or keep them `local` |
 | `skillet activity clear` | Delete your recorded activity: local history and server events |
 | `skillet activity export` | Export everything recorded about you (local route history + server activity) |
-| `skillet restore` | Restore skills a sync prune moved to trash. No args lists runs; pass a run id or `latest`. |
+| `skillet restore` | Restore skills that sync or the kit map moved to trash. No args lists runs; pass a run id or `latest`. |
 | `skillet edits` | Skills you customized: your live edits, with author updates held |
 | `skillet edits list` | List your customized skills and which have a held update |
 | `skillet edits check` | Detect unreconciled local edits (read-only; for the desktop tray) |
@@ -197,6 +197,8 @@ Read/status commands accept `--json`. Shapes are stable per command.
   "message": "This machine is not paired to an account. Sign in on … then run `skillet connect <code>`."
 }
 ```
+
+**`skillet map --apply --json`** makes the changes your account holds for this machine (the ones Save recorded, or ones you picked on skillet.md) and exits, with no map and no browser: what the app's sync runs. It returns `{ ok, data: { result, counts, left, … } }`, and exits **1** when something is left for the next run. On a machine that isn't connected it emits the auth envelope above and exits **3**.
 
 **`skillet sync --check --json`** uses the same auth envelope when unpaired. **`skillet scan --json`** and **`skillet status --json`** share the same scan-report shape; exit 1 when `hasQuarantined` is true.
 

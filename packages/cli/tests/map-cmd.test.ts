@@ -23,6 +23,7 @@ import { registerAllCommands } from "../src/commands/register-all.js";
 import {
   countLine,
   hasLocalConnection,
+  readConnection,
   startMap,
   textSummary,
   toKitMapScan,
@@ -708,18 +709,86 @@ test("drafting keeps the map open past the idle wait", async () => {
   });
 });
 
-test("until Save is built, Save says it isn't ready and changes nothing", async () => {
-  await withRun({}, async (run, printed) => {
-    const key = READING.payload.entries[1]!.key;
-    const reply = await postTo(run.origin, run.token, { type: "save", v: 1, drafts: [{ kind: "remove", key }] });
-    assert.equal(reply.status, 202);
-    const polled = await send(`${run.origin}/${run.token}/messages?after=0`);
-    const { messages } = JSON.parse(polled.body) as { messages: unknown[] };
-    assert.deepEqual(messages, [{ type: "status", v: 1, state: "failed", reason: "not-ready" }]);
-    assert.ok(printed.includes("Save isn't ready yet. Nothing changed."), printed.join("\n"));
-    // The map stays open for another try.
-    assert.equal((await send(run.url)).status, 200);
+test("closing after a Save that changed things doesn't say nothing changed", async () => {
+  const printed: string[] = [];
+  let changed = false;
+  const run = await startMap({
+    open: false,
+    reading: READING,
+    webUrl: WEB,
+    handleSignals: false,
+    print: (line) => printed.push(line),
+    onSave: (_drafts, link) => {
+      changed = true;
+      link.status("failed", { reason: "stopped" });
+    },
+    saveChanged: () => changed,
   });
+  assert.equal(run.save, null, "an injected Save replaces the built-in one");
+  const key = READING.payload.entries[1]!.key;
+  assert.equal((await postTo(run.origin, run.token, { type: "save", v: 1, drafts: [{ kind: "remove", key }] })).status, 202);
+  await send(`${run.origin}/${run.token}/messages?after=0`);
+  await run.stop("interrupted");
+  assert.equal(printed.at(-1), "Map closed.");
+  assert.ok(!printed.some((line) => /Nothing changed/.test(line)), printed.join("\n"));
+});
+
+test("without an injected Save, the map runs the real one", async () => {
+  await withRun({}, async (run) => {
+    assert.ok(run.save, "Save is built in");
+    assert.equal(run.save.changed(), false);
+    assert.equal(run.save.failed(), false);
+  });
+});
+
+test("connected asks the account only with a device token, and lists the changes waiting for this machine", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "skillet-map-account-"));
+  const prior = process.env["SKILLET_DIR"];
+  const priorToken = process.env["SKILLET_TOKEN"];
+  process.env["SKILLET_DIR"] = dir;
+  delete process.env["SKILLET_TOKEN"];
+  const asked: Array<{ url: string; auth: string | null }> = [];
+  let answer: () => Response = () => new Response("{}", { status: 200 });
+  const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+    const headers = new Headers(init?.headers);
+    asked.push({ url: String(url), auth: headers.get("authorization") });
+    return answer();
+  }) as typeof fetch;
+  const read = () => readConnection({ registryUrl: "https://registry.test", fetchImpl });
+  try {
+    assert.deepEqual(await read(), { connected: false }, "nothing on disk");
+    await writeFile(join(dir, "session.json"), JSON.stringify({ session_token: "ses_test" }));
+    assert.deepEqual(await read(), { connected: false }, "a session alone can't save as this machine");
+    assert.deepEqual(asked, [], "no device token, no request");
+
+    await writeFile(
+      join(dir, "device.json"),
+      JSON.stringify({ device_token: "dev_test", device_id: "dev-1", label: "test-machine", saved_at: "2026-01-01T00:00:00.000Z" }),
+    );
+    const waiting = { id: "change-1", kind: "remove", device: "dev-1", version: 1, key: hex(9) };
+    answer = () => new Response(JSON.stringify({ changes: [waiting, { id: "bad" }] }), { status: 200 });
+    const connected = await read();
+    assert.equal(connected.connected, true);
+    assert.deepEqual(connected.pending, [waiting], "a malformed change is dropped");
+    assert.deepEqual(asked, [{ url: "https://registry.test/api/v1/kit-map/changes", auth: "Bearer dev_test" }]);
+
+    answer = () => new Response("{}", { status: 401 });
+    assert.deepEqual(await read(), { connected: false }, "a token the account refuses is no connection");
+    answer = () => {
+      throw new Error("offline");
+    };
+    assert.deepEqual(await read(), { connected: true }, "an account out of reach leaves it connected");
+
+    const payload = toKitMapScan(scanResult([]), usageResult({}), true, [waiting as never]);
+    assert.deepEqual(payload.pending, [waiting]);
+    assert.deepEqual(parseKitMapScan(payload), payload);
+    assert.equal("pending" in toKitMapScan(scanResult([]), usageResult({}), false, [waiting as never]), false);
+  } finally {
+    if (prior === undefined) delete process.env["SKILLET_DIR"];
+    else process.env["SKILLET_DIR"] = prior;
+    if (priorToken !== undefined) process.env["SKILLET_TOKEN"] = priorToken;
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("an injected save handler gets the drafts, and finishing ends the run without the nothing-changed line", async () => {
@@ -747,7 +816,7 @@ test("an injected save handler gets the drafts, and finishing ends the run witho
 // Registration
 // ---------------------------------------------------------------------------
 
-test("map is a visible device-tier command with --no-open and --json", () => {
+test("map is a visible device-tier command with --no-open, --json and --apply", () => {
   const program = new Command("skillet").version("test");
   registerAllCommands(program, { legacyManagement: false });
   const map = program.commands.find((c) => c.name() === "map");
@@ -756,5 +825,29 @@ test("map is a visible device-tier command with --no-open and --json", () => {
   const flags = map.options.map((o) => o.long);
   assert.ok(flags.includes("--no-open"));
   assert.ok(flags.includes("--json"));
-  assert.ok(!flags.includes("--apply"), "--apply arrives with Save (U11, U13)");
+  assert.ok(flags.includes("--apply"), "the app's sync runs `skillet map --apply --json`");
+});
+
+test("`skillet map --apply --json` on a machine that isn't connected prints the auth envelope, exits 3 and calls no one", { timeout: 60_000 }, async () => {
+  const fx = await makeFixture();
+  const registry = await trap();
+  const web = await trap();
+  try {
+    const res = spawnSync(process.execPath, cliArgs(["map", "--apply", "--json"]), {
+      cwd: CLI_ROOT,
+      env: childEnv(fx, registry.url, web.url),
+      encoding: "utf8",
+      timeout: 45_000,
+    });
+    assert.equal(res.status, 3, res.stderr);
+    const parsed = JSON.parse(res.stdout) as { ok: boolean; code: string };
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.code, "auth_required");
+    assert.deepEqual(registry.hits, []);
+    assert.deepEqual(web.hits, []);
+  } finally {
+    await registry.close();
+    await web.close();
+    await rm(fx.root, { recursive: true, force: true });
+  }
 });

@@ -159,7 +159,7 @@ Options
 
 
 # restore
-skillet restore   Restore skills a sync prune moved to trash. No args lists runs; pass a run id or `latest`.
+skillet restore   Restore skills that sync or the kit map moved to trash. No args lists runs; pass a run id or `latest`.
 
 Usage
   skillet restore [options] [run]
@@ -346,6 +346,7 @@ Usage
 Options
   --no-open             Print the map's address without opening a browser
   --json                Emit the scan as machine-readable JSON and exit
+  --apply               Make the changes waiting for this machine and exit (connected machines)
   -h, --help            display help for command
 
 

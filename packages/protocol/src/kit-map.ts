@@ -191,9 +191,11 @@ export interface KitMapScan {
   looked: KitMapLooked[];
   unchecked: KitMapUnchecked[];
   /**
-   * Whether this computer already has a Skillet connection, read from its own
-   * files with no network call. Absent means not connected. A connected Save
-   * skips the map-session handshake and confirms the account in the frame.
+   * Whether this computer has a Skillet connection its account still accepts.
+   * The CLI checks with one request that carries the device token and no skill
+   * data, only when a token is on disk, so an unconnected computer makes no
+   * request before Save. Absent means not connected. A connected Save skips the
+   * map-session handshake and confirms the account in the frame.
    */
   connected?: boolean;
   /**

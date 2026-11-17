@@ -99,6 +99,46 @@ export {
   type MapUsageHistory,
   type MapUsageTool,
 } from "./map/usage.js";
+// Save making the map's fixes on this computer (plan U11): backups by hash,
+// removes by the folder rules into their own trash, fills, the saved map, and
+// the lock that holds while it runs.
+export {
+  runMapApply,
+  readMapSkillBundle,
+  type MapApplyClient,
+  type MapApplyOptions,
+  type MapApplyResult,
+  type MapBackupBody,
+  type MapBackupPut,
+  type MapChangeInput,
+  type MapFillResult,
+  type MapKitRemoval,
+  type MapKeptRemove,
+  type MapNotBackedUp,
+  type MapRefusedFill,
+  type MapUnremoved,
+} from "./map/apply.js";
+export {
+  trashMapFolders,
+  listMapTrash,
+  restoreMapTrash,
+  mapTrashRoot,
+  MAP_REMOVE_RUN,
+  type MapTrashTarget,
+  type MapTrashItem,
+  type MapTrashResult,
+  type MapTrashRun,
+} from "./map/remove-trash.js";
+export {
+  acquireMapSaveLock,
+  readMapSaveLock,
+  isMapSaveLocked,
+  mapSaveLockPath,
+  MapSaveLockBusy,
+  type AcquireMapSaveLockOptions,
+  type MapSaveLock,
+  type MapSaveLockHolder,
+} from "./map/save-lock.js";
 export * from "./commands/sync.js";
 // Curated customized-skills surface: only what the CLI/desktop actually
 // consume. Internals (moveDir, ledgerStamp, backupSkillVersion, drift
@@ -233,6 +273,7 @@ export { loadSessionToken, readSessionFileToken, envSessionToken, envSessionToke
 export type { SessionTokenPrecedence } from "./session-token.js";
 export {
   readActiveDeviceFile,
+  readDeviceFile,
   saveDeviceToken,
   clearDeviceToken,
   deviceFilePath,
@@ -254,9 +295,11 @@ export {
 export { authConnect, type AuthConnectOptions, type AuthConnectResult } from "./commands/auth-connect.js";
 export {
   authConnectPair,
+  authConnectFreshPair,
   type AuthConnectPairOptions,
   type AuthConnectPairResult,
 } from "./commands/auth-connect-pair.js";
+export { defaultMachineLabel } from "./machine-label.js";
 export {
   mintPairCode,
   type MintPairCodeOptions,
@@ -372,6 +415,8 @@ export {
   validateProjectAdapterRoot,
   resolveAdapterRoot,
   MATERIALIZATION_ROOT_ALLOWLIST,
+  MAP_FOLDER_ROOT_ALLOWLIST,
+  mapFolderRootOf,
   PROJECT_TARGET_ALLOWLIST,
   HERMES_ENV_ROOT,
   HERMES_DEFAULT_HOME,

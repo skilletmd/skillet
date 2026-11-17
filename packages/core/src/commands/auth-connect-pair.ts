@@ -43,6 +43,29 @@ export interface AuthConnectPairResult {
 export async function authConnectPair(
   opts: AuthConnectPairOptions,
 ): Promise<AuthConnectPairResult> {
+  return claimPairCode(opts, { presentDeviceToken: true });
+}
+
+/**
+ * Redeem a code minted for one save from the kit map (plan KTD6) WITHOUT
+ * presenting this machine's stored device token. The claim looks a presented
+ * token up on any account and moves that device row to the account approving
+ * the code, and the next sync's prune would then trash the old account's kit on
+ * this machine; the registry refuses a token with a map-session code for that
+ * reason. The machine_id still goes, since the registry matches it only within
+ * the approving account. Writes session.json and device.json like
+ * {@link authConnectPair}.
+ */
+export async function authConnectFreshPair(
+  opts: AuthConnectPairOptions,
+): Promise<AuthConnectPairResult> {
+  return claimPairCode(opts, { presentDeviceToken: false });
+}
+
+async function claimPairCode(
+  opts: AuthConnectPairOptions,
+  how: { presentDeviceToken: boolean },
+): Promise<AuthConnectPairResult> {
   const code = extractPairCode(opts.code);
   if (!code) {
     throw new Error('Pair code must be 8 characters (letters and numbers).');
@@ -64,7 +87,7 @@ export async function authConnectPair(
   // identity so it survives sign-out, wipes, and fresh SKILLET_DIRs; the
   // stored id covers machines whose OS id is unreadable, and a random UUID is
   // the last resort (persisted via saveDeviceToken below).
-  const existingDevice = await readDeviceFile().catch(() => null);
+  const existingDevice = how.presentDeviceToken ? await readDeviceFile().catch(() => null) : null;
   const storedMachineId = await readStoredMachineId().catch(() => undefined);
   const machineId = stableMachineId() ?? storedMachineId ?? randomUUID();
 

@@ -11,14 +11,17 @@
  *
  * The map reaches the browser through a page served on 127.0.0.1
  * (../map/loopback-server.ts), which frames skillet.md/map/embed and hands it
- * the scan by postMessage. The payload holds no path, and `connected` says
- * only whether this machine already has a Skillet connection on disk, read
- * from its own files with no network call; never the account.
+ * the scan by postMessage. The payload holds no path. `connected` says this
+ * machine holds a device token its account still takes, and then `pending`
+ * lists the changes the account holds for it: one read of this machine's own
+ * waiting changes, sending nothing about its skills. A machine with no device
+ * token calls no one.
  *
- * Save runs an injected handler (U11 builds the real one). Until then Save
- * tells the frame it isn't ready, and nothing changes. Ctrl+C, or 30 minutes
- * with nothing done in the map, tells the frame `ended`, closes the server and
- * says nothing changed.
+ * Save is ../map/save-flow.ts (U11): it connects the machine if it needs to,
+ * then backs up, makes the drafted fixes and saves the map. Ctrl+C, or 30
+ * minutes with nothing done in the map, tells the frame `ended`, closes the
+ * server and says whether anything changed. `--apply` makes this machine's
+ * waiting changes with no map at all: what the app's sync runs.
  */
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -26,7 +29,9 @@ import { sep } from "node:path";
 import type { Command } from "commander";
 import {
   MAP_USAGE_WINDOW_DAYS,
+  REGISTRY_API,
   deviceFilePath,
+  readDeviceFile,
   readMapUsage,
   readSessionFileToken,
   scanMap,
@@ -40,11 +45,13 @@ import { JOBS, TOOLS_SECTION, type JobId } from "@skillet/protocol/jobs";
 import {
   KIT_MAP_DESCRIPTION_MAX,
   KIT_MAP_NAME_MAX,
+  parseKitMapPendingChange,
   parseKitMapScan,
   type KitMapEntry,
   type KitMapFlag,
   type KitMapFrom,
   type KitMapLooked,
+  type KitMapPendingChange,
   type KitMapScan,
   type KitMapSkillet,
   type KitMapSource,
@@ -52,11 +59,21 @@ import {
   type KitMapUnchecked,
 } from "@skillet/protocol/kit-map";
 import { tryToSkillId } from "@skillet/protocol/skill-id";
-import { ALL_ADAPTERS, BASELINE_READER_ADAPTERS } from "../cli-context.js";
+import { ALL_ADAPTERS, BASELINE_READER_ADAPTERS, REGISTRY_DEFAULT } from "../cli-context.js";
 import { webBaseUrl } from "../cli-command-tier.js";
-import { dim, fail } from "../cli-colors.js";
+import { dim, fail, ok } from "../cli-colors.js";
+import { failAuthRequired } from "../auth-required.js";
+import { ExitCode } from "../exit-codes.js";
 import { openBrowserUrl } from "../open-browser-url.js";
 import { startMapServer, type MapSaveHandler } from "../map/loopback-server.js";
+import {
+  createMapSaveFlow,
+  mapLeftText,
+  requestSignal,
+  runMapApplyOnly,
+  saveSummary,
+  type MapSaveFlow,
+} from "../map/save-flow.js";
 
 export type { MapFrameLink, MapSaveHandler } from "../map/loopback-server.js";
 
@@ -76,6 +93,11 @@ const SKILLET_SOURCES: ReadonlySet<KitMapSource> = new Set<KitMapSource>([
 ]);
 /** Names and places the text summary lists before it says how many more. */
 const LIST_MAX = 5;
+/** How long opening the map waits on the account for this machine's waiting changes. */
+const ACCOUNT_WAIT_MS = 5_000;
+const MAX_PENDING = 10_000;
+/** No usage at all: what a saved map or a backup is built from, since usage never leaves the machine. */
+const NO_USAGE: MapUsageResult = { marks: {}, tools: [], since: 0, until: 0 };
 
 /** What one scan of this machine gives the map. */
 export interface MapReading {
@@ -224,11 +246,16 @@ const oneEntry = (entry: KitMapEntry): boolean =>
 
 /**
  * The scan as the frame takes it: no path, names and descriptions cut to the
- * protocol's limits, and `connected` only when this machine has a connection.
- * An entry the protocol would still refuse is left out rather than blanking
- * the whole map.
+ * protocol's limits, and `connected` only when this machine has a connection,
+ * with the account's waiting changes for it when there are any. An entry the
+ * protocol would still refuse is left out rather than blanking the whole map.
  */
-export function toKitMapScan(scan: MapScanResult, usage: MapUsageResult, connected: boolean): KitMapScan {
+export function toKitMapScan(
+  scan: MapScanResult,
+  usage: MapUsageResult,
+  connected: boolean,
+  pending: readonly KitMapPendingChange[] = [],
+): KitMapScan {
   const payload: KitMapScan = {
     entries: scan.entries
       .slice(0, MAX_ENTRIES)
@@ -237,9 +264,22 @@ export function toKitMapScan(scan: MapScanResult, usage: MapUsageResult, connect
     looked: lookedOf(usage),
     unchecked: scan.unreadable.slice(0, MAX_ENTRIES).map(uncheckedOf),
   };
-  if (connected) payload.connected = true;
+  if (connected) {
+    payload.connected = true;
+    if (pending.length > 0) payload.pending = pending.slice(0, MAX_PENDING);
+  }
   if (parseKitMapScan(payload) === null) throw new Error("The scan couldn't be turned into a map.");
   return payload;
+}
+
+/** The entries as the map shows them, with no usage: what Save backs up and saves from. */
+export function wireEntries(scan: MapScanResult): KitMapEntry[] {
+  return toKitMapScan(scan, NO_USAGE, false).entries;
+}
+
+/** Scan this machine with the adapter set the desktop app uses (see the module comment). */
+export function scanThisMachine(): Promise<MapScanResult> {
+  return scanMap({ adapters: [...ALL_ADAPTERS, ...BASELINE_READER_ADAPTERS], home: homedir() });
 }
 
 /** Each AI tool that loads a skill and couldn't tell used from unused, in its own words. */
@@ -271,14 +311,58 @@ export async function hasLocalConnection(): Promise<boolean> {
   return (await readSessionFileToken()).length > 0;
 }
 
-/** Scan this machine, read its usage records and its connection: all local, all read-only. */
-export async function readMap(): Promise<MapReading> {
+export interface AccountConnection {
+  connected: boolean;
+  /** The changes the account holds for this machine; absent when it couldn't be asked. */
+  pending?: KitMapPendingChange[];
+}
+
+/**
+ * Whether this machine can save as itself: a device token on disk that its
+ * account still takes. Session-only or anonymous files count as not
+ * connected, so Save connects the machine through the map session. When it
+ * is connected, the same read brings the changes waiting for it. The request
+ * carries the token and nothing about the skills; a machine with no token
+ * makes no request at all. An account that can't be reached leaves the
+ * machine connected with nothing listed.
+ */
+export async function readConnection(
+  opts: { registryUrl?: string; fetchImpl?: typeof fetch; timeoutMs?: number } = {},
+): Promise<AccountConnection> {
+  if (!(await hasLocalConnection())) return { connected: false };
+  const device = await readDeviceFile();
+  if (!device?.device_token || device.label === "anonymous") return { connected: false };
+  const registryUrl = (opts.registryUrl ?? REGISTRY_DEFAULT).replace(/\/+$/, "");
+  const request = requestSignal(undefined, opts.timeoutMs ?? ACCOUNT_WAIT_MS);
+  try {
+    const res = await (opts.fetchImpl ?? globalThis.fetch)(`${registryUrl}${REGISTRY_API}/kit-map/changes`, {
+      headers: { accept: "application/json", authorization: `Bearer ${device.device_token}` },
+      signal: request.signal,
+    });
+    if (res.status === 401 || res.status === 403) return { connected: false };
+    if (!res.ok) return { connected: true };
+    const body = (await res.json().catch(() => null)) as { changes?: unknown } | null;
+    const list = Array.isArray(body?.changes) ? (body.changes as unknown[]) : [];
+    const pending = list
+      .slice(0, MAX_PENDING)
+      .map((item) => parseKitMapPendingChange(item))
+      .filter((change): change is KitMapPendingChange => change !== null);
+    return { connected: true, pending };
+  } catch {
+    return { connected: true };
+  } finally {
+    request.done();
+  }
+}
+
+/** Scan this machine and read its usage records, both local and read-only, and ask the account about it if it's connected. */
+export async function readMap(opts: { registryUrl?: string; fetchImpl?: typeof fetch } = {}): Promise<MapReading> {
   const home = homedir();
-  const scan = await scanMap({ adapters: [...ALL_ADAPTERS, ...BASELINE_READER_ADAPTERS], home });
+  const scan = await scanThisMachine();
   const usage = await readMapUsage({ scan, home });
-  const connected = await hasLocalConnection();
+  const account = await readConnection(opts);
   return {
-    payload: toKitMapScan(scan, usage, connected),
+    payload: toKitMapScan(scan, usage, account.connected, account.pending),
     usageNotes: usageNotes(usage, scan.entries),
     unreadable: scan.unreadable,
     home,
@@ -382,8 +466,12 @@ export interface StartMapOptions {
   open?: boolean;
   /** A scan to show instead of reading this machine. */
   reading?: MapReading;
-  /** What Save does. Defaults to telling the frame Save isn't ready. */
+  /** What Save does. Defaults to Save itself (../map/save-flow.ts), against `registryUrl`. */
   onSave?: MapSaveHandler;
+  /** With an injected `onSave`: whether it changed anything, so closing doesn't say nothing changed. */
+  saveChanged?: () => boolean;
+  /** The registry Save talks to. Defaults to `SKILLET_REGISTRY_URL`, else https://registry.skillet.md. */
+  registryUrl?: string;
   /** The site the frame comes from. Defaults to `SKILLET_WEB_URL`, else https://skillet.md. */
   webUrl?: string;
   openBrowser?: (url: string) => Promise<boolean>;
@@ -400,23 +488,30 @@ export interface MapRun {
   readonly token: string;
   /** Resolves once the server has closed. */
   readonly done: Promise<MapStopReason>;
+  /** The Save this run made itself; null when `onSave` was injected. */
+  readonly save: MapSaveFlow | null;
   stop(reason?: MapStopReason): Promise<void>;
-}
-
-/** Save before it's built (U11): the frame hears it isn't ready, and nothing changes. */
-function notReadySave(print: (line: string) => void): MapSaveHandler {
-  return (_drafts, link) => {
-    link.status("failed", { reason: "not-ready" });
-    print("Save isn't ready yet. Nothing changed.");
-  };
 }
 
 /** Serve the map, open it, and wait (see the module comment). */
 export async function startMap(opts: StartMapOptions = {}): Promise<MapRun> {
   const print = opts.print ?? ((line: string) => console.log(line));
-  const reading = opts.reading ?? (await readMap());
+  const registryUrl = opts.registryUrl ?? REGISTRY_DEFAULT;
+  const reading = opts.reading ?? (await readMap({ registryUrl }));
   const idleMs = opts.idleMs ?? MAP_IDLE_MS;
   const handleSignals = opts.handleSignals ?? true;
+  const save =
+    opts.onSave === undefined
+      ? createMapSaveFlow({
+          registryUrl,
+          entries: reading.payload.entries,
+          connected: reading.payload.connected === true,
+          rescan: scanThisMachine,
+          wire: wireEntries,
+          print,
+        })
+      : null;
+  const saveChanged = save ? save.changed : (opts.saveChanged ?? (() => false));
 
   let resolveDone!: (reason: MapStopReason) => void;
   const done = new Promise<MapStopReason>((resolve) => {
@@ -429,7 +524,7 @@ export async function startMap(opts: StartMapOptions = {}): Promise<MapRun> {
   const server = await startMapServer({
     scan: reading.payload,
     webUrl: opts.webUrl ?? webBaseUrl(),
-    onSave: opts.onSave ?? notReadySave(print),
+    onSave: opts.onSave ?? save!.handler,
     readyWaitMs: opts.readyWaitMs,
     onNoReady: () => {
       for (const line of textSummary(reading)) print(line);
@@ -465,8 +560,12 @@ export async function startMap(opts: StartMapOptions = {}): Promise<MapRun> {
       detachSignals();
       // A finished Save leaves its last status on the frame; anything else tells it the map closed.
       await server.stop({ notify: reason !== "finished" });
-      if (reason === "interrupted") print("Map closed. Nothing changed.");
-      if (reason === "idle") print(`Map closed after ${duration(idleMs)} with no Save. Nothing changed.`);
+      // A Save that changed things says what it did and what's left itself.
+      const changed = saveChanged();
+      if (reason === "interrupted") print(changed ? "Map closed." : "Map closed. Nothing changed.");
+      if (reason === "idle") {
+        print(changed ? `Map closed after ${duration(idleMs)}.` : `Map closed after ${duration(idleMs)} with no Save. Nothing changed.`);
+      }
       resolveDone(reason);
     })();
     return stopping;
@@ -489,7 +588,47 @@ export async function startMap(opts: StartMapOptions = {}): Promise<MapRun> {
     process.on("SIGINT", onSignal);
     process.on("SIGTERM", onSignal);
   }
-  return { url: server.url, origin: server.origin, token: server.token, done, stop: (reason) => stop(reason) };
+  return { url: server.url, origin: server.origin, token: server.token, done, save, stop: (reason) => stop(reason) };
+}
+
+/** `skillet map --apply` (see the module comment). Exits non-zero unless everything waiting is done. */
+async function applyCommand(json: boolean): Promise<void> {
+  const print = (line: string) => console.log(line);
+  const result = await runMapApplyOnly({
+    registryUrl: REGISTRY_DEFAULT,
+    rescan: scanThisMachine,
+    wire: wireEntries,
+    ...(json ? {} : { print }),
+  });
+  if (result.result === "not-connected") failAuthRequired({ json });
+  if (result.result === "locked") {
+    const message = "Another Save is still running on this machine.";
+    if (json) process.stdout.write(JSON.stringify({ ok: false, error: message, code: "locked" }, null, 2) + "\n");
+    else console.error(fail(message));
+    process.exitCode = ExitCode.ERROR;
+    return;
+  }
+  const done = result.result === "applied";
+  if (json) {
+    const data = {
+      result: result.result,
+      ...(result.reason !== undefined ? { reason: result.reason } : {}),
+      counts: result.counts,
+      left: result.left,
+      not_backed_up: result.notBackedUp,
+      kept: result.kept,
+      unremoved: result.unremoved,
+      refused: result.refused,
+      trash_run: result.trashRun,
+    };
+    process.stdout.write(JSON.stringify({ ok: done, data }, null, 2) + "\n");
+  } else {
+    for (const line of saveSummary(result)) print(line);
+    const left = mapLeftText(result.left);
+    if (done) print(result.changed ? ok("Made this machine's waiting changes.") : "Nothing is waiting for this machine.");
+    else print(fail(`Stopped partway.${left ? ` Left to do: ${left}.` : ""} Run \`skillet map --apply\` again to finish.`));
+  }
+  if (!done) process.exitCode = ExitCode.ERROR;
 }
 
 export function registerMapCommand(program: Command): void {
@@ -498,7 +637,12 @@ export function registerMapCommand(program: Command): void {
     .description("See every skill on this machine sorted into jobs. No account needed")
     .option("--no-open", "Print the map's address without opening a browser")
     .option("--json", "Emit the scan as machine-readable JSON and exit")
-    .action(async (opts: { open: boolean; json?: boolean }) => {
+    .option("--apply", "Make the changes waiting for this machine and exit (connected machines)")
+    .action(async (opts: { open: boolean; json?: boolean; apply?: boolean }) => {
+      if (opts.apply === true) {
+        await applyCommand(opts.json === true);
+        return;
+      }
       if (opts.json === true) {
         const reading = await readMap();
         process.stdout.write(JSON.stringify({ ok: true, scan: reading.payload }, null, 2) + "\n");
@@ -506,5 +650,8 @@ export function registerMapCommand(program: Command): void {
       }
       const run = await startMap({ open: opts.open });
       await run.done;
+      // Ctrl+C mid-Save: let it reach a safe stop before the process exits.
+      await run.save?.settled();
+      if (run.save?.failed()) process.exitCode = ExitCode.ERROR;
     });
 }

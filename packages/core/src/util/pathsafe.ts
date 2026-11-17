@@ -320,6 +320,44 @@ function buildAllowlist(): readonly string[] {
 export const MATERIALIZATION_ROOT_ALLOWLIST: readonly string[] = buildAllowlist();
 
 /**
+ * The skills folders the kit map may move a skill folder out of (Remove) and
+ * back into (restore): every materialization root, plus `~/.codex/skills`,
+ * which Codex still loads and the map scans, but which sync never writes to
+ * (plan KTD8). Compile-time constant, like MATERIALIZATION_ROOT_ALLOWLIST; the
+ * validated env roots (CLAUDE_CONFIG_DIR, HERMES_HOME, a Hermes profile) count
+ * too, through {@link mapFolderRootOf}.
+ */
+export const MAP_FOLDER_ROOT_ALLOWLIST: readonly string[] = Object.freeze([
+  ...MATERIALIZATION_ROOT_ALLOWLIST,
+  join(homedir(), ".codex", "skills"),
+]);
+
+/**
+ * The allowed root `path` sits directly inside, spelled as the allowlist spells
+ * it, or null. Only a direct child counts: a skill folder the map may move is
+ * always one level below a tool's skills folder, so a deeper path, a
+ * dot-folder, a relative or unnormalized path, or a root itself never matches.
+ * The parent is compared after resolving links on both sides.
+ */
+export function mapFolderRootOf(path: string): string | null {
+  if (typeof path !== "string" || path.length === 0 || path.includes("\x00")) return null;
+  if (resolve(path) !== path) return null;
+  const name = basename(path);
+  if (name === "" || name === "." || name === ".." || name.startsWith(".")) return null;
+  const parent = dirname(path);
+  const roots = [...MAP_FOLDER_ROOT_ALLOWLIST, ..._runtimeRoots];
+  const exact = roots.find((root) => resolve(root) === parent);
+  if (exact !== undefined) return exact;
+  const realParent = realpathDeepestExisting(parent);
+  return roots.find((root) => realpathDeepestExisting(root) === realParent) ?? null;
+}
+
+/** Whether `root` is one of the map's allowed roots, exactly as {@link mapFolderRootOf} names them. */
+export function isMapFolderRoot(root: string): boolean {
+  return typeof root === "string" && [...MAP_FOLDER_ROOT_ALLOWLIST, ..._runtimeRoots].includes(root);
+}
+
+/**
  * Per-runtime allowlist for `kind === "project"` adapters. Each entry is a
  * POSIX-relative path under the project cwd; an adapter's `targetDir` MUST
  * match exactly. This is the project equivalent of
