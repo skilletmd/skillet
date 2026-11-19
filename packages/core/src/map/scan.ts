@@ -6,7 +6,8 @@
  * Code and Codex plugins. Each folder is labeled by who owns it (the folder
  * rules in ./folder-rules.ts), identical copies merge into one entry by
  * content key with every path and tool kept, and every place the scan could
- * not check lands in the unreadable list.
+ * not check lands in the unreadable list. A skills folder linked to another is
+ * read once, so a skill has one location per real folder.
  *
  * Read-only (R5, AE4). The only filesystem calls are lstat, stat, realpath,
  * readdir and readFile, and nothing goes over the network. Folders are found
@@ -312,7 +313,7 @@ async function detectedNames(adapters: readonly Adapter[]): Promise<Set<string>>
   return detected;
 }
 
-/** The skills folders to read, one per real folder, each with every tool that loads it. */
+/** The skills folders to read, one per path, each with every tool that loads it. */
 function skillsRoots(
   adapters: readonly Adapter[],
   detected: ReadonlySet<string>,
@@ -347,6 +348,30 @@ function skillsRoots(
   // Codex still loads its old folder.
   add(legacyCodex, "codex", false);
   return roots;
+}
+
+/**
+ * One root per real folder. Two roots that resolve to the same folder, such as
+ * ~/.claude/skills linked to ~/.agents/skills, are read once, through the
+ * first: it takes the other's tools, and it is Claude Code's when either was.
+ * Read twice, every skill there would get a location per spelling, and Remove
+ * and a replace would act on the one folder twice. A root that doesn't resolve
+ * stays as it is, for openFolder to skip or name.
+ */
+async function mergeLinkedRoots(roots: readonly SkillsRoot[]): Promise<SkillsRoot[]> {
+  const merged: Array<{ root: SkillsRoot; real: string | null }> = [];
+  for (const root of roots) {
+    const real = await realpath(root.path).catch(() => null);
+    const same = real === null ? undefined : merged.find((m) => m.real === real);
+    if (!same) {
+      merged.push({ root, real });
+      continue;
+    }
+    for (const tool of root.tools) if (!same.root.tools.includes(tool)) same.root.tools.push(tool);
+    if (root.kind === "claude") same.root.kind = "claude";
+    same.root.detected ||= root.detected;
+  }
+  return merged.map((m) => m.root);
 }
 
 /** Find the skill folders below an app or `synced/` folder, `depth` levels down at most. */
@@ -658,7 +683,7 @@ export async function scanMap(opts: MapScanOptions): Promise<MapScanResult> {
   const state: ScanState = { candidates: [], folders: [], unreadable: [], tools: [] };
 
   const detected = await detectedNames(opts.adapters);
-  const roots = skillsRoots(opts.adapters, detected, home);
+  const roots = await mergeLinkedRoots(skillsRoots(opts.adapters, detected, home));
   for (const root of roots) if (root.detected) noteTools(state, root.tools);
   for (const root of roots) await scanRoot(root, handle, state);
 

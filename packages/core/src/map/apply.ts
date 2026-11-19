@@ -64,7 +64,7 @@ import {
 } from "@skillet/protocol/kit-map";
 import { readState, writeState } from "../kit/store.js";
 import { mapInOrder } from "../util/in-order.js";
-import { mapFolderRootOf } from "../util/pathsafe.js";
+import { mapFolderRootOf, realpathDeepestExisting } from "../util/pathsafe.js";
 import { readMapMergeRecords, type MapMergeRecord } from "./merge-run.js";
 import {
   listMapReplaceRuns,
@@ -311,6 +311,9 @@ type ReplaceOutcome =
 const sameKeySet = (a: readonly string[], b: readonly string[]): boolean =>
   a.length === b.length && new Set(a).size === a.length && a.every((key) => b.includes(key));
 
+/** Whether two allowed roots are one folder, as when ~/.claude/skills links to ~/.agents/skills. */
+const sameFolder = (a: string, b: string): boolean => a === b || realpathDeepestExisting(a) === realpathDeepestExisting(b);
+
 /** The folder name a merged skill takes: its name as a slug, never one the folder rules read as Skillet's. */
 function mergedFolderName(name: string): string {
   return slugify(name, { maxLength: 64, fallback: "merged-skill" });
@@ -385,10 +388,10 @@ async function applyReplace(change: ReplaceChange, ctx: ReplaceContext): Promise
     }
   }
 
-  // Every tool folder that held an original gets the merged skill.
+  // Every tool folder that held an original gets the merged skill, once per real folder.
   const roots: string[] = [];
   const addRoot = (root: string | null): void => {
-    if (root !== null && !roots.includes(root)) roots.push(root);
+    if (root !== null && !roots.some((r) => sameFolder(r, root))) roots.push(root);
   };
   for (const run of earlier) {
     for (const moved of run.moved) addRoot(moved.root);
@@ -427,7 +430,10 @@ async function applyReplace(change: ReplaceChange, ctx: ReplaceContext): Promise
     for (const folder of created) await rm(folder.from, { recursive: true, force: true }).catch(() => {});
   };
   for (const root of roots) {
-    const there = already.find((location) => mapFolderRootOf(location.path) === root);
+    const there = already.find((location) => {
+      const at = mapFolderRootOf(location.path);
+      return at !== null && sameFolder(at, root);
+    });
     if (there) {
       placed.push({ root, folder: basename(there.path), from: join(root, basename(there.path)) });
       continue;

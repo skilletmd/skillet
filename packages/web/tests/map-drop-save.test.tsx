@@ -520,6 +520,11 @@ describe('Save on a dropped map', () => {
     expect(record!.body.changes.some((change: object) => 'device' in change)).toBe(false)
     // A removed skill isn't backed up from here; the app backs it up before it moves it.
     expect(api.of('PUT backups/*').map((c) => c.path)).not.toContain(`backups/${hexOf(KEY.zebra)}`)
+    // It stays on the saved map, where the folder had it, until a computer
+    // removes it: the app claims a change with no computer by the hashes the saved map holds.
+    const doc = api.state.doc!
+    expect(doc.entries.map((e) => e.name).sort()).toEqual(['Code Review', 'Copy Editor', 'Plain Prose', 'Zebra Quux'])
+    expect(doc.assignments).toHaveProperty([KEY.zebra], null)
 
     fireEvent.click(screen.getByRole('button', { name: 'What changed' }))
     const done = screen.getByRole('dialog', { name: 'Saved' })
@@ -571,6 +576,26 @@ describe('Save on a dropped map', () => {
     for (const entry of doc.entries) expect(Object.keys(entry).sort()).toEqual(['description', 'key', 'name', 'source'])
     // No removes or merges were drafted, so none were recorded.
     expect(api.of('POST kit-map/changes')).toEqual([])
+  })
+
+  it('a skill drafted for removal keeps the job saved before, until a computer removes it', async () => {
+    const api = registry()
+    api.state.doc = {
+      version: 2,
+      entries: [{ key: KEY.zebra, name: 'Zebra Quux', description: 'Nothing here.', source: 'local' }],
+      assignments: { [KEY.zebra]: 'business.meetings' },
+    }
+    page()
+    await dropTree()
+    draftRemoveZebra()
+    await saveAndConfirm()
+    expect(await screen.findByText('Saved. Backed up 3 skills. 1 change waits for the app.')).toBeInTheDocument()
+
+    expect(api.state.changes).toEqual([expect.objectContaining({ kind: 'remove', key: KEY.zebra, device: null })])
+    const doc = api.state.doc!
+    expect(doc.version).toBe(3)
+    expect(doc.entries.map((e) => e.key)).toContain(KEY.zebra)
+    expect(doc.assignments[KEY.zebra]).toBe('business.meetings')
   })
 
   it('re-reads the saved map when someone wrote it first', async () => {

@@ -39,8 +39,9 @@ import {
  * Save runs in this tab with the person's session, through the same-origin
  * registry proxy: it backs up each kept skill by hash, adds picks to the
  * account's Saved kit, records removes and merges as changes with no computer
- * (the browser can't write files), and saves the map's jobs. Every step can run
- * again, so Try again finishes what's left.
+ * (the browser can't write files), and saves the map's jobs, with a removed
+ * skill still on it until the app removes it. Every step can run again, so Try
+ * again finishes what's left.
  */
 
 /** A skill's files by path in its folder: the bytes its key was computed over. */
@@ -413,22 +414,23 @@ function backupRefusal(answer: Answer): Omit<NotBackedUp, 'name'> | 'retry' | nu
   return 'retry'
 }
 
-/** The saved map with this folder's skills in it, kept on top of what other computers saved. */
-function mapDocument(
-  base: KitMapDocument | null,
-  entries: readonly KitMapEntry[],
-  derived: KitMapChanges,
-  removed: ReadonlySet<string>,
-): KitMapDocument {
+/**
+ * The saved map with this folder's skills in it, kept on top of what other
+ * computers saved. A skill drafted for removal stays, in the job it has, until
+ * a computer removes it: the app claims a change with no computer only by the
+ * hashes the saved map holds, and takes the skill off the map once it has
+ * removed it.
+ */
+function mapDocument(base: KitMapDocument | null, entries: readonly KitMapEntry[], derived: KitMapChanges): KitMapDocument {
   const moved = new Set(derived.changes.flatMap((change) => (change.kind === 'move' ? [change.key] : [])))
   const kept = new Map<string, KitMapSavedEntry>()
-  for (const entry of base?.entries ?? []) if (!removed.has(entry.key)) kept.set(entry.key, entry)
+  for (const entry of base?.entries ?? []) kept.set(entry.key, entry)
   const assignments: Record<string, JobId | null> = {}
   for (const [key, job] of Object.entries(base?.assignments ?? {})) if (kept.has(key)) assignments[key] = job
   for (const entry of entries) {
-    if (removed.has(entry.key)) continue
     kept.set(entry.key, toSavedEntry(entry))
     const saved = base?.assignments[entry.key]
+    // Where it ends up here; drafted for removal, it has none in `derived`, so where the folder had it.
     const here = derived.jobs.has(entry.key) ? (derived.jobs.get(entry.key) ?? null) : entry.job
     // A move made here wins; otherwise a job saved before stays.
     assignments[entry.key] = moved.has(entry.key) || saved === undefined ? here : saved
@@ -562,7 +564,7 @@ export async function saveDroppedMap({ entries, drafts, bundles, handle, pickNam
     const read = await call('GET', 'kit-map')
     const base = read.status === 200 ? parseKitMapDocument(read.body) : null
     if (read.status !== 404 && !base) break
-    const put = await call('PUT', 'kit-map', mapDocument(base, entries, derived, removed))
+    const put = await call('PUT', 'kit-map', mapDocument(base, entries, derived))
     if (put.status === 200) out.mapSaved = true
     else if (put.status !== 409) break
   }

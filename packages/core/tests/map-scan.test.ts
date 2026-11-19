@@ -239,6 +239,45 @@ describe("scanMap: links", () => {
     },
   );
 
+  it.skipIf(!symlinksAvailable)(
+    "a skills folder linked to another is read once: each skill has one location, loaded by both tools",
+    async () => {
+      // ~/.claude/skills -> ~/.agents/skills: one shared folder.
+      await writeSkill(join(AGENTS, "pdf"), "pdf");
+      await writeSkill(join(AGENTS, "synced", "acme", "brand-voice"), "brand-voice");
+      await mkdir(join(HOME, ".claude"), { recursive: true });
+      await symlink(AGENTS, CLAUDE, "dir");
+
+      const result = await scanMap({ adapters: [codex(), claude()], handle: null });
+
+      expect(result.entries.map((e) => e.name)).toEqual(["brand-voice", "pdf"]);
+      const pdf = result.entries.find((e) => e.name === "pdf")!;
+      expect(pdf.locations.map((l) => [l.path, l.tools])).toEqual([[join(AGENTS, "pdf"), ["codex", "claude-code"]]]);
+      expect(pdf.copies).toEqual({ codex: 1, "claude-code": 1 });
+      // Claude Code loads the folder, so its synced/ is still Claude Code's organization sync.
+      const synced = result.entries.find((e) => e.name === "brand-voice")!;
+      expect(synced.locations.map((l) => [l.path, l.source])).toEqual([
+        [join(AGENTS, "synced", "acme", "brand-voice"), "synced"],
+      ]);
+      expect(synced.owner).toEqual({ kind: "organization", name: "acme" });
+      expect(result.folders).toEqual([{ path: AGENTS, tools: ["codex", "claude-code"] }]);
+      expect(result.tools).toEqual(["codex", "claude-code"]);
+    },
+  );
+
+  it.skipIf(!symlinksAvailable)("~/.codex/skills linked to ~/.agents/skills doesn't count Codex's copy twice", async () => {
+    await writeSkill(join(AGENTS, "pdf"), "pdf");
+    await mkdir(join(HOME, ".codex"), { recursive: true });
+    await symlink(AGENTS, CODEX_LEGACY, "dir");
+
+    const result = await scanMap({ adapters: [codex(), claude()], handle: null });
+
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0]!.locations.map((l) => l.path)).toEqual([join(AGENTS, "pdf")]);
+    expect(result.entries[0]!.copies).toEqual({ codex: 1 });
+    expect(result.folders).toEqual([{ path: AGENTS, tools: ["codex"] }]);
+  });
+
   it.skipIf(!symlinksAvailable)("a link to nowhere is named as broken, and the scan goes on", async () => {
     await writeSkill(join(CLAUDE, "pdf"), "pdf");
     await symlink(join(HOME, "nowhere"), join(CLAUDE, "dangling"), "dir");

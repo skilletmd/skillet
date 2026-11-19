@@ -25,12 +25,12 @@
  * as it would any restore.
  */
 import { readdir, readFile } from "node:fs/promises";
-import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { canonicalContentHash } from "@skillet/protocol";
 import { KIT_MAP_HASH_RE } from "@skillet/protocol/kit-map";
 import { skilletDir } from "../session-token.js";
 import { atomicWrite } from "../util/atomic.js";
-import { isMapFolderRoot, mapFolderRootOf } from "../util/pathsafe.js";
+import { isMapFolderRoot, mapFolderRootOf, realpathDeepestExisting } from "../util/pathsafe.js";
 import { LEDGER_STAMP, ledgerStamp, moveDir } from "../commands/edits-store.js";
 import { readMapMergeRecord } from "./merge-run.js";
 import { present, readMapSkillBundle } from "./skill-fs.js";
@@ -159,7 +159,8 @@ async function writeLedger(runDir: string, ledger: MapTrashLedger): Promise<void
  * Move each target into one new run. The ledger is written before the first
  * move and again after the last, so a run cut short still lists every folder
  * it may have moved, and restore skips the ones that never left. A folder that
- * is already gone is skipped, so running the same Remove again moves nothing.
+ * is already gone is skipped, so running the same Remove again moves nothing,
+ * and a folder named twice, under two spellings of one root, moves once.
  *
  * With `replace`, the run is a replace's: its ledger also names the merge and
  * the merged folders in place of the originals, and it is written even when no
@@ -181,8 +182,11 @@ export async function trashMapFolders(
       skipped.push({ key: target.key, name: target.name, path: target.path, reason: "outside-allowlist" });
       continue;
     }
-    if (seen.has(target.path)) continue;
-    seen.add(target.path);
+    // By the folder it reaches: two allowed roots can be one folder (~/.claude/skills
+    // linked to ~/.agents/skills), and a folder moves once. Its own link is never followed.
+    const reaches = join(realpathDeepestExisting(dirname(target.path)), basename(target.path));
+    if (seen.has(reaches)) continue;
+    seen.add(reaches);
     if (!(await present(target.path))) {
       skipped.push({ key: target.key, name: target.name, path: target.path, reason: "missing" });
       continue;

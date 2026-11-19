@@ -11,10 +11,11 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { lstat, mkdir, readdir, readFile, readlink, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, readlink, rm, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { canonicalContentHash } from "@skillet/protocol";
-import type { KitMapDocument, KitMapDraft, KitMapEntry, KitMapPendingChange } from "@skillet/protocol/kit-map";
+import { toSavedEntry, type KitMapDocument, type KitMapDraft, type KitMapEntry, type KitMapPendingChange } from "@skillet/protocol/kit-map";
+import { symlinksAvailable } from "./symlink-support.js";
 
 const HOME = vi.hoisted(() => {
   const { redirectHome } = require("./helpers/redirect-home.cjs");
@@ -537,6 +538,28 @@ describe("Remove", () => {
     expect((await readState()).skills["agent-browser"], "restore never re-imports").toBeUndefined();
   });
 
+  it.skipIf(!symlinksAvailable)("a skill in a skills folder linked to another moves once, and its Remove is done", async () => {
+    // ~/.claude/skills -> ~/.agents/skills: one folder both tools load.
+    await writeSkill(join(AGENTS, "old-notes"), "old-notes");
+    await symlink(AGENTS, CLAUDE, "dir");
+    const before = await scan();
+    const fake = account();
+
+    const res = await saveWith(fake, [{ kind: "remove", key: byName(before, "old-notes").key }]);
+
+    expect(res.result).toBe("applied");
+    expect(res.counts.removals).toBe(1);
+    expect(res.left.removals).toBe(0);
+    expect([...fake.changes.values()].find((c) => c.kind === "remove")?.outcome).toBe("applied");
+    expect(existsSync(join(AGENTS, "old-notes"))).toBe(false);
+    const ledger = JSON.parse(readFileSync(join(mapTrashRoot(), res.trashRun!, "manifest.json"), "utf8")) as { items: unknown[] };
+    expect(ledger.items).toHaveLength(1);
+
+    const restored = await restoreTrash(res.trashRun!);
+    expect(restored?.restored).toEqual(["old-notes"]);
+    expect(existsSync(join(AGENTS, "old-notes", "SKILL.md"))).toBe(true);
+  });
+
   it("another maker's skill leaves through kit removal, and its folders are left for sync to take", async () => {
     await writeSkill(join(CLAUDE, "alice--show-notes"), "show-notes");
     const before = await scan();
@@ -664,28 +687,38 @@ describe("resuming", () => {
     expect(fake.calls.filter((c) => c.startsWith("putBackup")).slice(putsAfterFirst)).toEqual([`putBackup ${zulu}`]);
   });
 
-  it("a waiting change from a dropped-folder Save is claimed with the scan's hashes and applied as this computer's own", async () => {
+  it("a remove from a dropped-folder Save, on the saved map as the web writes it, is claimed, applied and taken off the map", async () => {
     await writeSkill(join(CLAUDE, "dropped"), "dropped");
     await writeSkill(join(CLAUDE, "kept"), "kept");
     const before = await scan();
-    const dropped = byName(before, "dropped").key;
+    const dropped = byName(before, "dropped");
+    const kept = byName(before, "kept");
     const fake = account();
-    fake.deviceless.push({ id: "dropped-1", device: null, version: 1, kind: "remove", key: dropped });
-    // The dropped-folder Save saved the map with the hashes it saw.
+    fake.deviceless.push({ id: "dropped-1", device: null, version: 1, kind: "remove", key: dropped.key });
+    // What the web's dropped-folder Save writes (mapDocument in
+    // packages/web/src/lib/map-drop-store.ts): every skill in the folder as
+    // toSavedEntry saves it, the one drafted for removal included, each in the
+    // job the folder had it, until a computer removes it.
+    const folder = wireOf(before);
     await fake.client.writeMap({
       version: 0,
-      entries: [{ key: dropped, name: "dropped", description: "", source: "local" }],
-      assignments: {},
+      entries: folder.map(toSavedEntry),
+      assignments: Object.fromEntries(folder.map((entry) => [entry.key, entry.job])),
     });
 
+    // The app's sync tick: `skillet map --apply`.
     const res = await runMapApply({ mode: "apply", scan: before, wire: wireOf, client: fake.client });
 
-    expect(fake.claimedWith).toEqual([[dropped]]);
+    // Offered only what the saved map holds, which now includes the removed skill.
+    expect(fake.claimedWith).toEqual([[dropped.key, kept.key]]);
     expect(fake.changes.get("dropped-1")?.outcome).toBe("applied");
     expect(existsSync(join(CLAUDE, "dropped"))).toBe(false);
     expect(existsSync(join(CLAUDE, "kept", "SKILL.md"))).toBe(true);
+    expect(res.result).toBe("applied");
     expect(res.counts.removals).toBe(1);
-    expect(fake.doc()?.entries.map((e) => e.key)).not.toContain(dropped);
+    // Removed, so off the saved map; the rest keep their entries and jobs.
+    expect(fake.doc()?.entries).toEqual([toSavedEntry(folder.find((entry) => entry.key === kept.key)!)]);
+    expect(fake.doc()?.assignments).toEqual({ [kept.key]: kept.jobId });
   });
 
   it("two waiting removes of one skill move it once and acknowledge both", async () => {

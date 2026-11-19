@@ -180,6 +180,24 @@ describe("a root spelled through a link", () => {
     expect(restored?.restored).toEqual(["notes"]);
     expect(readFileSync(join(CLAUDE, "notes", "SKILL.md"), "utf8")).toContain("name: notes");
   });
+
+  it.skipIf(!symlinksAvailable)("two allowed roots that are one folder: a skill named under both moves once, and neither is a failed move", async () => {
+    // ~/.claude/skills -> ~/.agents/skills.
+    await writeSkill(join(AGENTS, "notes"), "notes");
+    await mkdir(join(HOME, ".claude"), { recursive: true });
+    await symlink(AGENTS, CLAUDE, "dir");
+
+    const res = await trashMapFolders([target(join(AGENTS, "notes")), target(join(CLAUDE, "notes"))]);
+
+    expect(res.skipped).toEqual([]);
+    expect(res.moved).toHaveLength(1);
+    expect(res.moved[0]).toMatchObject({ root: AGENTS, folder: "notes", from: join(AGENTS, "notes"), path: join(AGENTS, "notes") });
+    expect(existsSync(join(AGENTS, "notes"))).toBe(false);
+
+    const restored = await restoreTrash(res.runId!);
+    expect(restored).toEqual({ runId: res.runId, restored: ["notes"], reimported: [], skipped: [] });
+    expect(readFileSync(join(AGENTS, "notes", "SKILL.md"), "utf8")).toContain("name: notes");
+  });
 });
 
 describe("restoring a map-trash run never trusts its ledger", () => {

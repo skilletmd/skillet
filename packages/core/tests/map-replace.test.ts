@@ -11,10 +11,11 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { lstat, mkdir, readdir, readFile, readlink, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { lstat, mkdir, readdir, readFile, readlink, rm, symlink, writeFile } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import { canonicalContentHash } from "@skillet/protocol";
 import type { KitMapDocument, KitMapEntry, KitMapPendingChange } from "@skillet/protocol/kit-map";
+import { symlinksAvailable } from "./symlink-support.js";
 
 const HOME = vi.hoisted(() => {
   const { redirectHome } = require("./helpers/redirect-home.cjs");
@@ -237,6 +238,21 @@ async function twoOriginals(): Promise<{ prose: string; copy: string; wire: KitM
   return { prose, copy, wire: wireOf(before) };
 }
 
+/** Two originals in ~/.agents/skills, with ~/.claude/skills linked to it, and the merge this computer wrote from them. */
+async function linkedOriginals(): Promise<{ prose: string; copy: string; wire: KitMapEntry[] }> {
+  await writeSkill(join(AGENTS, "plain-prose"), "plain-prose", "Edit prose so it reads plainly.");
+  await writeSkill(join(AGENTS, "copy-editor"), "copy-editor", "Copy edit prose before it ships.");
+  await symlink(AGENTS, CLAUDE, "dir");
+  const before = await scan();
+  const prose = byName(before, "plain-prose").key;
+  const copy = byName(before, "copy-editor").key;
+  await keepRecord("merge-1", [prose, copy]);
+  return { prose, copy, wire: wireOf(before) };
+}
+
+/** A skills folder's skill folders: no dot-folders. */
+const skillFolders = (names: string[]): string[] => names.filter((name) => !name.startsWith(".")).sort();
+
 // ---------------------------------------------------------------------------
 // Replace
 // ---------------------------------------------------------------------------
@@ -390,6 +406,53 @@ describe("replace (U15, KTD13)", () => {
     expect(fake.changes.get("replace-1")?.outcome).toBe("applied");
     expect(await snapshot()).toEqual(placed);
     expect((await listMapTrash()).length).toBe(runs);
+  });
+
+  it.skipIf(!symlinksAvailable)("with ~/.claude/skills linked to ~/.agents/skills, the merged skill goes into the one folder once", async () => {
+    const { prose, copy, wire } = await linkedOriginals();
+    const fake = account(savedMap(wire));
+    replace(fake, [prose, copy]);
+
+    const res = await apply(fake);
+
+    expect(res.result).toBe("applied");
+    expect(fake.changes.get("replace-1")?.outcome).toBe("applied");
+    expect(skillFolders(await readdir(AGENTS))).toEqual(["editing"]);
+    expect(readFileSync(join(AGENTS, "editing", "SKILL.md"), "utf8")).toBe(MERGED_TEXT);
+    const after = await scan();
+    expect(after.entries.map((e) => [e.name, e.locations.length, [...e.tools].sort()])).toEqual([["Editing", 1, ["claude-code", "codex"]]]);
+  });
+
+  it.skipIf(!symlinksAvailable)("a scan that names one folder under both its spellings still gets the merged skill once", async () => {
+    const { prose, copy } = await linkedOriginals();
+    const fake = account();
+    replace(fake, [prose, copy]);
+    // Each original once per spelling, as the scan listed a linked folder before it read it once.
+    const scanned = await scan();
+    const twice: MapScanResult = {
+      ...scanned,
+      entries: scanned.entries.map((entry) => {
+        const [first] = entry.locations;
+        const folder = basename(first!.path);
+        return {
+          ...entry,
+          tools: ["claude-code", "codex"],
+          copies: { "claude-code": 1, codex: 1 },
+          locations: [
+            { ...first!, path: join(CLAUDE, folder), tools: ["claude-code"] },
+            { ...first!, path: join(AGENTS, folder), tools: ["codex"] },
+          ],
+        };
+      }),
+    };
+
+    const res = await runMapApply({ mode: "apply", scan: twice, wire: wireOf, client: fake.client });
+
+    expect(res.result).toBe("applied");
+    expect(fake.changes.get("replace-1")?.outcome).toBe("applied");
+    expect(skillFolders(await readdir(AGENTS))).toEqual(["editing"]);
+    const run = (await listTrash()).find((r) => r.kind === "map-replace");
+    expect(run?.skills.sort()).toEqual(["copy-editor", "plain-prose"]);
   });
 
   it("a folder now at an original's path blocks only that original's restore", async () => {
