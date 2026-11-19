@@ -2,6 +2,12 @@
 // age-clear old trash. Operates ONLY off the ledger each prune run writes
 // (`~/.skillet/trash/<stamp>/manifest.json`); it never reconstructs paths
 // heuristically, and it only ever touches dirs matching the prune stamp format.
+//
+// The kit map's Remove and a picked merge's replace keep their runs apart, in
+// `~/.skillet/map-trash` (../map/remove-trash.ts): they are listed and restored
+// here beside the prune runs, but restore them through their own rules (never
+// re-import, never overwrite, back only into the compile-time allowlist), and
+// `clearOldTrash` never reads that root.
 import { readdir, readFile, rm, lstat } from 'node:fs/promises';
 import { realpathSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
@@ -10,6 +16,7 @@ import { isSkilletSlugDirName } from '../bundle/write.js';
 import { MATERIALIZATION_ROOT_ALLOWLIST } from '../util/pathsafe.js';
 import { ledgerStamp, LEDGER_STAMP, writeRunManifest, moveDir } from './edits-store.js';
 import { importSkill } from './import.js';
+import { MAP_REMOVE_RUN, MAP_REPLACE_RUN, listMapTrash, restoreMapTrash, type MapRunKind } from '../map/remove-trash.js';
 
 /** True iff `child` resolves to `root` or a path beneath it (symlink-safe). */
 function withinRoot(child: string, root: string): boolean {
@@ -68,8 +75,13 @@ export interface TrashRun {
   /** The trash dir name (the prune run stamp). */
   id: string;
   trashedAt: string;
-  /** Distinct skill refs in this run. */
+  /** Distinct skill refs in this run (a map run lists the skills' names). */
   skills: string[];
+  /**
+   * `map-remove` for a run the kit map's Remove made, `map-replace` for one a
+   * picked merge made in place of its originals; absent for sync's own trash.
+   */
+  kind?: MapRunKind;
 }
 
 export interface RestoreResult {
@@ -112,8 +124,14 @@ async function exists(p: string): Promise<boolean> {
 // Dir moves share moveDir from ./edits-store.js (atomic rename, EXDEV copy+remove
 // fallback) — one implementation, one set of semantics.
 
-/** List restorable trash runs, newest first. */
+/** List restorable trash runs, newest first: sync's own and the kit map's Remove runs. */
 export async function listTrash(): Promise<TrashRun[]> {
+  const runs: TrashRun[] = [...(await listPruneTrash()), ...(await listMapTrash())];
+  runs.sort((a, b) => b.id.localeCompare(a.id)); // stamp is ISO-prefixed → lexical = chronological
+  return runs;
+}
+
+async function listPruneTrash(): Promise<TrashRun[]> {
   let entries;
   try {
     entries = await readdir(trashRoot(), { withFileTypes: true });
@@ -131,7 +149,6 @@ export async function listTrash(): Promise<TrashRun[]> {
       skills: [...new Set(ledger.items.map((i) => i.slug))],
     });
   }
-  runs.sort((a, b) => b.id.localeCompare(a.id)); // stamp is ISO-prefixed → lexical = chronological
   return runs;
 }
 
@@ -147,6 +164,9 @@ export async function restoreTrash(runId?: string): Promise<RestoreResult | null
   if (runs.length === 0) return null;
   const target = runId ? runs.find((r) => r.id === runId) : runs[0];
   if (!target) return null;
+  // A map run goes back by its own rules, and never re-imports. A replace run
+  // first moves the merged folders it wrote to the map trash.
+  if (target.kind === MAP_REMOVE_RUN || target.kind === MAP_REPLACE_RUN) return restoreMapTrash(target.id);
   const ledger = await readLedger(join(trashRoot(), target.id));
   if (!ledger) return null;
 

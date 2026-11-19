@@ -44,6 +44,7 @@ import { lastCleanHashPrisma } from '../lib/sync-manifest.js';
 import { platformAttestationKeyPrisma } from '../lib/platform-signing.js';
 import { commitPublishNewVersionPrisma, getSkillForPublishPrisma, persistVersionScanPrisma, skillVersionExistsPrisma, updateSkillVisibilityPrisma } from '../lib/skill-publish.js';
 import { computeSkillTokens } from '../lib/skill-tokens.js';
+import { mergedFromBackup } from '../lib/merged-from.js';
 import { authorExistsPrisma } from '../lib/kit-payload.js';
 import type { PrismaClient } from '@prisma/client';
 import { serveBlockForScanFromInfo, serveBlockForModerationPrisma, serveBlockForScanPrisma } from './serve-guards.js';
@@ -496,6 +497,9 @@ export function registerSkillRoutes(app: FastifyInstance, db: DatabaseSync, blob
         // — a private skill never persists nor serves notes. Strip them off the
         // base metadata spread either way so a private publish can't smuggle them.
         const { harm_notes: rawHarmNotes, ...restMetadata } = metadata ?? {};
+        // `merged_from` is never the caller's to say: a merged skill's sources
+        // come from the publisher's own merge backup of these bytes (below).
+        delete restMetadata.merged_from;
         const harmNotes = visibility === 'public' ? sanitizeHarmNotes(rawHarmNotes) : {};
         // Invocation facts (how the skill triggers) — orthogonal to the security
         // scan. Stored as explicit booleans on every publish so the detail API
@@ -562,6 +566,9 @@ export function registerSkillRoutes(app: FastifyInstance, db: DatabaseSync, blob
         }
         const skillId = toSkillId(`${author}/${slug}`);
         const versionHash = canonicalContentHash(bundle);
+        // Kit map U15 (KTD14): publishing a merged skill the person holds as a
+        // merge backup copies the sources it credits into the version.
+        const mergedFrom = await mergedFromBackup(prisma, sessionPrincipal.user_id, versionHash);
         const userKeyRow = await prisma.users.findUnique({
             where: { id: authorRow.user_id },
             select: { author_public_key: true, author_key_id: true },
@@ -712,6 +719,7 @@ export function registerSkillRoutes(app: FastifyInstance, db: DatabaseSync, blob
             bumpKind,
             metadataJson: JSON.stringify({
                 ...versionMetadata,
+                ...(mergedFrom ? { merged_from: mergedFrom } : {}),
                 ...(orgPublish
                     ? { published_under_org: author, published_by_handle: publishedBy }
                     : {}),

@@ -55,6 +55,7 @@ async function insertPairCodePrisma(
   prisma: PrismaDb,
   userId: string,
   now: number,
+  mapSessionId: string | null = null,
 ): Promise<{ code: string; expires_at: number }> {
   for (let attempt = 0; attempt < 8; attempt++) {
     const code = mintPairCode()
@@ -66,6 +67,7 @@ async function insertPairCodePrisma(
           user_id: userId,
           created_at: now,
           expires_at: expiresAt,
+          map_session_id: mapSessionId,
         },
       })
       return { code, expires_at: expiresAt }
@@ -98,12 +100,29 @@ export async function getOrCreatePairCodePrisma(
       user_id: userId,
       redeemed_at: null,
       expires_at: { gte: now + MIN_REUSE_REMAINING_SEC },
+      // A map session's code belongs to the CLI polling for it, never to Settings.
+      map_session_id: null,
     },
     orderBy: { expires_at: 'desc' },
     select: { code: true, expires_at: true },
   })
   if (live) return live
   return insertPairCodePrisma(prisma, userId, now)
+}
+
+/**
+ * A fresh connect code for an approved map session (KTD6), valid for 5
+ * minutes. Never the Settings code {@link getOrCreatePairCodePrisma} reuses, and
+ * marked with its session, so {@link claimPairCodePrisma} refuses it alongside a
+ * device token and records the computer it connected.
+ */
+export async function mintMapSessionPairCodePrisma(
+  prisma: PrismaDb,
+  userId: string,
+  mapSessionId: string,
+  now: number,
+): Promise<{ code: string; expires_at: number }> {
+  return insertPairCodePrisma(prisma, userId, now, mapSessionId)
 }
 
 export type ClaimPairResult =
@@ -130,6 +149,7 @@ export async function claimPairCodePrisma(
       user_id: true,
       expires_at: true,
       redeemed_at: true,
+      map_session_id: true,
     },
   })
   if (!row) {
@@ -153,6 +173,21 @@ export async function claimPairCodePrisma(
       body: {
         error: 'code_expired',
         message: 'This code has expired — generate a new one on the web',
+      },
+    }
+  }
+
+  // A map-session code connects a computer to the account that approved it. A
+  // presented device token would be looked up on ANY account below and its row
+  // moved to this one, and the next sync's prune would then trash the old
+  // account's kit on that computer. Refused without spending the code.
+  if (row.map_session_id != null && opts.presentedToken) {
+    return {
+      ok: false,
+      status: 403,
+      body: {
+        error: 'device_token_not_allowed',
+        message: 'This code connects a new computer. Claim it without a device token.',
       },
     }
   }
@@ -217,6 +252,13 @@ export async function claimPairCodePrisma(
         throw new Error('code_already_used')
       }
 
+      if (row.map_session_id != null) {
+        await tx.map_sessions.updateMany({
+          where: { id: row.map_session_id, claimed_at: null },
+          data: { claimed_at: opts.now, device_id: deviceId },
+        })
+      }
+
       await tx.sessions.create({
         data: {
           id: sessionId,
@@ -260,6 +302,7 @@ export async function claimPairCodePrisma(
               client_platform: opts.clientPlatform ?? current?.client_platform ?? null,
               machine_id: opts.machineId ?? current?.machine_id ?? null,
               last_seen_at: opts.now,
+              connected_at: opts.now,
               // Re-pairing the same machine reclaims a logged-out or idle-expired
               // device: clear the revoke and refresh the sliding deadline (#464).
               revoked_at: null,
@@ -278,6 +321,7 @@ export async function claimPairCodePrisma(
               client_platform: opts.clientPlatform,
               machine_id: opts.machineId,
               expires_at: opts.now + DEVICE_TOKEN_TTL_SEC,
+              connected_at: opts.now,
             },
           })
         }

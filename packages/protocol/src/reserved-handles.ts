@@ -162,6 +162,9 @@ export const RESERVED_HANDLES: ReadonlySet<string> = new Set<string>([
   'installs',
   'kit',
   'kits',
+  // The kit map (/map) and its preview (/packs).
+  'map',
+  'packs',
   'org',
   'orgs',
   'organization',
@@ -173,6 +176,7 @@ export const RESERVED_HANDLES: ReadonlySet<string> = new Set<string>([
   'documentation',
   'blog',
   'news',
+  'arena',
   'status',
   'health',
   'pricing',

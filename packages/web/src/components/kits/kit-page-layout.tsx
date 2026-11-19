@@ -78,6 +78,7 @@ export function KitPageLayout({
   skills,
   capabilities,
   usedByBlock,
+  list,
   /** Extra sections in the main column, below the skill list (a named kit's
    *  install command + version history; empty for the virtual author-kit). */
   mainExtra,
@@ -106,6 +107,8 @@ export function KitPageLayout({
   skills: KitSkillEntry[]
   capabilities: KitCapabilities
   usedByBlock?: ReactNode
+  /** Replaces the default skill list. The arena's slots preview passes its own. */
+  list?: ReactNode
   mainExtra?: ReactNode
   authorRow?: ReactNode
   railExtra?: ReactNode
@@ -235,7 +238,7 @@ export function KitPageLayout({
             {usedByBlock && <div className="mt-2 lg:hidden">{usedByBlock}</div>}
 
             <section className="mt-6">
-              <KitSkillList entries={skills} owner={owner} />
+              {list ?? <KitSkillList entries={skills} owner={owner} />}
             </section>
 
             {/* Permissions AFTER the list. What the kit contains is the question

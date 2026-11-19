@@ -3797,3 +3797,53 @@ html {
 .rail-scroll::-webkit-scrollbar {
   display: none;
 }
+
+/* Arena: each version keeps one color everywhere it appears (cards, tallies,
+   picks), so a reader follows A and B without reading labels. Validated as a
+   two-slot categorical pair on both surfaces (dataviz validate_palette). The
+   vote screen never uses them: voters must not know which side is which. */
+.arena {
+  --arena-a: #eb6834;
+  --arena-b: #2a78d6;
+}
+[data-theme='dark'] .arena {
+  --arena-a: #d95926;
+  --arena-b: #3987e5;
+}
+@keyframes arena-seal {
+  0% {
+    opacity: 0;
+    transform: scale(1.35) rotate(-14deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.96) rotate(-6deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-6deg);
+  }
+}
+.arena-seal {
+  transform: rotate(-6deg);
+  animation: arena-seal 520ms var(--ease) both;
+}
+@keyframes arena-pair-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.arena-pair-in {
+  animation: arena-pair-in 240ms var(--ease) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .arena-seal,
+  .arena-pair-in {
+    animation: none;
+  }
+}

@@ -16,6 +16,7 @@ import { SkillCard } from '@/components/skill-card'
 import { Eyebrow } from '@/components/ui/eyebrow'
 import { UsedBy } from '@/components/kits/used-by'
 import { WorksWithRail } from '@/components/works-with-rail'
+import { ArenaRecord } from '@/components/arena/arena-record'
 import { PAGE_CONTAINER_CLASS } from '@/lib/page-layout'
 import { AddToKitButton } from '@/components/add-to-kit-button'
 import { SkillDelivery } from '@/components/skills/skill-delivery'
@@ -25,6 +26,7 @@ import { fetchEvidenceFileTexts } from '@/lib/skill-bundle-evidence'
 import { SkillOwnerControls } from '@/components/skills/skill-owner-controls'
 import { Tooltip } from '@/components/ui/tooltip'
 import { VersionHistory } from '@/components/skills/version-history'
+import { MergedFrom } from '@/components/skills/merged-from'
 import { DeprecatedBadge } from '@/components/deprecated-badge'
 import {
   SkillInstallSkeleton,
@@ -390,6 +392,8 @@ export async function SkillPageView({
               </div>
             )}
 
+            {skill.mergedFrom && <MergedFrom from={skill.mergedFrom} />}
+
             {noServableVersion && !quarantined && (
               <div className="mt-6 rounded-xl border border-(--danger-line) bg-(--danger-bg) px-4 py-3">
                 <p className="text-sm font-medium leading-[1.5] text-(--danger)">
@@ -625,6 +629,8 @@ export async function SkillPageView({
                     cover), so the rail keeps only the quieter identity facts. */}
               </div>
             </section>
+
+            <ArenaRecord author={author} slug={slug} />
 
             {/* Desktop only — on mobile this lives up under the hero (below).
                 The wrapper makes the inner section a first-child, so restore its

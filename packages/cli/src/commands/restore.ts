@@ -17,7 +17,7 @@ export function registerRestoreCommand(program: Command): void {
   program
     .command("restore [run]")
     .description(
-      "Restore skills a sync prune moved to trash. No args lists runs; pass a run id or `latest`.",
+      "Restore skills that sync or the kit map moved to trash. No args lists runs; pass a run id or `latest`.",
     )
     .option("--json", "Emit machine-readable output")
     .action(async (run: string | undefined, opts: { json?: boolean }) => {
@@ -34,7 +34,7 @@ export function registerRestoreCommand(program: Command): void {
           console.log("Nothing in trash to restore.");
           return;
         }
-        console.log("Trashed by sync prune (restore with `skillet restore <id>` or `latest`):\n");
+        console.log("In trash (restore with `skillet restore <id>` or `latest`):\n");
         for (const r of runs) {
           console.log(
             `  ${r.id}  · ${relTime(r.trashedAt)} · ${r.skills.length} skill${r.skills.length === 1 ? "" : "s"}`,

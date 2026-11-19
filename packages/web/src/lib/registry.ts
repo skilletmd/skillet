@@ -1,4 +1,5 @@
 import { cache } from 'react'
+import { isWireRef } from '@skillet/protocol/skill-id'
 import type {
   AuthorProfile,
   CapabilityAnalysis,
@@ -9,6 +10,7 @@ import type {
   SignatureStatus,
   Skill,
   SkillCapabilityReport,
+  SkillMergedFrom,
   SkillSecurity,
   SkillSummary,
 } from './types'
@@ -217,6 +219,8 @@ interface SkillDetailResponse extends SkillSummary {
   author_public_key: string | null
   manifest_url: string
   triggers?: string[]
+  /** A merged skill's sources (kit map U15): public ones by ref and name, private ones counted. */
+  merged_from?: { sources?: Array<{ ref?: unknown; name?: unknown }>; private?: unknown }
   eval?: 'passed' | 'failed' | 'none'
   /** Invocation facts — how the skill triggers (orthogonal to the security scan). */
   model_invoked?: boolean
@@ -359,6 +363,18 @@ function mapSummary(s: SkillSummary): Skill {
   }
 }
 
+/** The registry's `merged_from`, kept only where every part reads: a ref in its canonical `@owner/slug` form, a name, a count. */
+function mapMergedFrom(raw: SkillDetailResponse['merged_from']): SkillMergedFrom | undefined {
+  if (!raw || !Array.isArray(raw.sources)) return undefined
+  const sources = raw.sources.flatMap((s) =>
+    isWireRef(s?.ref) && typeof s.name === 'string' && s.name.trim() !== ''
+      ? [{ ref: s.ref, name: s.name }]
+      : [],
+  )
+  const privateCount = typeof raw.private === 'number' && Number.isSafeInteger(raw.private) && raw.private > 0 ? raw.private : 0
+  return sources.length > 0 || privateCount > 0 ? { sources, privateCount } : undefined
+}
+
 function mapDetail(d: SkillDetailResponse): Skill {
   const skill = mapSummary(d)
   // Real version history from the registry (newest first). Prefer each row's
@@ -376,6 +392,8 @@ function mapDetail(d: SkillDetailResponse): Skill {
   if (Array.isArray(d.triggers) && d.triggers.length > 0) {
     skill.triggers = d.triggers
   }
+  const mergedFrom = mapMergedFrom(d.merged_from)
+  if (mergedFrom) skill.mergedFrom = mergedFrom
   if (d.eval === 'passed' || d.eval === 'failed' || d.eval === 'none') {
     skill.evalStatus = d.eval
   }

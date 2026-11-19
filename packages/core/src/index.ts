@@ -57,6 +57,118 @@ export {
   type DiscoveryReport,
   type ImportDiscoveredResult,
 } from "./commands/discover.js";
+// The kit map's read-only scan (plan U3): every skill on the computer, sorted
+// by who owns its folder, with nothing written and nothing sent.
+export {
+  scanMap,
+  type MapScanOptions,
+  type MapScanResult,
+  type MapScanEntry,
+  type MapScanLocation,
+  type MapScannedFolder,
+  type MapFlags,
+  type MapBackupBlock,
+  type MapMergeBlock,
+} from "./map/scan.js";
+export {
+  type MapSource,
+  type MapOwner,
+  type MapPluginOwner,
+  type MapOrganizationOwner,
+  type MapAppOwner,
+  type MapUnreadable,
+  type MapUnreadableReason,
+} from "./map/folder-rules.js";
+// Usage marks for the map (plan U4): used, unused or unknown per entry, from
+// each tool's own records on this computer, never uploaded.
+export {
+  readMapUsage,
+  MAP_USAGE_WINDOW_DAYS,
+  CODEX_READ_BUDGET_MS,
+  CLAUDE_SKILL_USAGE_CAP,
+  type MapUsageOptions,
+  type MapUsageResult,
+  type MapUsageMark,
+  type MapUsageState,
+  type MapUsageReason,
+  type MapUsageGap,
+  type MapUsageGapReason,
+  type MapUsageHistory,
+  type MapUsageTool,
+} from "./map/usage.js";
+// Save making the map's fixes on this computer (plan U11): backups by hash,
+// removes by the folder rules into their own trash, fills, the saved map, and
+// the lock that holds while it runs.
+export {
+  runMapApply,
+  emptyMapApplyResult,
+  type MapApplyClient,
+  type MapApplyOptions,
+  type MapApplyResult,
+  type MapChangeInput,
+  type MapFillResult,
+  type MapKitRemoval,
+  type MapKeptRemove,
+  type MapNotBackedUp,
+  type MapRefusedFill,
+  type MapReplaced,
+  type MapUnremoved,
+} from "./map/apply.js";
+export { readMapSkillBundle, type MapBackupBody, type MapBackupPut } from "./map/skill-fs.js";
+// The merge step (plan U14): drafted merges written by the person's own AI
+// tool with no tools, stored privately with their blind rounds, and the record
+// of what this computer wrote.
+export {
+  runMapMerges,
+  isMergeableEntry,
+  readMapMergeRecord,
+  readMapMergeRecords,
+  mapMergeRecordsDir,
+  MAP_MERGE_LIMITS,
+  type MapMergeClient,
+  type MapMergeLimits,
+  type MapMergeOutcome,
+  type MapMergeRecord,
+  type MapMergeRunOptions,
+  type MapMergeRunResult,
+} from "./map/merge-run.js";
+export {
+  MergeWriterError,
+  createToolMergeWriter,
+  findMergeTool,
+  findMergeWriter,
+  mergeToolSearchDirs,
+  type MergeSourceSkill,
+  type MergeTool,
+  type MergeToolId,
+  type MergeToolSearch,
+  type MergeWriter,
+  type MergeWriterCall,
+  type MergeWriterFailure,
+} from "./map/merge-writer.js";
+export {
+  trashMapFolders,
+  listMapTrash,
+  restoreMapTrash,
+  mapTrashRoot,
+  MAP_REMOVE_RUN,
+  MAP_REPLACE_RUN,
+  type MapRunKind,
+  type MapTrashTarget,
+  type MapTrashItem,
+  type MapTrashResult,
+  type MapTrashRun,
+  type MapPlacedFolder,
+  type MapReplaceRecord,
+} from "./map/remove-trash.js";
+export {
+  acquireMapSaveLock,
+  mapSaveLockPath,
+  MapSaveLockBusy,
+  type AcquireMapSaveLockOptions,
+  type MapSaveLock,
+  type MapSaveLockHolder,
+} from "./map/save-lock.js";
 export * from "./commands/sync.js";
 // Curated customized-skills surface: only what the CLI/desktop actually
 // consume. Internals (moveDir, ledgerStamp, backupSkillVersion, drift
@@ -191,6 +303,7 @@ export { loadSessionToken, readSessionFileToken, envSessionToken, envSessionToke
 export type { SessionTokenPrecedence } from "./session-token.js";
 export {
   readActiveDeviceFile,
+  readDeviceFile,
   saveDeviceToken,
   clearDeviceToken,
   deviceFilePath,
@@ -212,9 +325,11 @@ export {
 export { authConnect, type AuthConnectOptions, type AuthConnectResult } from "./commands/auth-connect.js";
 export {
   authConnectPair,
+  authConnectFreshPair,
   type AuthConnectPairOptions,
   type AuthConnectPairResult,
 } from "./commands/auth-connect-pair.js";
+export { defaultMachineLabel } from "./machine-label.js";
 export {
   mintPairCode,
   type MintPairCodeOptions,
@@ -330,6 +445,8 @@ export {
   validateProjectAdapterRoot,
   resolveAdapterRoot,
   MATERIALIZATION_ROOT_ALLOWLIST,
+  MAP_FOLDER_ROOT_ALLOWLIST,
+  mapFolderRootOf,
   PROJECT_TARGET_ALLOWLIST,
   HERMES_ENV_ROOT,
   HERMES_DEFAULT_HOME,

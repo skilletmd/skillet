@@ -32,9 +32,10 @@ test('root help lists journey groups and root-tier commands from matrix', () => 
     assert.match(text, new RegExp(escaped));
   }
 
-  // 17 since `create` earned a root row: it is the authoring front door, in the
-  // same group as add/search/list. `eval` stays in the footer, not a row.
-  assert.equal(rootHelpRowCount(), 17);
+  // 18 since `map` joined `create`: `map` is the first-run front door, beside
+  // init, and `create` is the authoring one, in the same group as
+  // add/search/list. `eval` stays in the footer, not a row.
+  assert.equal(rootHelpRowCount(), 18);
   assert.doesNotMatch(text, /kit create/);
   assert.doesNotMatch(text, /publish/);
   assert.doesNotMatch(text, /Trust/);

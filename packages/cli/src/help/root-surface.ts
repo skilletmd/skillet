@@ -26,6 +26,12 @@ export const ROOT_SURFACE: SurfaceRow[] = [
     tier: 'root',
   },
   {
+    command: 'map',
+    usage: 'map',
+    group: 'Getting started',
+    tier: 'root',
+  },
+  {
     command: 'connect',
     usage: 'connect <code>',
     group: 'Getting started',

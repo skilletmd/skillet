@@ -26,6 +26,7 @@ import { PROTECTED_RESOURCE_WELL_KNOWN } from '@skillet/protocol/protected-resou
 import { CATEGORY_BY_KEY, isCategoryKey } from './categories'
 import { DOC_NAV } from './docs-nav'
 import { TOUR_SLUGS } from './tour'
+import { ARENA_ROUND_SLUGS } from './arena/rounds'
 
 /**
  * The registry's claim-gate handle grammar. Kept as a literal rather than
@@ -59,6 +60,9 @@ export const KNOWN_TOP_LEVEL_SEGMENTS: ReadonlySet<string> = new Set([
   'about',
   'admin',
   'api',
+  'arena',
+  // Example screenshots for the arena preview's vote pairs.
+  'arena-demo',
   'blog',
   'browse',
   'connect',
@@ -77,9 +81,13 @@ export const KNOWN_TOP_LEVEL_SEGMENTS: ReadonlySet<string> = new Set([
   'lab',
   'legal',
   'login',
+  // The kit map: the saved map, the frame `skillet map` loads, the save tab.
+  'map',
   'moderation',
   'news',
   'notifications',
+  // The packs preview: premade sets of job slots.
+  'packs',
   'privacy',
   'search',
   'settings',
@@ -184,6 +192,9 @@ export type RegistryLookup =
 
 const SKILL_SUBPAGES = new Set(['edit', 'propose', 'review'])
 
+/** The pages under /map. */
+const MAP_PAGES: ReadonlySet<string> = new Set(['embed', 'save'])
+
 /**
  * Classify a pathname. Callers pass an already-normalized pathname (leading
  * slash, no query, no trailing slash except for the root).
@@ -234,6 +245,33 @@ export function classifyRoute(pathname: string): RouteVerdict {
     if (segments.length === 3 && second === 'topic' && isCategoryKey(third)) {
       return { kind: 'known' }
     }
+    return { kind: 'unknown' }
+  }
+
+  // /arena is the round list; /arena/<round> is one round and
+  // /arena/<round>/vote its voting screen. Only real rounds resolve, decided
+  // here for the same PPR reason as /news topics.
+  if (first === 'arena') {
+    if (segments.length === 1) return { kind: 'known' }
+    // /arena/slots previews a kit as job slots; /arena/slots/before is today's
+    // kit page with the same kit, for a side-by-side.
+    if (second === 'slots') {
+      if (segments.length === 2) return { kind: 'known' }
+      if (segments.length === 3 && third === 'before') return { kind: 'known' }
+      return { kind: 'unknown' }
+    }
+    if (!ARENA_ROUND_SLUGS.has(second!)) return { kind: 'unknown' }
+    if (segments.length === 2) return { kind: 'known' }
+    if (segments.length === 3 && third === 'vote') return { kind: 'known' }
+    return { kind: 'unknown' }
+  }
+
+  // /map is the saved kit map, /map/embed the frame the page `skillet map`
+  // serves loads, and /map/save the tab Save opens. Enumerated like /tour so a
+  // guessed /map/anything is a real 404.
+  if (first === 'map') {
+    if (segments.length === 1) return { kind: 'known' }
+    if (segments.length === 2 && MAP_PAGES.has(second!)) return { kind: 'known' }
     return { kind: 'unknown' }
   }
 

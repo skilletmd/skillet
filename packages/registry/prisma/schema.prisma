@@ -92,6 +92,7 @@ model blobs {
   storage_loc         String                @default("inline")
   proposal_files      proposal_files[]
   skill_version_files skill_version_files[]
+  skill_backup_files  skill_backup_files[]
 }
 
 model capability_result_cache {
@@ -185,6 +186,11 @@ model devices {
   client_platform     String?
   machine_id          String?
   client_kinds        String? @db.Text
+  /// When a pair code last connected this row (new or reclaimed). Null for rows
+  /// connected before this column, and for wizard tokens: read `created_at` then.
+  /// A device-less kit map change goes only to a computer that connected after
+  /// the change was made (kit_map_changes).
+  connected_at        Int?
   device_kit_excludes device_kit_excludes[]
   device_skill_edits  device_skill_edits[]
   users               users                 @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -411,6 +417,9 @@ model machine_pair_codes {
   expires_at         Int
   redeemed_at        Int?
   redeemed_device_id String?
+  /// Set when an approved map session minted this code. Such a code is never the
+  /// reused Settings code, and its claim refuses a presented device token.
+  map_session_id     String?
   users              users   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([user_id, expires_at], map: "idx_machine_pair_codes_user")
@@ -941,8 +950,11 @@ model users {
   kit_keys                                                    kit_keys[]
   kit_members_kit_members_invited_byTousers                   kit_members[]                @relation("kit_members_invited_byTousers")
   kit_members_kit_members_user_idTousers                      kit_members[]                @relation("kit_members_user_idTousers")
+  kit_map_changes                                             kit_map_changes[]
+  kit_maps                                                    kit_maps?
   kit_subscriptions                                           kit_subscriptions[]
   machine_pair_codes                                          machine_pair_codes[]
+  map_merges                                                  map_merges[]
   mcp_links                                                   mcp_links[]
   organization_invites                                        organization_invites[]
   organization_members_organization_members_invited_byTousers organization_members[]       @relation("organization_members_invited_byTousers")
@@ -951,6 +963,7 @@ model users {
   publish_log                                                 publish_log[]
   removal_decisions                                           removal_decisions[]
   sessions                                                    sessions[]
+  skill_backups                                               skill_backups[]
   skill_moderation_actions                                    skill_moderation_actions[]
   skill_reports                                               skill_reports[]
   skill_runtime_availability                                  skill_runtime_availability[]
@@ -1015,4 +1028,152 @@ model skill_summon_counts {
   @@id([skill_id, via_handle, day])
   @@index([day], map: "idx_skill_summon_counts_day")
   @@index([skill_id], map: "idx_skill_summon_counts_skill")
+}
+
+/// Save from a computer that isn't connected yet (kit map onboarding, KTD6).
+/// The CLI creates the row when the person presses Save and keeps the poll
+/// secret. The save tab on skillet.md trades the one-time proof for a binding,
+/// and the signed-in person approves with that binding, which mints a fresh
+/// connect code the CLI picks up by polling. Only hashes of the poll secret, the
+/// proof and the binding are stored. Rows are swept a day after creation.
+model map_sessions {
+  id                  String  @id
+  poll_secret_hash    String
+  proof_hash          String
+  proof_used_at       Int?
+  /// Null until the proof is traded, and again once an approve spends it.
+  binding_hash        String?
+  /// The computer's name, shown in the confirm.
+  label               String  @db.Text
+  created_at          Int     @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  /// 10 minutes after creation; ends the wait for an approve.
+  expires_at          Int
+  approved_by_user_id String?
+  approved_at         Int?
+  pair_code           String?
+  /// 5 minutes after approval; ends the wait for the code to be redeemed.
+  code_expires_at     Int?
+  code_delivered_at   Int?
+  claimed_at          Int?
+  /// The device row the code connected; the only one that reports the result.
+  device_id           String?
+  /// `applied`, `partial` or `failed`, as the CLI last reported.
+  result              String?
+  result_json         String? @db.LongText
+  result_at           Int?
+
+  @@index([created_at], map: "idx_map_sessions_created")
+}
+
+/// Per-address attempts on the two unauthenticated map-session routes (create
+/// and poll), counted like pair_claim_attempts and swept after an hour.
+model map_session_attempts {
+  id           String @id
+  kind         String
+  ip           String
+  attempted_at Int    @default(dbgenerated("(UNIX_TIMESTAMP())"))
+
+  @@index([kind, ip, attempted_at], map: "idx_map_session_attempts_kind_ip_time")
+  @@index([attempted_at], map: "idx_map_session_attempts_time")
+}
+
+/// Private backups of the person's own skills, keyed by content hash (KTD7).
+/// Never a `skills` row and never in the sync manifest, so sync never writes
+/// them back into a tool. A hash is no secret, so every read and delete is
+/// scoped to the owner. The bundle is kept the way skill versions keep theirs:
+/// content-addressed blobs joined through skill_backup_files.
+model skill_backups {
+  id                 String               @id
+  user_id            String
+  hash               String
+  name               String               @db.Text
+  description        String               @db.Text
+  /// JSON array of the tool ids that load the skill.
+  tools              String               @db.Text
+  size               Int
+  /// `scan`, `drop` or `merge`.
+  origin             String
+  /// JSON array of a merge's sources; null for every other origin.
+  sources            String?              @db.Text
+  created_at         Int                  @default(dbgenerated("(UNIX_TIMESTAMP())"))
+  users              users                @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  skill_backup_files skill_backup_files[]
+
+  @@unique([user_id, hash], map: "uniq_skill_backups_user_hash")
+  @@index([user_id, created_at], map: "idx_skill_backups_user_created")
+}
+
+model skill_backup_files {
+  backup_id     String
+  path          String
+  blob_hash     String
+  skill_backups skill_backups @relation(fields: [backup_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  blobs         blobs         @relation(fields: [blob_hash], references: [hash], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([backup_id, path])
+  @@index([blob_hash], map: "idx_skill_backup_files_blob")
+}
+
+/// The saved kit map: one validated `@skillet/protocol/kit-map` document per
+/// account (KTD9). Entries and job assignments only: never a path, a usage mark
+/// or its reason. A write sends the version it read.
+model kit_maps {
+  user_id       String @id
+  version       Int
+  document_json String @db.LongText
+  updated_at    Int
+  users         users  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// Changes waiting for a computer: remove, merge and replace, by content hash
+/// only (KTD9). Each targets one device, or none after a dropped-folder Save,
+/// when the first computer that connected after the change and whose scan holds
+/// its hashes claims it. `device_id` has no foreign key, so removing a device
+/// row never fails on its leftovers.
+model kit_map_changes {
+  id              String  @id
+  user_id         String
+  device_id       String?
+  kind            String
+  version         Int
+  /// The kind's own fields (`key`, `job` and `keys`, or `merged` and `keys`).
+  body_json       String  @db.LongText
+  created_at      Int
+  claimed_at      Int?
+  acknowledged_at Int?
+  outcome         String?
+  users           users   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, acknowledged_at], map: "idx_kit_map_changes_user_open")
+  @@index([device_id, acknowledged_at], map: "idx_kit_map_changes_device_open")
+}
+
+/// The merges a computer writes for the kit map (KTD12, KTD13): one per merge
+/// change, keyed by that change's id, with its job and originals copied from
+/// it. The computer the change targets writes the merge with the person's own
+/// AI tool and reports here: writing, ready (with the brief and one blind round
+/// per original), failed with its reason, or out of date. The pick and the
+/// replace move it on, and no report overwrites a picked or applied merge. The
+/// merged skill itself is a private backup (origin merge) holding the sources
+/// it credits (KTD14). `device_id` has no foreign key, like kit_map_changes.
+model map_merges {
+  id          String  @id
+  user_id     String
+  device_id   String?
+  job         String
+  /// JSON array of the originals' content hashes.
+  keys_json   String  @db.Text
+  /// `writing`, `ready`, `failed`, `picked`, `applied` or `out-of-date`.
+  status      String
+  reason      String?
+  merged_hash String?
+  brief       String? @db.Text
+  /// JSON array of the blind rounds, `{ key, merged, original }` each.
+  rounds_json String? @db.LongText
+  /// The merge change's own creation time, so merges list in the order they were drafted.
+  created_at  Int
+  updated_at  Int
+  users       users   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, created_at], map: "idx_map_merges_user_created")
 }

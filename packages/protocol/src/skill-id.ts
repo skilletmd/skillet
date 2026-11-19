@@ -215,6 +215,20 @@ export function toWireRef(input: string): string {
 }
 
 /**
+ * Whether `value` is already a wireRef in its canonical form (`@owner/slug`,
+ * exactly as {@link toWireRef} writes it). Never throws: anything else,
+ * including the other two forms and a non-string, is false.
+ */
+export function isWireRef(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  try {
+    return toWireRef(value) === value;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Encode an identity to its on-disk slugDir (`owner--slug`).
  *
  * The `@` is stripped (parseRef already dropped it), so the dir is always the

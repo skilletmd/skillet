@@ -28,11 +28,16 @@ function pagesUnder(dir: string): string[] {
   return out
 }
 
-/** Routes whose shell is KitPageLayout: the kit surfaces, however they are named. */
+/**
+ * Routes whose shell is KitPageLayout and that pass it an `action`: the kit
+ * surfaces, however they are named. A page that passes no action offers no Add
+ * (the arena's static side-by-side previews draw a kit with fake data), so it
+ * owes no delivery bar.
+ */
 function kitSurfaces(): { path: string; src: string }[] {
   return pagesUnder(APP)
     .map((path) => ({ path, src: readFileSync(path, 'utf8') }))
-    .filter((f) => f.src.includes('KitPageLayout'))
+    .filter((f) => f.src.includes('KitPageLayout') && /\baction=\{/.test(f.src))
 }
 
 describe('every kit surface answers Add the same way', () => {

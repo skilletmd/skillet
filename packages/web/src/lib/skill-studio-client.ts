@@ -101,12 +101,14 @@ export async function publishSkillFromBrowser(
 
   if (!res.ok) {
     let message = `Publish failed (${res.status})`
+    let code: string | undefined
     try {
       const err = (await res.json()) as {
         message?: string
         error?: string
         findings?: Array<{ category?: string; file?: string; lineStart?: number }>
       }
+      code = err.error
       if (err.error === 'handle_not_claimed') {
         message = NEEDS_HANDLE_MESSAGE
       } else if (err.error === 'scan_blocked') {
@@ -130,7 +132,8 @@ export async function publishSkillFromBrowser(
     } catch {
       /* keep default */
     }
-    throw new Error(message)
+    // The status and code ride along, so a caller can tell a taken slug (409) from a failure.
+    throw Object.assign(new Error(message), { status: res.status, ...(code ? { code } : {}) })
   }
 
   return (await res.json()) as PublishSkillResult

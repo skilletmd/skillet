@@ -13,7 +13,10 @@ import { browseHref } from '@/lib/urls'
 
 // Feed is no longer a top-nav item — the Skillet wordmark is the home/Feed entry
 // (logged-in `/` redirects to Feed) and the bell carries the attention count.
-const PRIMARY_LINKS = [{ href: browseHref(), label: 'Browse' }]
+const PRIMARY_LINKS = [
+  { href: browseHref(), label: 'Browse' },
+  { href: '/arena', label: 'Arena' },
+]
 
 export function SiteNav({ transparentAtTop = false }: { transparentAtTop?: boolean }) {
   const pathname = usePathname()

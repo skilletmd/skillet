@@ -9,6 +9,16 @@ describe('reserved handles', () => {
     }
   });
 
+  // /map (the kit map) and /packs (its preview) are top-level web routes, so no
+  // profile may take either path.
+  it('reserves the kit map routes', () => {
+    for (const h of ['map', 'packs', 'MAP', ' Packs ']) {
+      assert.equal(isReservedHandle(h), true, h);
+    }
+    assert.ok(RESERVED_HANDLES.has('map'));
+    assert.ok(RESERVED_HANDLES.has('packs'));
+  });
+
   it('is case-insensitive and trims', () => {
     assert.equal(isReservedHandle('ADMIN'), true);
     assert.equal(isReservedHandle('  Skillet  '), true);
